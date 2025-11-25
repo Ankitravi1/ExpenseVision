@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ExpenseVision API Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 {
+            color: #4f46e5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #4f46e5;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #4338ca;
+        }
+        .success {
+            background: #10b981;
+        }
+        .success:hover {
+            background: #059669;
+        }
+        pre {
+            background: #1f2937;
+            color: #10b981;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status.running {
+            background: #10b981;
+            color: white;
+        }
+        .status.error {
+            background: #ef4444;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <h1>🚀 ExpenseVision API Test Dashboard</h1>
+    
+    <div class="test-section">
+        <h2>Backend Status: <span id="status" class="status">Checking...</span></h2>
+        <p>Backend URL: <strong>http://localhost:5000</strong></p>
+        <button onclick="checkHealth()">Check Health</button>
+    </div>
+
+    <div class="test-section">
+        <h2>📊 Test API Endpoints</h2>
+        <button onclick="testInitialData()">Get Initial Data</button>
+        <button onclick="testAccounts()">Get Accounts</button>
+        <button onclick="testCategories()">Get Categories</button>
+        <button onclick="testTransactions()">Get Transactions</button>
+        <button onclick="testBudgets()">Get Budgets</button>
+        <button class="success" onclick="testCreateTransaction()">Create Test Transaction</button>
+    </div>
+
+    <div class="test-section">
+        <h2>📝 Response:</h2>
+        <pre id="response">Click a button above to test the API...</pre>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:5000/api';
+
+        async function makeRequest(endpoint, method = 'GET', body = null) {
+            const response = document.getElementById('response');
+            try {
+                const options = {
+                    method,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                };
+                
+                if (body) {
+                    options.body = JSON.stringify(body);
+                }
+
+                const res = await fetch(`${API_URL}${endpoint}`, options);
+                const data = await res.json();
+                
+                response.textContent = JSON.stringify(data, null, 2);
+                return data;
+            } catch (error) {
+                response.textContent = `Error: ${error.message}\n\nMake sure the backend server is running:\ncd backend\nnpm run dev`;
+                document.getElementById('status').textContent = 'Error';
+                document.getElementById('status').className = 'status error';
+            }
+        }
+
+        async function checkHealth() {
+            const data = await makeRequest('/health');
+            if (data && data.status === 'ok') {
+                document.getElementById('status').textContent = 'Running';
+                document.getElementById('status').className = 'status running';
+            }
+        }
+
+        async function testInitialData() {
+            await makeRequest('/initial-data');
+        }
+
+        async function testAccounts() {
+            await makeRequest('/accounts');
+        }
+
+        async function testCategories() {
+            await makeRequest('/categories');
+        }
+
+        async function testTransactions() {
+            await makeRequest('/transactions');
+        }
+
+        async function testBudgets() {
+            await makeRequest('/budgets');
+        }
+
+        async function testCreateTransaction() {
+            // Get accounts and categories first
+            const accounts = await fetch(`${API_URL}/accounts`).then(r => r.json());
+            const categories = await fetch(`${API_URL}/categories`).then(r => r.json());
+            
+            const expenseCategory = categories.find(c => c.type === 'expense');
+            const account = accounts[0];
+
+            const newTransaction = {
+                accountId: account.id,
+                categoryId: expenseCategory.id,
+                amount: 50.00,
+                type: 'expense',
+                date: new Date().toISOString().split('T')[0],
+                description: 'API Test Transaction'
+            };
+
+            await makeRequest('/transactions', 'POST', newTransaction);
+        }
+
+        // Check health on load
+        window.onload = () => {
+            setTimeout(checkHealth, 500);
+        };
+    </script>
+</body>
+</html>

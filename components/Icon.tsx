@@ -1,0 +1,141 @@
+
+import React from 'react';
+import {
+  LayoutDashboard,
+  Wallet,
+  ArrowLeftRight,
+  PieChart,
+  Target,
+  Tags,
+  Settings,
+  LogOut,
+  ChevronUp,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  MoreHorizontal,
+  Plus,
+  X,
+  ShoppingCart,
+  Utensils,
+  Bus,
+  Lightbulb,
+  Home,
+  Ticket,
+  ShoppingBag,
+  HeartPulse,
+  Landmark,
+  Briefcase,
+  TrendingUp,
+  Bell,
+  Search,
+  ArrowUp,
+  ArrowDown,
+  Download,
+  User,
+  Sun,
+  Moon,
+  CircleDollarSign,
+  PiggyBank,
+  CreditCard,
+  TrendingDown,
+  Banknote,
+  Smartphone,
+  Wifi,
+  Coffee,
+  Car,
+  Plane,
+  Gift,
+  Music,
+  Video,
+  Book,
+  GraduationCap,
+  Smile,
+  Frown,
+  Meh,
+  Gamepad2,
+  Dumbbell,
+  Trash2,
+  Pencil,
+  AlertTriangle
+} from 'lucide-react';
+
+export type IconName = string;
+
+interface IconProps {
+  name: IconName;
+  className?: string;
+  size?: number;
+}
+
+const iconComponents: { [key: string]: React.ComponentType<any> } = {
+  LayoutDashboard,
+  Wallet,
+  ArrowLeftRight,
+  PieChart,
+  Target,
+  Tags,
+  Settings,
+  LogOut,
+  ChevronUp,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  MoreHorizontal,
+  Plus,
+  X,
+  ShoppingCart,
+  Utensils,
+  Bus,
+  Lightbulb,
+  Home,
+  Ticket,
+  ShoppingBag,
+  HeartPulse,
+  Landmark,
+  Briefcase,
+  TrendingUp,
+  Bell,
+  Search,
+  ArrowUp,
+  ArrowDown,
+  Download,
+  User,
+  Sun,
+  Moon,
+  CircleDollarSign,
+  PiggyBank,
+  CreditCard,
+  TrendingDown,
+  Banknote,
+  Smartphone,
+  Wifi,
+  Coffee,
+  Car,
+  Plane,
+  Gift,
+  Music,
+  Video,
+  Book,
+  GraduationCap,
+  Smile,
+  Frown,
+  Meh,
+  Gamepad2,
+  Dumbbell,
+  Trash2,
+  Pencil,
+  AlertTriangle
+};
+
+export const iconList = Object.keys(iconComponents);
+
+export const Icon: React.FC<IconProps> = ({ name, className, size = 20 }) => {
+  const LucideIcon = iconComponents[name] || iconComponents['Tags'];
+
+  if (!LucideIcon) {
+    return null;
+  }
+
+  return <LucideIcon className={className} size={size} />;
+};
