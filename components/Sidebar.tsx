@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Page } from '../types';
 import { Icon, IconName } from './Icon';
+import { authService, User } from '../services/auth';
 
 interface SidebarProps {
   activePage: Page;
@@ -9,6 +10,7 @@ interface SidebarProps {
   setCollapsed: (isCollapsed: boolean) => void;
   theme: 'light' | 'dark';
   setTheme: (theme: 'light' | 'dark') => void;
+  onLogout?: () => void;
 }
 
 interface NavItemProps {
@@ -39,9 +41,15 @@ const NavItem: React.FC<NavItemProps> = ({ icon, label, isActive, onClick, isCol
   </li>
 );
 
-export const Sidebar: React.FC<SidebarProps> = ({ activePage, setActivePage, isCollapsed, setCollapsed, theme, setTheme }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ activePage, setActivePage, isCollapsed, setCollapsed, theme, setTheme, onLogout }) => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const currentUser = authService.getUser();
+    setUser(currentUser);
+  }, []);
 
   const navItems: { icon: IconName; label: Page }[] = [
     { icon: 'LayoutDashboard', label: 'Dashboard' },
@@ -131,20 +139,30 @@ export const Sidebar: React.FC<SidebarProps> = ({ activePage, setActivePage, isC
                 >
                   <Icon name="Settings" className="mr-3" size={16} /> Settings
                 </li>
-                <li className="px-4 py-2.5 hover:bg-gray-700/50 flex items-center cursor-pointer text-red-400 transition-colors"><Icon name="LogOut" className="mr-3" size={16} /> Log out</li>
+                <li
+                  className="px-4 py-2.5 hover:bg-gray-700/50 flex items-center cursor-pointer text-red-400 transition-colors"
+                  onClick={() => {
+                    if (onLogout) {
+                      onLogout();
+                    }
+                    setIsUserMenuOpen(false);
+                  }}
+                >
+                  <Icon name="LogOut" className="mr-3" size={16} /> Log out
+                </li>
               </ul>
             </div>
           )}
           <button onClick={() => setIsUserMenuOpen(o => !o)} className={`flex items-center w-full p-3 rounded-xl hover:bg-white/10 transition-colors ${isCollapsed ? 'justify-center' : ''}`}>
             <img
-              src="https://i.pravatar.cc/150?u=jane_doe"
+              src={user?.profilePicture || "https://i.pravatar.cc/150?u=jane_doe"}
               alt="User Avatar"
               className="h-9 w-9 rounded-full ring-2 ring-white/20"
             />
             {!isCollapsed &&
               <div className="ml-3 text-left overflow-hidden">
-                <p className="font-semibold text-white text-sm truncate">Jane Doe</p>
-                <p className="text-xs text-gray-400 truncate">jane.doe@email.com</p>
+                <p className="font-semibold text-white text-sm truncate">{user?.name || 'User'}</p>
+                <p className="text-xs text-gray-400 truncate">{user?.email || 'user@example.com'}</p>
               </div>
             }
           </button>

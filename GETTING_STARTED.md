@@ -42,13 +42,14 @@ You should see:
 
 ### Step 2: Test the Backend API
 
-Open the API test dashboard in your browser:
-```bash
-# Open this file in your browser:
-api-test.html
+**Option 1: Using Browser**
+Open the API test dashboard in your browser by navigating to:
 ```
+file:///C:/Users/Administrator/Documents/0Project/expensevision/api-test.html
+```
+Or simply double-click the `api-test.html` file in the project root directory.
 
-Or test with curl:
+**Option 2: Using curl (Recommended for quick tests)**
 ```bash
 # Health check
 curl http://localhost:5000/api/health
@@ -59,6 +60,8 @@ curl http://localhost:5000/api/initial-data
 # Get accounts
 curl http://localhost:5000/api/accounts
 ```
+
+**Note**: The api-test.html file is located in the project root directory (`expensevision/api-test.html`). If you cannot open it, ensure your backend is running on port 5000 first.
 
 ### Step 3: Start the Frontend
 

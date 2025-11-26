@@ -1,12 +1,53 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card } from '../components/Card';
 import { Icon } from '../components/Icon';
+import { Modal } from '../components/Modal';
+import { authService } from '../services/auth';
 
 export const Settings: React.FC = () => {
     const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system');
     const [notifications, setNotifications] = useState(true);
     const [budgetAlerts, setBudgetAlerts] = useState(true);
     const [emailReports, setEmailReports] = useState(false);
+
+    // 2FA State
+    const [is2FAEnabled, setIs2FAEnabled] = useState(false);
+    const [show2FAModal, setShow2FAModal] = useState(false);
+    const [qrCode, setQrCode] = useState('');
+    const [verificationCode, setVerificationCode] = useState('');
+    const [error, setError] = useState('');
+    const [successMessage, setSuccessMessage] = useState('');
+
+    useEffect(() => {
+        // Check if 2FA is enabled (this should ideally come from user profile)
+        // For now, we'll assume false or check local storage if we stored it
+        const user = authService.getUser();
+        // We need to update the user type to include twoFactorEnabled
+    }, []);
+
+    const handleSetup2FA = async () => {
+        try {
+            setError('');
+            const data = await authService.setup2FA();
+            setQrCode(data.qrCode);
+            setShow2FAModal(true);
+        } catch (err) {
+            setError('Failed to setup 2FA');
+        }
+    };
+
+    const handleVerify2FA = async () => {
+        try {
+            setError('');
+            await authService.verify2FA(verificationCode);
+            setIs2FAEnabled(true);
+            setShow2FAModal(false);
+            setSuccessMessage('Two-Factor Authentication enabled successfully');
+            setTimeout(() => setSuccessMessage(''), 3000);
+        } catch (err) {
+            setError('Invalid code. Please try again.');
+        }
+    };
 
     const handleThemeChange = (newTheme: 'light' | 'dark' | 'system') => {
         setTheme(newTheme);
@@ -41,8 +82,8 @@ export const Settings: React.FC = () => {
                             <button
                                 onClick={() => handleThemeChange('light')}
                                 className={`p-4 rounded-lg border-2 transition-all ${theme === 'light'
-                                        ? 'border-primary bg-primary-light dark:bg-primary/20'
-                                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                                    ? 'border-primary bg-primary-light dark:bg-primary/20'
+                                    : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
                                     }`}
                             >
                                 <Icon name="Sun" size={24} className="mx-auto mb-2" />
@@ -51,8 +92,8 @@ export const Settings: React.FC = () => {
                             <button
                                 onClick={() => handleThemeChange('dark')}
                                 className={`p-4 rounded-lg border-2 transition-all ${theme === 'dark'
-                                        ? 'border-primary bg-primary-light dark:bg-primary/20'
-                                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                                    ? 'border-primary bg-primary-light dark:bg-primary/20'
+                                    : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
                                     }`}
                             >
                                 <Icon name="Moon" size={24} className="mx-auto mb-2" />
@@ -61,8 +102,8 @@ export const Settings: React.FC = () => {
                             <button
                                 onClick={() => handleThemeChange('system')}
                                 className={`p-4 rounded-lg border-2 transition-all ${theme === 'system'
-                                        ? 'border-primary bg-primary-light dark:bg-primary/20'
-                                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                                    ? 'border-primary bg-primary-light dark:bg-primary/20'
+                                    : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
                                     }`}
                             >
                                 <Icon name="Monitor" size={24} className="mx-auto mb-2" />

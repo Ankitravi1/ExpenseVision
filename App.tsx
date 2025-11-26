@@ -9,9 +9,16 @@ import { Categories } from './pages/Categories';
 import { TransactionsPage } from './pages/TransactionsPage';
 import { Profile } from './pages/Profile';
 import { Settings } from './pages/Settings';
+import { LandingPage } from './pages/LandingPage';
+import { Login } from './pages/Login';
+import { Signup } from './pages/Signup';
+import { VerifyEmail } from './pages/VerifyEmail';
+import { ForgotPassword } from './pages/ForgotPassword';
+import { ResetPassword } from './pages/ResetPassword';
 import { mockAccounts, mockCategories, mockTransactions, mockBudgets } from './data/mockData';
 import { Account, Budget, Category, Transaction, Page, TransactionType } from './types';
 import { NewTransactionModal } from './components/NewTransactionModal';
+import { authService } from './services/auth';
 
 export const AppContext = React.createContext<{
   accounts: Account[];
@@ -29,14 +36,20 @@ export const AppContext = React.createContext<{
   deleteCategory: (id: string) => void;
   setBudget: (budget: Budget) => void;
   deleteBudget: (id: string) => void;
+  clearAllTransactions: () => void;
   setActivePage: (page: Page) => void;
 } | null>(null);
 
 const App: React.FC = () => {
+  const [isAuthenticated, setIsAuthenticated] = useState(authService.isAuthenticated());
+  const [authView, setAuthView] = useState<'landing' | 'login' | 'signup' | 'verify-email' | 'forgot-password' | 'reset-password'>('landing');
   const [activePage, setActivePage] = useState<Page>('Dashboard');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    const savedTheme = localStorage.getItem('theme');
+    return (savedTheme as 'light' | 'dark') || 'light';
+  });
 
   const [transactions, setTransactions] = useState<Transaction[]>(mockTransactions);
   const [accounts, setAccounts] = useState<Account[]>(mockAccounts);
@@ -44,12 +57,22 @@ const App: React.FC = () => {
   const [budgets, setBudgets] = useState<Budget[]>(mockBudgets);
 
   useEffect(() => {
+    localStorage.setItem('theme', theme);
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
     }
   }, [theme]);
+
+  useEffect(() => {
+    // Check URL for verification token or reset token
+    if (window.location.pathname === '/verify-email') {
+      setAuthView('verify-email');
+    } else if (window.location.pathname === '/reset-password') {
+      setAuthView('reset-password');
+    }
+  }, []);
 
   const addTransaction = useCallback((transaction: Omit<Transaction, 'id'>) => {
     const newTransaction: Transaction = {
@@ -201,6 +224,12 @@ const App: React.FC = () => {
     });
   }, []);
 
+  const clearAllTransactions = useCallback(() => {
+    setTransactions([]);
+    // Reset all budget spent amounts to 0
+    setBudgets(prev => prev.map(b => ({ ...b, spent: 0 })));
+  }, []);
+
   const addAccount = useCallback((account: Omit<Account, 'id'>) => {
     const newAccount = { ...account, id: `acc${Date.now()}` };
     setAccounts(prev => [...prev, newAccount]);
@@ -297,10 +326,69 @@ const App: React.FC = () => {
     deleteCategory,
     setBudget,
     deleteBudget,
-    setActivePage
-  }), [accounts, categories, transactions, budgets, addTransaction, updateTransaction, deleteTransaction,
-    addAccount, updateAccount, deleteAccount, addCategory, updateCategory, deleteCategory,
-    setBudget, deleteBudget]);
+    clearAllTransactions,
+    setActivePage,
+  }), [accounts, categories, transactions, budgets, addTransaction, updateTransaction, deleteTransaction, clearAllTransactions, addAccount, updateAccount, deleteAccount, addCategory, updateCategory, deleteCategory, setBudget, deleteBudget]);
+
+  // Auth handlers
+  const handleLoginSuccess = () => {
+    setIsAuthenticated(true);
+    setAuthView('landing');
+  };
+
+  const handleSignupSuccess = () => {
+    setIsAuthenticated(true);
+    setAuthView('landing');
+  };
+
+  const handleLogout = () => {
+    authService.logout();
+    setIsAuthenticated(false);
+    setAuthView('landing');
+  };
+
+  // Show auth views if not authenticated
+  if (!isAuthenticated) {
+    if (authView === 'login') {
+      return (
+        <Login
+          onSuccess={handleLoginSuccess}
+          onBackToLanding={() => setAuthView('landing')}
+          onSwitchToSignup={() => setAuthView('signup')}
+          onForgotPassword={() => setAuthView('forgot-password')}
+        />
+      );
+    }
+
+    if (authView === 'signup') {
+      return (
+        <Signup
+          onSuccess={handleSignupSuccess}
+          onBackToLanding={() => setAuthView('landing')}
+          onSwitchToLogin={() => setAuthView('login')}
+        />
+      );
+    }
+
+    if (authView === 'verify-email') {
+      return <VerifyEmail />;
+    }
+
+    if (authView === 'forgot-password') {
+      return <ForgotPassword onBackToLogin={() => setAuthView('login')} />;
+    }
+
+    if (authView === 'reset-password') {
+      return <ResetPassword onSuccess={() => setAuthView('login')} />;
+    }
+
+    return (
+      <LandingPage
+        onLoginClick={() => setAuthView('login')}
+        onSignupClick={() => setAuthView('signup')}
+      />
+    );
+  }
 
   return (
     <AppContext.Provider value={appContextValue}>
@@ -313,6 +401,7 @@ const App: React.FC = () => {
             setCollapsed={setIsSidebarCollapsed}
             theme={theme}
             setTheme={setTheme}
+            onLogout={handleLogout}
           />
           <main className={`flex-1 min-w-0 relative z-0 transition-all duration-300 ${isSidebarCollapsed ? 'ml-20' : 'ml-64'}`}>
             <div className="min-h-screen flex flex-col">

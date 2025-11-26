@@ -1,0 +1,119 @@
+import React, { useState } from 'react';
+import { Icon } from './Icon';
+import { authService } from '../services/auth';
+
+interface ProfileCompletionProps {
+    initialName?: string;
+    onComplete: () => void;
+}
+
+export const ProfileCompletion: React.FC<ProfileCompletionProps> = ({ initialName = '', onComplete }) => {
+    const [name, setName] = useState(initialName);
+    const [country, setCountry] = useState('');
+    const [currency, setCurrency] = useState('INR');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError('');
+        setLoading(true);
+
+        try {
+            await authService.updateProfile({
+                name,
+                country: country || undefined,
+                currency,
+            });
+            onComplete();
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to update profile');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="w-full">
+            <div className="text-center mb-8">
+                <div className="flex items-center justify-center gap-2 mb-4">
+                    <Icon name="UserCheck" size={40} className="text-primary" />
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Complete Your Profile</h2>
+                <p className="text-gray-600 dark:text-gray-400">
+                    Please provide a few more details to get started.
+                </p>
+            </div>
+
+            {error && (
+                <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-start gap-3">
+                    <Icon name="AlertTriangle" size={20} className="text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                    <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+                </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-6">
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Full Name
+                    </label>
+                    <input
+                        type="text"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        required
+                        className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                        placeholder="John Doe"
+                    />
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Country (Optional)
+                    </label>
+                    <input
+                        type="text"
+                        value={country}
+                        onChange={(e) => setCountry(e.target.value)}
+                        className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                        placeholder="India"
+                    />
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Currency
+                    </label>
+                    <select
+                        value={currency}
+                        onChange={(e) => setCurrency(e.target.value)}
+                        className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                    >
+                        <option value="INR">₹ INR - Indian Rupee</option>
+                        <option value="USD">$ USD - US Dollar</option>
+                        <option value="EUR">€ EUR - Euro</option>
+                        <option value="GBP">£ GBP - British Pound</option>
+                        <option value="JPY">¥ JPY - Japanese Yen</option>
+                        <option value="AUD">$ AUD - Australian Dollar</option>
+                        <option value="CAD">$ CAD - Canadian Dollar</option>
+                    </select>
+                </div>
+
+                <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full btn btn-primary py-3 text-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    {loading ? (
+                        <span className="flex items-center justify-center gap-2">
+                            <Icon name="Loader" size={20} className="animate-spin" />
+                            Saving...
+                        </span>
+                    ) : (
+                        'Complete Setup'
+                    )}
+                </button>
+            </form>
+        </div>
+    );
+};

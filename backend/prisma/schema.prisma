@@ -11,16 +11,45 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String   @id @default(uuid())
+  email           String   @unique
+  password        String?  // Null for Google OAuth users
+  name            String
+  country         String?
+  currency        String   @default("INR")
+  googleId        String?  @unique
+  profilePicture  String?
+  
+  // Auth fields
+  emailVerified       Boolean   @default(false)
+  verificationToken   String?
+  resetPasswordToken  String?
+  resetPasswordExpires DateTime?
+  
+  // 2FA fields
+  twoFactorEnabled    Boolean   @default(false)
+  twoFactorSecret     String?
 
-  accounts     Account[]
-  categories   Category[]
-  transactions Transaction[]
-  budgets      Budget[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  accounts        Account[]
+  categories      Category[]
+  transactions    Transaction[]
+  budgets         Budget[]
+  refreshTokens   RefreshToken[]
+}
+
+model RefreshToken {
+  id          String   @id @default(uuid())
+  token       String   @unique
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt   DateTime
+  revoked     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  replacedByToken String?
 }
 
 model Account {

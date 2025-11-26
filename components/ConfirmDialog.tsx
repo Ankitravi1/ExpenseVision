@@ -43,8 +43,8 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div 
-        className="modal-content w-full max-w-md p-6 animate-scale-in"
+      <div
+        className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md p-6 animate-scale-in mx-4"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4">
@@ -55,7 +55,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             {message}
           </p>
         </div>
-        
+
         <div className="flex gap-3 justify-end">
           <button
             onClick={onClose}

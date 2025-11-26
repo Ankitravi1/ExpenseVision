@@ -1,24 +1,35 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import { Card } from '../components/Card';
 import { Icon } from '../components/Icon';
 import { AppContext } from '../App';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { authService, User } from '../services/auth';
 
 export const Profile: React.FC = () => {
     const context = useContext(AppContext);
     const [clearConfirm, setClearConfirm] = useState(false);
     const [currency, setCurrency] = useState('INR');
+    const [user, setUser] = useState<User | null>(null);
+
+    useEffect(() => {
+        const currentUser = authService.getUser();
+        setUser(currentUser);
+        if (currentUser?.currency) {
+            setCurrency(currentUser.currency);
+        }
+    }, []);
 
     if (!context) return null;
 
-    const { transactions } = context;
+    const { transactions, clearAllTransactions, setActivePage } = context;
 
     const handleClearAllTransactions = () => {
-        // This will be implemented when we connect to backend
-        transactions.forEach(t => {
-            // context.deleteTransaction(t.id);
-        });
-        alert('All transactions cleared! (This will be fully implemented with backend integration)');
+        clearAllTransactions();
+        setClearConfirm(false);
+    };
+
+    const handleExportData = () => {
+        setActivePage('Transactions');
     };
 
     return (
@@ -36,7 +47,7 @@ export const Profile: React.FC = () => {
                             </label>
                             <input
                                 type="text"
-                                defaultValue="Personal User"
+                                defaultValue={user?.name || ''}
                                 className="input w-full"
                                 placeholder="Your name"
                             />
@@ -47,9 +58,9 @@ export const Profile: React.FC = () => {
                             </label>
                             <input
                                 type="email"
-                                defaultValue="user@expensevision.local"
-                                className="input w-full"
-                                placeholder="your.email@example.com"
+                                value={user?.email || ''}
+                                readOnly
+                                className="input w-full bg-gray-50 dark:bg-gray-700 cursor-not-allowed"
                             />
                         </div>
                         <button className="btn btn-primary">
@@ -120,7 +131,7 @@ export const Profile: React.FC = () => {
                                     Download all your financial data as a CSV file for backup or analysis
                                 </p>
                             </div>
-                            <button className="btn btn-secondary ml-4">
+                            <button onClick={handleExportData} className="btn btn-secondary ml-4">
                                 <Icon name="Download" size={16} className="mr-2" />
                                 Export CSV
                             </button>
