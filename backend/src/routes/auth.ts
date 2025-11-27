@@ -18,8 +18,6 @@ const signupSchema = z.object({
     email: z.string().email(),
     password: z.string().min(6),
     name: z.string().min(1),
-    country: z.string().optional(),
-    currency: z.string().default('INR'),
 });
 
 const loginSchema = z.object({
@@ -60,15 +58,15 @@ router.post('/signup', async (req, res) => {
         // Generate verification token
         const verificationToken = crypto.randomBytes(32).toString('hex');
 
-        // Create user
+        // Create user with Stage 1 data only
         const user = await prisma.user.create({
             data: {
                 email: data.email,
                 password: hashedPassword,
                 name: data.name,
-                country: data.country,
-                currency: data.currency,
                 verificationToken,
+                onboardingStage: 1,
+                profileComplete: false,
             },
             select: {
                 id: true,
@@ -77,6 +75,8 @@ router.post('/signup', async (req, res) => {
                 country: true,
                 currency: true,
                 profilePicture: true,
+                onboardingStage: true,
+                profileComplete: true,
                 createdAt: true,
             },
         });
@@ -94,7 +94,12 @@ router.post('/signup', async (req, res) => {
             },
         });
 
-        res.status(201).json({ user, token, refreshToken: refreshToken.token });
+        res.status(201).json({
+            user,
+            token,
+            refreshToken: refreshToken.token,
+            needsProfileCompletion: !user.profileComplete,
+        });
 
         // Send verification email (async, don't wait)
         sendVerificationEmail(user.email, verificationToken).catch(console.error);
@@ -157,9 +162,12 @@ router.post('/login', async (req, res) => {
                 country: user.country,
                 currency: user.currency,
                 profilePicture: user.profilePicture,
+                profileComplete: user.profileComplete,
+                emailVerified: user.emailVerified,
             },
             token,
             refreshToken: refreshToken.token,
+            needsProfileCompletion: !user.profileComplete,
         });
     } catch (error) {
         if (error instanceof z.ZodError) {
@@ -186,7 +194,7 @@ router.post('/google', async (req, res) => {
             return res.status(401).json({ error: 'Invalid Google token' });
         }
 
-        const { sub: googleId, email, name, picture } = payload;
+        const { sub: googleId, email, name, picture, email_verified } = payload;
 
         if (!email) {
             return res.status(400).json({ error: 'Email not provided by Google' });
@@ -202,14 +210,17 @@ router.post('/google', async (req, res) => {
         let isNewUser = false;
 
         if (!user) {
-            // Create new user
+            // Create new user immediately with Stage 1 data
             user = await prisma.user.create({
                 data: {
                     email,
                     name: name || 'User',
                     googleId,
                     profilePicture: picture,
+                    emailVerified: email_verified || false,  // Store email verification status from Google
                     password: null, // No password for Google users
+                    onboardingStage: 1,
+                    profileComplete: false,
                 },
             });
             isNewUser = true;
@@ -220,12 +231,23 @@ router.post('/google', async (req, res) => {
                 data: {
                     googleId,
                     profilePicture: picture || user.profilePicture,
+                    emailVerified: email_verified || user.emailVerified,  // Update email verification if verified by Google
                 },
             });
         }
 
         // Generate token
         const token = generateToken(user.id);
+        const refreshToken = generateRefreshToken();
+
+        // Save refresh token
+        await prisma.refreshToken.create({
+            data: {
+                token: refreshToken.token,
+                userId: user.id,
+                expiresAt: refreshToken.expiresAt,
+            },
+        });
 
         res.json({
             user: {
@@ -235,12 +257,70 @@ router.post('/google', async (req, res) => {
                 country: user.country,
                 currency: user.currency,
                 profilePicture: user.profilePicture,
+                profileComplete: user.profileComplete,
+                emailVerified: user.emailVerified,
             },
             token,
+            refreshToken: refreshToken.token,
             isNewUser,
+            needsProfileCompletion: !user.profileComplete,
         });
     } catch (error) {
         console.error('Google auth error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// PUT /api/auth/complete-profile
+router.put('/complete-profile', async (req, res) => {
+    try {
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(401).json({ error: 'No token provided' });
+        }
+
+        const token = authHeader.substring(7);
+        const { verifyToken } = await import('../utils/auth');
+        const decoded = verifyToken(token);
+
+        if (!decoded) {
+            return res.status(401).json({ error: 'Invalid token' });
+        }
+
+        const { country, currency } = req.body;
+
+        if (!currency) {
+            return res.status(400).json({ error: 'Currency is required' });
+        }
+
+        if (!country) {
+            return res.status(400).json({ error: 'Country is required' });
+        }
+
+        // Update user profile
+        const user = await prisma.user.update({
+            where: { id: decoded.userId },
+            data: {
+                country,
+                currency,
+                profileComplete: true,
+                onboardingStage: 2,
+            },
+            select: {
+                id: true,
+                email: true,
+                name: true,
+                country: true,
+                currency: true,
+                profilePicture: true,
+                onboardingStage: true,
+                profileComplete: true,
+            },
+        });
+
+        res.json({ user });
+    } catch (error) {
+        console.error('Profile completion error:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });

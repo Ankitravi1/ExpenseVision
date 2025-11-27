@@ -11,18 +11,15 @@ interface SignupProps {
 }
 
 export const Signup: React.FC<SignupProps> = ({ onSuccess, onBackToLanding, onSwitchToLogin }) => {
-    const [step, setStep] = useState<1 | 2>(1);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [name, setName] = useState('');
-    const [country, setCountry] = useState('');
-    const [currency, setCurrency] = useState('INR');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [showProfileCompletion, setShowProfileCompletion] = useState(false);
 
-    const handleStep1Submit = (e: React.FormEvent) => {
+    const handleSignup = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
 
@@ -36,23 +33,20 @@ export const Signup: React.FC<SignupProps> = ({ onSuccess, onBackToLanding, onSw
             return;
         }
 
-        setStep(2);
-    };
-
-    const handleStep2Submit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setError('');
         setLoading(true);
 
         try {
-            await authService.signup({
+            const res = await authService.signup({
                 email,
                 password,
                 name,
-                country: country || undefined,
-                currency,
             });
-            onSuccess();
+
+            if (res.needsProfileCompletion) {
+                setShowProfileCompletion(true);
+            } else {
+                onSuccess();
+            }
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Signup failed');
         } finally {
@@ -65,11 +59,11 @@ export const Signup: React.FC<SignupProps> = ({ onSuccess, onBackToLanding, onSw
             <div className="w-full max-w-md">
                 {/* Back Button */}
                 <button
-                    onClick={step === 1 ? onBackToLanding : () => setStep(1)}
+                    onClick={onBackToLanding}
                     className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white mb-8 transition-colors"
                 >
                     <Icon name="ChevronLeft" size={20} />
-                    {step === 1 ? 'Back to Home' : 'Back'}
+                    Back to Home
                 </button>
 
                 {/* Signup Card */}
@@ -86,14 +80,8 @@ export const Signup: React.FC<SignupProps> = ({ onSuccess, onBackToLanding, onSw
                                 </div>
                                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Create Account</h2>
                                 <p className="text-gray-600 dark:text-gray-400">
-                                    {step === 1 ? 'Step 1 of 2: Account Details' : 'Step 2 of 2: Personal Information'}
+                                    Sign up to get started
                                 </p>
-                            </div>
-
-                            {/* Progress Indicator */}
-                            <div className="flex gap-2 mb-8">
-                                <div className={`flex-1 h-2 rounded-full ${step >= 1 ? 'bg-primary' : 'bg-gray-200 dark:bg-gray-700'}`}></div>
-                                <div className={`flex-1 h-2 rounded-full ${step >= 2 ? 'bg-primary' : 'bg-gray-200 dark:bg-gray-700'}`}></div>
                             </div>
 
                             {/* Error Message */}
@@ -104,166 +92,117 @@ export const Signup: React.FC<SignupProps> = ({ onSuccess, onBackToLanding, onSw
                                 </div>
                             )}
 
-                            {/* Step 1: Email & Password */}
-                            {step === 1 && (
-                                <>
-                                    {/* Google Login */}
-                                    <div className="mb-6 flex justify-center">
-                                        <GoogleLogin
-                                            onSuccess={async (credentialResponse) => {
-                                                if (credentialResponse.credential) {
-                                                    try {
-                                                        const res = await authService.googleAuth(credentialResponse.credential);
-                                                        if (res.isNewUser) {
-                                                            setShowProfileCompletion(true);
-                                                        } else {
-                                                            onSuccess();
-                                                        }
-                                                    } catch (err) {
-                                                        setError('Google signup failed');
-                                                    }
+                            {/* Google Signup */}
+                            <div className="mb-6 flex justify-center">
+                                <GoogleLogin
+                                    onSuccess={async (credentialResponse) => {
+                                        if (credentialResponse.credential) {
+                                            try {
+                                                const res = await authService.googleAuth(credentialResponse.credential);
+                                                if (res.needsProfileCompletion) {
+                                                    setShowProfileCompletion(true);
+                                                } else {
+                                                    onSuccess();
                                                 }
-                                            }}
-                                            onError={() => {
+                                            } catch (err) {
                                                 setError('Google signup failed');
-                                            }}
-                                            text="signup_with"
-                                            theme="filled_blue"
-                                            shape="pill"
-                                            size="large"
-                                            width="100%"
-                                        />
-                                    </div>
+                                            }
+                                        }
+                                    }}
+                                    onError={() => {
+                                        setError('Google signup failed');
+                                    }}
+                                    theme="filled_blue"
+                                    shape="pill"
+                                    size="large"
+                                    width="100%"
+                                    text="signup_with"
+                                />
+                            </div>
 
-                                    <div className="relative mb-6">
-                                        <div className="absolute inset-0 flex items-center">
-                                            <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
-                                        </div>
-                                        <div className="relative flex justify-center text-sm">
-                                            <span className="px-2 bg-white dark:bg-gray-800 text-gray-500">Or sign up with email</span>
-                                        </div>
-                                    </div>
+                            <div className="relative mb-6">
+                                <div className="absolute inset-0 flex items-center">
+                                    <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
+                                </div>
+                                <div className="relative flex justify-center text-sm">
+                                    <span className="px-2 bg-white dark:bg-gray-800 text-gray-500">Or sign up with email</span>
+                                </div>
+                            </div>
 
-                                    <form onSubmit={handleStep1Submit} className="space-y-6">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                                Email Address
-                                            </label>
-                                            <input
-                                                type="email"
-                                                value={email}
-                                                onChange={(e) => setEmail(e.target.value)}
-                                                required
-                                                className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                                                placeholder="you@example.com"
-                                            />
-                                        </div>
+                            <form onSubmit={handleSignup} className="space-y-6">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Full Name
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={name}
+                                        onChange={(e) => setName(e.target.value)}
+                                        required
+                                        className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                                        placeholder="John Doe"
+                                    />
+                                </div>
 
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                                Password
-                                            </label>
-                                            <input
-                                                type="password"
-                                                value={password}
-                                                onChange={(e) => setPassword(e.target.value)}
-                                                required
-                                                minLength={6}
-                                                className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                                                placeholder="At least 6 characters"
-                                            />
-                                        </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Email Address
+                                    </label>
+                                    <input
+                                        type="email"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        required
+                                        className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                                        placeholder="you@example.com"
+                                    />
+                                </div>
 
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                                Confirm Password
-                                            </label>
-                                            <input
-                                                type="password"
-                                                value={confirmPassword}
-                                                onChange={(e) => setConfirmPassword(e.target.value)}
-                                                required
-                                                minLength={6}
-                                                className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                                                placeholder="Re-enter password"
-                                            />
-                                        </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Password
+                                    </label>
+                                    <input
+                                        type="password"
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        required
+                                        minLength={6}
+                                        className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                                        placeholder="At least 6 characters"
+                                    />
+                                </div>
 
-                                        <button
-                                            type="submit"
-                                            className="w-full btn btn-primary py-3 text-lg font-semibold"
-                                        >
-                                            Continue
-                                        </button>
-                                    </form>
-                                </>
-                            )}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Confirm Password
+                                    </label>
+                                    <input
+                                        type="password"
+                                        value={confirmPassword}
+                                        onChange={(e) => setConfirmPassword(e.target.value)}
+                                        required
+                                        minLength={6}
+                                        className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                                        placeholder="Re-enter password"
+                                    />
+                                </div>
 
-                            {/* Step 2: Personal Information */}
-                            {step === 2 && (
-                                <form onSubmit={handleStep2Submit} className="space-y-6">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                            Full Name
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={name}
-                                            onChange={(e) => setName(e.target.value)}
-                                            required
-                                            className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                                            placeholder="John Doe"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                            Country (Optional)
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={country}
-                                            onChange={(e) => setCountry(e.target.value)}
-                                            className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                                            placeholder="India"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                            Currency
-                                        </label>
-                                        <select
-                                            value={currency}
-                                            onChange={(e) => setCurrency(e.target.value)}
-                                            className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                                        >
-                                            <option value="INR">₹ INR - Indian Rupee</option>
-                                            <option value="USD">$ USD - US Dollar</option>
-                                            <option value="EUR">€ EUR - Euro</option>
-                                            <option value="GBP">£ GBP - British Pound</option>
-                                            <option value="JPY">¥ JPY - Japanese Yen</option>
-                                            <option value="AUD">$ AUD - Australian Dollar</option>
-                                            <option value="CAD">$ CAD - Canadian Dollar</option>
-                                        </select>
-                                    </div>
-
-                                    <button
-                                        type="submit"
-                                        disabled={loading}
-                                        className="w-full btn btn-primary py-3 text-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        {loading ? (
-                                            <span className="flex items-center justify-center gap-2">
-                                                <Icon name="Loader" size={20} className="animate-spin" />
-                                                Creating account...
-                                            </span>
-                                        ) : (
-                                            'Create Account'
-                                        )}
-                                    </button>
-                                </form>
-                            )}
+                                <button
+                                    type="submit"
+                                    disabled={loading}
+                                    className="w-full btn btn-primary py-3 text-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {loading ? (
+                                        <span className="flex items-center justify-center gap-2">
+                                            <Icon name="Loader" size={20} className="animate-spin" />
+                                            Creating Account...
+                                        </span>
+                                    ) : (
+                                        'Create Account'
+                                    )}
+                                </button>
+                            </form>
 
                             {/* Divider */}
                             <div className="my-8 flex items-center gap-4">

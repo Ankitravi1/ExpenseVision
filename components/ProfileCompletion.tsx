@@ -3,12 +3,10 @@ import { Icon } from './Icon';
 import { authService } from '../services/auth';
 
 interface ProfileCompletionProps {
-    initialName?: string;
     onComplete: () => void;
 }
 
-export const ProfileCompletion: React.FC<ProfileCompletionProps> = ({ initialName = '', onComplete }) => {
-    const [name, setName] = useState(initialName);
+export const ProfileCompletion: React.FC<ProfileCompletionProps> = ({ onComplete }) => {
     const [country, setCountry] = useState('');
     const [currency, setCurrency] = useState('INR');
     const [loading, setLoading] = useState(false);
@@ -17,17 +15,23 @@ export const ProfileCompletion: React.FC<ProfileCompletionProps> = ({ initialNam
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
+
+        if (!country.trim()) {
+            setError('Country is required');
+            return;
+        }
+
         setLoading(true);
 
         try {
-            await authService.updateProfile({
-                name,
-                country: country || undefined,
+            // Use generic completeProfile for all users
+            await authService.completeProfile({
+                country,
                 currency,
             });
             onComplete();
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to update profile');
+            setError(err instanceof Error ? err.message : 'Failed to complete profile');
         } finally {
             setLoading(false);
         }
@@ -55,26 +59,13 @@ export const ProfileCompletion: React.FC<ProfileCompletionProps> = ({ initialNam
             <form onSubmit={handleSubmit} className="space-y-6">
                 <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Full Name
-                    </label>
-                    <input
-                        type="text"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        required
-                        className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                        placeholder="John Doe"
-                    />
-                </div>
-
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Country (Optional)
+                        Country *
                     </label>
                     <input
                         type="text"
                         value={country}
                         onChange={(e) => setCountry(e.target.value)}
+                        required
                         className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                         placeholder="India"
                     />

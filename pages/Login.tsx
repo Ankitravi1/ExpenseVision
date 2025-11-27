@@ -20,7 +20,6 @@ export const Login: React.FC<LoginProps> = ({ onSuccess, onBackToLanding, onSwit
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [showProfileCompletion, setShowProfileCompletion] = useState(false);
-    const [initialName, setInitialName] = useState('');
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -70,8 +69,12 @@ export const Login: React.FC<LoginProps> = ({ onSuccess, onBackToLanding, onSwit
                             <Icon name="Wallet" size={40} className="text-primary" />
                             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">ExpenseVision</h1>
                         </div>
-                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Welcome Back</h2>
-                        <p className="text-gray-600 dark:text-gray-400">Sign in to your account</p>
+                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                            {showProfileCompletion ? 'Complete Your Profile' : 'Welcome Back'}
+                        </h2>
+                        <p className="text-gray-600 dark:text-gray-400">
+                            {showProfileCompletion ? 'Please provide a few more details to get started' : 'Sign in to your account'}
+                        </p>
                     </div>
 
                     {/* Error Message */}
@@ -83,7 +86,7 @@ export const Login: React.FC<LoginProps> = ({ onSuccess, onBackToLanding, onSwit
                     )}
 
                     {showProfileCompletion ? (
-                        <ProfileCompletion onComplete={onSuccess} initialName={initialName} />
+                        <ProfileCompletion onComplete={onSuccess} />
                     ) : (
                         <>
                             {/* Google Login */}
@@ -93,8 +96,7 @@ export const Login: React.FC<LoginProps> = ({ onSuccess, onBackToLanding, onSwit
                                         if (credentialResponse.credential) {
                                             try {
                                                 const res = await authService.googleAuth(credentialResponse.credential);
-                                                if (res.isNewUser) {
-                                                    setInitialName(res.user.name);
+                                                if (res.needsProfileCompletion) {
                                                     setShowProfileCompletion(true);
                                                 } else {
                                                     onSuccess();

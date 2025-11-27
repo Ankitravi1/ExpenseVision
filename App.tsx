@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
@@ -15,6 +14,7 @@ import { Signup } from './pages/Signup';
 import { VerifyEmail } from './pages/VerifyEmail';
 import { ForgotPassword } from './pages/ForgotPassword';
 import { ResetPassword } from './pages/ResetPassword';
+import { ProfileCompletion } from './components/ProfileCompletion';
 import { mockAccounts, mockCategories, mockTransactions, mockBudgets } from './data/mockData';
 import { Account, Budget, Category, Transaction, Page, TransactionType } from './types';
 import { NewTransactionModal } from './components/NewTransactionModal';
@@ -42,6 +42,7 @@ export const AppContext = React.createContext<{
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(authService.isAuthenticated());
+  const [needsProfileCompletion, setNeedsProfileCompletion] = useState(false);
   const [authView, setAuthView] = useState<'landing' | 'login' | 'signup' | 'verify-email' | 'forgot-password' | 'reset-password'>('landing');
   const [activePage, setActivePage] = useState<Page>('Dashboard');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -73,6 +74,18 @@ const App: React.FC = () => {
       setAuthView('reset-password');
     }
   }, []);
+
+  // Check profile completion status on mount
+  useEffect(() => {
+    if (isAuthenticated) {
+      const user = authService.getUser();
+      if (user) {
+        // Check profileComplete field from database
+        const profileComplete = user.profileComplete === true;
+        setNeedsProfileCompletion(!profileComplete);
+      }
+    }
+  }, [isAuthenticated]);
 
   const addTransaction = useCallback((transaction: Omit<Transaction, 'id'>) => {
     const newTransaction: Transaction = {
@@ -345,6 +358,7 @@ const App: React.FC = () => {
     authService.logout();
     setIsAuthenticated(false);
     setAuthView('landing');
+    setActivePage('Dashboard');
   };
 
   // Show auth views if not authenticated
@@ -387,6 +401,45 @@ const App: React.FC = () => {
         onLoginClick={() => setAuthView('login')}
         onSignupClick={() => setAuthView('signup')}
       />
+    );
+  }
+
+  // If authenticated but needs profile completion, show profile completion screen
+  if (needsProfileCompletion) {
+    const user = authService.getUser();
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center p-6">
+        <div className="w-full max-w-md">
+          {/* Back to Home Button */}
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white mb-8 transition-colors"
+          >
+            <span className="text-xl">←</span>
+            Back to Home
+          </button>
+
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 border border-gray-100 dark:border-gray-700">
+            <div className="text-center mb-8">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                Complete Your Profile
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400">
+                Please provide a few more details to continue
+              </p>
+            </div>
+            <ProfileCompletion
+              onComplete={() => {
+                // Refresh user data and clear profile completion flag
+                const updatedUser = authService.getUser();
+                if (updatedUser?.profileComplete) {
+                  setNeedsProfileCompletion(false);
+                }
+              }}
+            />
+          </div>
+        </div>
+      </div>
     );
   }
 

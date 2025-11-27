@@ -16,7 +16,7 @@ model User {
   password        String?  // Null for Google OAuth users
   name            String
   country         String?
-  currency        String   @default("INR")
+  currency        String?  // Null until profile completion
   googleId        String?  @unique
   profilePicture  String?
   
@@ -29,6 +29,10 @@ model User {
   // 2FA fields
   twoFactorEnabled    Boolean   @default(false)
   twoFactorSecret     String?
+
+  // Onboarding tracking
+  onboardingStage     Int       @default(1)
+  profileComplete     Boolean   @default(false)
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

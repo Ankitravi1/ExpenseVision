@@ -5,20 +5,20 @@ export interface User {
     email: string;
     name: string;
     country?: string | null;
-    currency: string;
+    currency?: string | null;
     profilePicture?: string | null;
+    profileComplete?: boolean;
+    emailVerified?: boolean;
 }
 
 export interface SignupData {
     email: string;
     password: string;
     name: string;
-    country?: string;
-    currency?: string;
 }
 
 export const authService = {
-    signup: async (data: SignupData): Promise<{ user: User; token: string }> => {
+    signup: async (data: SignupData): Promise<{ user: User; token: string; needsProfileCompletion: boolean }> => {
         const res = await fetch(`${API_URL}/auth/signup`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -37,7 +37,7 @@ export const authService = {
         return json;
     },
 
-    login: async (email: string, password: string): Promise<{ user: User; token: string }> => {
+    login: async (email: string, password: string): Promise<{ user: User; token: string; needsProfileCompletion: boolean }> => {
         const res = await fetch(`${API_URL}/auth/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -56,7 +56,7 @@ export const authService = {
         return json;
     },
 
-    googleAuth: async (googleToken: string): Promise<{ user: User; token: string; isNewUser: boolean }> => {
+    googleAuth: async (googleToken: string): Promise<{ user: User; token: string; isNewUser: boolean; needsProfileCompletion: boolean }> => {
         const res = await fetch(`${API_URL}/auth/google`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -71,6 +71,32 @@ export const authService = {
         const json = await res.json();
         localStorage.setItem('token', json.token);
         localStorage.setItem('refreshToken', json.refreshToken);
+        localStorage.setItem('user', JSON.stringify(json.user));
+        return json;
+    },
+
+    completeProfile: async (data: { country?: string; currency: string }): Promise<{ user: User }> => {
+        const token = authService.getToken();
+        if (!token) throw new Error('No token found');
+
+        const res = await fetch(`${API_URL}/auth/complete-profile`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+                country: data.country,
+                currency: data.currency,
+            }),
+        });
+
+        if (!res.ok) {
+            const error = await res.json();
+            throw new Error(error.error || 'Failed to complete profile');
+        }
+
+        const json = await res.json();
         localStorage.setItem('user', JSON.stringify(json.user));
         return json;
     },

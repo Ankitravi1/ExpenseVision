@@ -47,9 +47,22 @@ export const Profile: React.FC = () => {
                             </label>
                             <input
                                 type="text"
+                                key={user?.name}
                                 defaultValue={user?.name || ''}
                                 className="input w-full"
                                 placeholder="Your name"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                Country
+                            </label>
+                            <input
+                                type="text"
+                                key={user?.country}
+                                defaultValue={user?.country || 'Not specified'}
+                                className="input w-full"
+                                placeholder="Your country"
                             />
                         </div>
                         <div>
