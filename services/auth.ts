@@ -6,6 +6,7 @@ export interface User {
     name: string;
     country?: string | null;
     currency?: string | null;
+    theme?: string | null;
     profilePicture?: string | null;
     profileComplete?: boolean;
     emailVerified?: boolean;
@@ -101,7 +102,7 @@ export const authService = {
         return json;
     },
 
-    updateProfile: async (data: { name?: string; country?: string; currency?: string }): Promise<{ user: User }> => {
+    updateProfile: async (data: { name?: string; country?: string; currency?: string; theme?: string }): Promise<{ user: User }> => {
         const token = authService.getToken();
         if (!token) throw new Error('No token found');
 

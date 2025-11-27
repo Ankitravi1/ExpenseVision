@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Icon } from './Icon';
 import { authService } from '../services/auth';
+import { CURRENCIES } from '../utils/currency';
 
 interface ProfileCompletionProps {
     onComplete: () => void;
@@ -80,13 +81,11 @@ export const ProfileCompletion: React.FC<ProfileCompletionProps> = ({ onComplete
                         onChange={(e) => setCurrency(e.target.value)}
                         className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                     >
-                        <option value="INR">₹ INR - Indian Rupee</option>
-                        <option value="USD">$ USD - US Dollar</option>
-                        <option value="EUR">€ EUR - Euro</option>
-                        <option value="GBP">£ GBP - British Pound</option>
-                        <option value="JPY">¥ JPY - Japanese Yen</option>
-                        <option value="AUD">$ AUD - Australian Dollar</option>
-                        <option value="CAD">$ CAD - Canadian Dollar</option>
+                        {CURRENCIES.map(c => (
+                            <option key={c.code} value={c.code}>
+                                {c.symbol} {c.name} ({c.code})
+                            </option>
+                        ))}
                     </select>
                 </div>
 

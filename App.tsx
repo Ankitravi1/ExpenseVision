@@ -25,6 +25,10 @@ export const AppContext = React.createContext<{
   categories: Category[];
   transactions: Transaction[];
   budgets: Budget[];
+  currency: string;
+  setCurrency: (currency: string) => void;
+  theme: 'light' | 'dark';
+  setTheme: (theme: 'light' | 'dark') => void;
   addTransaction: (transaction: Omit<Transaction, 'id'>) => void;
   updateTransaction: (id: string, transaction: Partial<Transaction>) => void;
   deleteTransaction: (id: string) => void;
@@ -47,10 +51,34 @@ const App: React.FC = () => {
   const [activePage, setActivePage] = useState<Page>('Dashboard');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+  const [currency, setCurrencyState] = useState('INR');
+  const [theme, setThemeState] = useState<'light' | 'dark'>(() => {
     const savedTheme = localStorage.getItem('theme');
     return (savedTheme as 'light' | 'dark') || 'light';
   });
+
+  const setTheme = useCallback((newTheme: 'light' | 'dark') => {
+    setThemeState(newTheme);
+    localStorage.setItem('theme', newTheme);
+    if (newTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+
+    // Persist to DB if authenticated
+    if (isAuthenticated) {
+      authService.updateProfile({ theme: newTheme }).catch(console.error);
+    }
+  }, [isAuthenticated]);
+
+  const setCurrency = useCallback((newCurrency: string) => {
+    setCurrencyState(newCurrency);
+    // Persist to DB if authenticated
+    if (isAuthenticated) {
+      authService.updateProfile({ currency: newCurrency }).catch(console.error);
+    }
+  }, [isAuthenticated]);
 
   const [transactions, setTransactions] = useState<Transaction[]>(mockTransactions);
   const [accounts, setAccounts] = useState<Account[]>(mockAccounts);
@@ -58,7 +86,6 @@ const App: React.FC = () => {
   const [budgets, setBudgets] = useState<Budget[]>(mockBudgets);
 
   useEffect(() => {
-    localStorage.setItem('theme', theme);
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
     } else {
@@ -83,6 +110,10 @@ const App: React.FC = () => {
         // Check profileComplete field from database
         const profileComplete = user.profileComplete === true;
         setNeedsProfileCompletion(!profileComplete);
+
+        // Load user preferences
+        if (user.currency) setCurrencyState(user.currency);
+        if (user.theme) setThemeState(user.theme as 'light' | 'dark');
       }
     }
   }, [isAuthenticated]);
@@ -328,6 +359,10 @@ const App: React.FC = () => {
     categories,
     transactions,
     budgets,
+    currency,
+    setCurrency,
+    theme,
+    setTheme,
     addTransaction,
     updateTransaction,
     deleteTransaction,
@@ -341,7 +376,7 @@ const App: React.FC = () => {
     deleteBudget,
     clearAllTransactions,
     setActivePage,
-  }), [accounts, categories, transactions, budgets, addTransaction, updateTransaction, deleteTransaction, clearAllTransactions, addAccount, updateAccount, deleteAccount, addCategory, updateCategory, deleteCategory, setBudget, deleteBudget]);
+  }), [accounts, categories, transactions, budgets, currency, setCurrency, theme, setTheme, addTransaction, updateTransaction, deleteTransaction, clearAllTransactions, addAccount, updateAccount, deleteAccount, addCategory, updateCategory, deleteCategory, setBudget, deleteBudget]);
 
   // Auth handlers
   const handleLoginSuccess = () => {

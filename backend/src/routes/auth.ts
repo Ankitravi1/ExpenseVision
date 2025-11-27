@@ -33,6 +33,7 @@ const updateUserSchema = z.object({
     name: z.string().min(1).optional(),
     country: z.string().optional(),
     currency: z.string().optional(),
+    theme: z.string().optional(),
 });
 
 // Apply rate limiting to all auth routes
@@ -74,6 +75,7 @@ router.post('/signup', async (req, res) => {
                 name: true,
                 country: true,
                 currency: true,
+                theme: true,
                 profilePicture: true,
                 onboardingStage: true,
                 profileComplete: true,
@@ -161,6 +163,7 @@ router.post('/login', async (req, res) => {
                 name: user.name,
                 country: user.country,
                 currency: user.currency,
+                theme: user.theme,
                 profilePicture: user.profilePicture,
                 profileComplete: user.profileComplete,
                 emailVerified: user.emailVerified,
@@ -256,6 +259,7 @@ router.post('/google', async (req, res) => {
                 name: user.name,
                 country: user.country,
                 currency: user.currency,
+                theme: user.theme,
                 profilePicture: user.profilePicture,
                 profileComplete: user.profileComplete,
                 emailVerified: user.emailVerified,
@@ -312,6 +316,7 @@ router.put('/complete-profile', async (req, res) => {
                 name: true,
                 country: true,
                 currency: true,
+                theme: true,
                 profilePicture: true,
                 onboardingStage: true,
                 profileComplete: true,
@@ -352,7 +357,11 @@ router.put('/update-profile', async (req, res) => {
                 name: true,
                 country: true,
                 currency: true,
+                theme: true,
                 profilePicture: true,
+                onboardingStage: true,
+                profileComplete: true,
+                emailVerified: true,
             },
         });
 
@@ -591,6 +600,7 @@ router.post('/2fa/login', async (req, res) => {
                 name: user.name,
                 country: user.country,
                 currency: user.currency,
+                theme: user.theme,
                 profilePicture: user.profilePicture,
             },
             token,

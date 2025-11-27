@@ -41,3 +41,15 @@ export interface Budget {
   amount: number;
   spent: number;
 }
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  country?: string | null;
+  currency?: string | null;
+  theme?: string | null;
+  profilePicture?: string | null;
+  profileComplete?: boolean;
+  emailVerified?: boolean;
+}

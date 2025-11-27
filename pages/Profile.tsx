@@ -4,6 +4,7 @@ import { Icon } from '../components/Icon';
 import { AppContext } from '../App';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { authService, User } from '../services/auth';
+import { CURRENCIES } from '../utils/currency';
 
 export const Profile: React.FC = () => {
     const context = useContext(AppContext);
@@ -14,14 +15,40 @@ export const Profile: React.FC = () => {
     useEffect(() => {
         const currentUser = authService.getUser();
         setUser(currentUser);
-        if (currentUser?.currency) {
-            setCurrency(currentUser.currency);
+        if (currentUser) {
+            setName(currentUser.name);
+            setCountry(currentUser.country || '');
+            if (currentUser.currency) {
+                setCurrency(currentUser.currency);
+            }
         }
     }, []);
 
+    const handleSaveProfile = async () => {
+        setIsSaving(true);
+        try {
+            const updatedUser = await authService.updateProfile({
+                name,
+                country,
+                currency
+            });
+            setUser(updatedUser.user);
+            setGlobalCurrency(currency);
+            alert('Profile updated successfully!');
+        } catch (error) {
+            console.error('Failed to update profile:', error);
+            alert('Failed to update profile');
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
     if (!context) return null;
 
-    const { transactions, clearAllTransactions, setActivePage } = context;
+    const { transactions, clearAllTransactions, setActivePage, currency: globalCurrency, setCurrency: setGlobalCurrency } = context;
+    const [name, setName] = useState('');
+    const [country, setCountry] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
 
     const handleClearAllTransactions = () => {
         clearAllTransactions();
@@ -30,6 +57,21 @@ export const Profile: React.FC = () => {
 
     const handleExportData = () => {
         setActivePage('Transactions');
+    };
+
+    const handleCurrencyChange = async (newCurrency: string) => {
+        setCurrency(newCurrency);
+        try {
+            const updatedUser = await authService.updateProfile({
+                currency: newCurrency
+            });
+            setUser(updatedUser.user);
+            setGlobalCurrency(newCurrency);
+            // Optional: Show a small toast or indicator, but user asked for "update and be saved... once we select"
+        } catch (error) {
+            console.error('Failed to update currency:', error);
+            alert('Failed to update currency preference');
+        }
     };
 
     return (
@@ -47,8 +89,8 @@ export const Profile: React.FC = () => {
                             </label>
                             <input
                                 type="text"
-                                key={user?.name}
-                                defaultValue={user?.name || ''}
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
                                 className="input w-full"
                                 placeholder="Your name"
                             />
@@ -59,8 +101,8 @@ export const Profile: React.FC = () => {
                             </label>
                             <input
                                 type="text"
-                                key={user?.country}
-                                defaultValue={user?.country || 'Not specified'}
+                                value={country}
+                                onChange={(e) => setCountry(e.target.value)}
                                 className="input w-full"
                                 placeholder="Your country"
                             />
@@ -76,8 +118,12 @@ export const Profile: React.FC = () => {
                                 className="input w-full bg-gray-50 dark:bg-gray-700 cursor-not-allowed"
                             />
                         </div>
-                        <button className="btn btn-primary">
-                            Save Changes
+                        <button
+                            className="btn btn-primary"
+                            onClick={handleSaveProfile}
+                            disabled={isSaving}
+                        >
+                            {isSaving ? 'Saving...' : 'Save Changes'}
                         </button>
                     </div>
                 </Card>
@@ -92,14 +138,14 @@ export const Profile: React.FC = () => {
                             </label>
                             <select
                                 value={currency}
-                                onChange={(e) => setCurrency(e.target.value)}
+                                onChange={(e) => handleCurrencyChange(e.target.value)}
                                 className="select w-full max-w-xs"
                             >
-                                <option value="INR">₹ Indian Rupee (INR)</option>
-                                <option value="USD">$ US Dollar (USD)</option>
-                                <option value="EUR">€ Euro (EUR)</option>
-                                <option value="GBP">£ British Pound (GBP)</option>
-                                <option value="JPY">¥ Japanese Yen (JPY)</option>
+                                {CURRENCIES.map(c => (
+                                    <option key={c.code} value={c.code}>
+                                        {c.symbol} {c.name} ({c.code})
+                                    </option>
+                                ))}
                             </select>
                             <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
                                 This will be used for displaying all amounts in the application

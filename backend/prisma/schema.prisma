@@ -17,6 +17,7 @@ model User {
   name            String
   country         String?
   currency        String?  // Null until profile completion
+  theme           String?  @default("light")
   googleId        String?  @unique
   profilePicture  String?
   

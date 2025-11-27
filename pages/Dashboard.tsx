@@ -5,8 +5,9 @@ import { Card } from '../components/Card';
 import { Icon } from '../components/Icon';
 import { Transaction } from '../types';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
+import { formatCurrency } from '../utils/currency';
 
-const StatCard: React.FC<{ title: string; amount: number; change: number; type: 'income' | 'expense' | 'net' }> = ({ title, amount, change, type }) => {
+const StatCard: React.FC<{ title: string; amount: number; change: number; type: 'income' | 'expense' | 'net'; currency: string }> = ({ title, amount, change, type, currency }) => {
   const isPositiveChange = change >= 0;
 
   let gradientClass = '';
@@ -45,7 +46,7 @@ const StatCard: React.FC<{ title: string; amount: number; change: number; type: 
         <div>
           <p className={`text-sm font-medium mb-1 ${type === 'income' ? 'text-emerald-700' : type === 'expense' ? 'text-rose-700' : 'text-blue-700'} dark:text-gray-300`}>{title}</p>
           <h3 className={`text-3xl font-bold ${textClass}`}>
-            ₹{amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {formatCurrency(amount, currency)}
           </h3>
         </div>
         <div className={`p-2 rounded-lg bg-white/50 dark:bg-white/10 ${textClass}`}>
@@ -64,7 +65,7 @@ const StatCard: React.FC<{ title: string; amount: number; change: number; type: 
 };
 
 const TransactionRow: React.FC<{ transaction: Transaction }> = ({ transaction }) => {
-  const { categories, accounts } = useContext(AppContext)!;
+  const { categories, accounts, currency } = useContext(AppContext)!;
   const category = categories.find(c => c.id === transaction.categoryId);
   const account = accounts.find(a => a.id === transaction.accountId);
   const destAccount = accounts.find(a => a.id === transaction.transferToAccountId);
@@ -115,7 +116,7 @@ const TransactionRow: React.FC<{ transaction: Transaction }> = ({ transaction })
         </div>
       </div>
       <p className={`font-semibold whitespace-nowrap ${amountClass}`}>
-        {amountPrefix}₹{transaction.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        {amountPrefix}{formatCurrency(transaction.amount, currency)}
       </p>
     </div>
   )
@@ -137,7 +138,7 @@ const COLORS = {
 const DEFAULT_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#f43f5e', '#3b82f6', '#8b5cf6', '#ec4899', '#64748b'];
 
 export const Dashboard: React.FC = () => {
-  const { transactions, categories, setActivePage } = useContext(AppContext)!;
+  const { transactions, categories, setActivePage, currency } = useContext(AppContext)!;
   const [currentDate, setCurrentDate] = useState(new Date());
 
   const changeMonth = (offset: number) => {
@@ -221,9 +222,9 @@ export const Dashboard: React.FC = () => {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <StatCard title="Total Income" amount={totalIncome} change={5.2} type="income" />
-        <StatCard title="Total Expenses" amount={totalExpenses} change={8.1} type="expense" />
-        <StatCard title="Net Flow" amount={netFlow} change={-2.7} type="net" />
+        <StatCard title="Total Income" amount={totalIncome} change={5.2} type="income" currency={currency} />
+        <StatCard title="Total Expenses" amount={totalExpenses} change={8.1} type="expense" currency={currency} />
+        <StatCard title="Net Flow" amount={netFlow} change={-2.7} type="net" currency={currency} />
       </div>
 
       {/* Charts Section */}
@@ -252,7 +253,7 @@ export const Dashboard: React.FC = () => {
                   ))}
                 </Pie>
                 <Tooltip
-                  formatter={(value: number) => `₹${value.toLocaleString('en-IN')}`}
+                  formatter={(value: number) => formatCurrency(value, currency)}
                   contentStyle={{
                     backgroundColor: 'rgba(31, 41, 55, 0.95)',
                     border: 'none',
@@ -273,7 +274,7 @@ export const Dashboard: React.FC = () => {
             </ResponsiveContainer>
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-12">
               <span className="text-2xl font-bold text-gray-900 dark:text-white">
-                ₹{totalExpenses.toLocaleString('en-IN', { notation: 'compact' })}
+                {formatCurrency(totalExpenses, currency)}
               </span>
               <span className="text-xs text-gray-500 dark:text-gray-400">Total</span>
             </div>
@@ -298,7 +299,7 @@ export const Dashboard: React.FC = () => {
                       </div>
                       <span className="font-medium text-gray-700 dark:text-gray-200">{cat.name}</span>
                     </div>
-                    <span className="font-semibold text-gray-900 dark:text-white">₹{cat.value.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <span className="font-semibold text-gray-900 dark:text-white">{formatCurrency(cat.value, currency)}</span>
                   </div>
                   <div className="w-full bg-gray-100 rounded-full h-2 dark:bg-gray-700 overflow-hidden">
                     <div

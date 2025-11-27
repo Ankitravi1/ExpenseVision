@@ -6,9 +6,10 @@ import { Icon } from '../components/Icon';
 import { Transaction } from '../types';
 import { ExportButton } from '../components/ExportButton';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { formatCurrency } from '../utils/currency';
 
 const TransactionRow: React.FC<{ transaction: Transaction; onEdit: () => void; onDelete: () => void }> = ({ transaction, onEdit, onDelete }) => {
-    const { categories, accounts } = useContext(AppContext)!;
+    const { categories, accounts, currency } = useContext(AppContext)!;
     const category = categories.find(c => c.id === transaction.categoryId);
     const account = accounts.find(a => a.id === transaction.accountId);
     const destAccount = accounts.find(a => a.id === transaction.transferToAccountId);
@@ -69,7 +70,7 @@ const TransactionRow: React.FC<{ transaction: Transaction; onEdit: () => void; o
                 </span>
             </td>
             <td className={`px-6 py-4 whitespace-nowrap text-sm font-semibold text-right ${amountColor}`}>
-                {prefix}₹{transaction.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {prefix}{formatCurrency(transaction.amount, currency)}
             </td>
             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                 <button

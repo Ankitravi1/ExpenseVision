@@ -6,8 +6,10 @@ import { Icon } from '../components/Icon';
 import { Account, AccountType } from '../types';
 import { AddAccountModal } from '../components/AddAccountModal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { formatCurrency } from '../utils/currency';
 
 const AccountCard: React.FC<{ account: Account; onDelete: () => void }> = ({ account, onDelete }) => {
+    const { currency } = useContext(AppContext)!;
     const isNegative = account.balance < 0;
 
     // Map standard types to icons, fallback to 'Wallet'
@@ -38,7 +40,7 @@ const AccountCard: React.FC<{ account: Account; onDelete: () => void }> = ({ acc
                 <div>
                     <p className="text-sm text-gray-medium dark:text-gray-400">Current Balance</p>
                     <p className={`text-2xl font-bold ${isNegative ? 'text-danger' : 'text-gray-darkest dark:text-gray-50'}`}>
-                        ₹{account.balance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {formatCurrency(account.balance, currency)}
                     </p>
                 </div>
                 <button
@@ -54,7 +56,7 @@ const AccountCard: React.FC<{ account: Account; onDelete: () => void }> = ({ acc
 }
 
 export const Accounts: React.FC = () => {
-    const { accounts, deleteAccount } = useContext(AppContext)!;
+    const { accounts, deleteAccount, currency } = useContext(AppContext)!;
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; accountId: string | null }>({ isOpen: false, accountId: null });
 
@@ -76,7 +78,7 @@ export const Accounts: React.FC = () => {
                 <Card>
                     <h3 className="text-gray-medium font-medium dark:text-gray-400">Total Net Worth</h3>
                     <p className={`text-4xl font-bold mt-2 ${totalBalance < 0 ? 'text-danger' : 'text-gray-darkest dark:text-gray-50'}`}>
-                        ₹{totalBalance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {formatCurrency(totalBalance, currency)}
                     </p>
                     <p className="text-success font-semibold text-sm mt-2">+2.5% this month</p>
                 </Card>

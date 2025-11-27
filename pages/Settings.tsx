@@ -4,8 +4,12 @@ import { Icon } from '../components/Icon';
 import { Modal } from '../components/Modal';
 import { authService } from '../services/auth';
 
+import { AppContext } from '../App';
+
 export const Settings: React.FC = () => {
-    const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system');
+    const context = React.useContext(AppContext);
+    const { theme, setTheme } = context!;
+
     const [notifications, setNotifications] = useState(true);
     const [budgetAlerts, setBudgetAlerts] = useState(true);
     const [emailReports, setEmailReports] = useState(false);
@@ -50,19 +54,13 @@ export const Settings: React.FC = () => {
     };
 
     const handleThemeChange = (newTheme: 'light' | 'dark' | 'system') => {
-        setTheme(newTheme);
-        if (newTheme === 'dark') {
-            document.documentElement.classList.add('dark');
-        } else if (newTheme === 'light') {
-            document.documentElement.classList.remove('dark');
-        } else {
-            // System preference
+        if (newTheme === 'system') {
+            // For system, we just check preference and set light/dark accordingly
+            // In a real app we might want to store 'system' as a preference
             const isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-            if (isDark) {
-                document.documentElement.classList.add('dark');
-            } else {
-                document.documentElement.classList.remove('dark');
-            }
+            setTheme(isDark ? 'dark' : 'light');
+        } else {
+            setTheme(newTheme);
         }
     };
 

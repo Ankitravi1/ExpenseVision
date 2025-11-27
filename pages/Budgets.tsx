@@ -6,6 +6,7 @@ import { AppContext } from '../App';
 import { Budget } from '../types';
 import { SetBudgetModal } from '../components/SetBudgetModal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { formatCurrency } from '../utils/currency';
 
 const PeriodNavigator: React.FC<{ date: Date; setDate: (date: Date) => void }> = ({ date, setDate }) => {
     const changeMonth = (offset: number) => {
@@ -30,7 +31,7 @@ const PeriodNavigator: React.FC<{ date: Date; setDate: (date: Date) => void }> =
 };
 
 const BudgetCard: React.FC<{ budget: Budget; onEdit: () => void }> = ({ budget, onEdit }) => {
-    const { categories } = useContext(AppContext)!;
+    const { categories, currency } = useContext(AppContext)!;
     const category = categories.find(c => c.id === budget.categoryId);
     if (!category) return null;
 
@@ -58,8 +59,8 @@ const BudgetCard: React.FC<{ budget: Budget; onEdit: () => void }> = ({ budget, 
                 </div>
             </div>
             <div className="flex justify-between items-baseline mb-1">
-                <span className="font-bold text-xl text-gray-darkest dark:text-gray-50">₹{budget.spent.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                <span className="text-gray-medium dark:text-gray-400">of ₹{budget.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                <span className="font-bold text-xl text-gray-darkest dark:text-gray-50">{formatCurrency(budget.spent, currency)}</span>
+                <span className="text-gray-medium dark:text-gray-400">of {formatCurrency(budget.amount, currency)}</span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-600 mb-2">
                 <div className={`${progressBarColor} h-2.5 rounded-full transition-all`} style={{ width: `${Math.min(percentage, 100)}%` }}></div>
@@ -69,7 +70,7 @@ const BudgetCard: React.FC<{ budget: Budget; onEdit: () => void }> = ({ budget, 
                     {percentage.toFixed(1)}% used
                 </span>
                 <span className={`font-medium ${remaining >= 0 ? 'text-success' : 'text-danger'}`}>
-                    ₹{Math.abs(remaining).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {remaining >= 0 ? 'left' : 'over'}
+                    {formatCurrency(Math.abs(remaining), currency)} {remaining >= 0 ? 'left' : 'over'}
                 </span>
             </div>
         </Card>
@@ -99,7 +100,7 @@ export const Budgets: React.FC = () => {
     const [selectedCategoryId, setSelectedCategoryId] = useState<string | undefined>(undefined);
     const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; budgetId: string | null }>({ isOpen: false, budgetId: null });
 
-    const { budgets, categories, deleteBudget } = useContext(AppContext)!;
+    const { budgets, categories, deleteBudget, currency } = useContext(AppContext)!;
 
     const { totalBudget, totalSpent } = budgets.reduce(
         (acc, budget) => ({
@@ -162,8 +163,8 @@ export const Budgets: React.FC = () => {
                         </span>
                     </div>
                     <div className="flex justify-between items-baseline mb-2">
-                        <span className="font-bold text-3xl text-gray-darkest dark:text-gray-50">₹{totalSpent.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                        <span className="text-gray-medium dark:text-gray-400">of ₹{totalBudget.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        <span className="font-bold text-3xl text-gray-darkest dark:text-gray-50">{formatCurrency(totalSpent, currency)}</span>
+                        <span className="text-gray-medium dark:text-gray-400">of {formatCurrency(totalBudget, currency)}</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-4 dark:bg-gray-700 mb-3">
                         <div
@@ -176,7 +177,7 @@ export const Budgets: React.FC = () => {
                             {budgets.length} {budgets.length === 1 ? 'budget' : 'budgets'} active
                         </span>
                         <span className={`font-semibold ${totalRemaining >= 0 ? 'text-success' : 'text-danger'}`}>
-                            ₹{Math.abs(totalRemaining).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {totalRemaining >= 0 ? 'remaining' : 'over budget'}
+                            {formatCurrency(Math.abs(totalRemaining), currency)} {totalRemaining >= 0 ? 'remaining' : 'over budget'}
                         </span>
                     </div>
                 </Card>
