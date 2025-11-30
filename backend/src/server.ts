@@ -8,6 +8,7 @@ import categoriesRouter from './routes/categories.js';
 import budgetsRouter from './routes/budgets.js';
 import authRouter from './routes/auth.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { authenticateToken } from './middleware/auth.js';
 
 dotenv.config();
 
@@ -22,7 +23,6 @@ app.use(express.json());
 // Make prisma available to routes
 app.use((req, res, next) => {
     (req as any).prisma = prisma;
-    (req as any).userId = process.env.DEFAULT_USER_ID || 'default-user-123';
     next();
 });
 
@@ -32,13 +32,15 @@ app.get('/api/health', (req, res) => {
 });
 
 app.use('/api/auth', authRouter);
-app.use('/api/transactions', transactionsRouter);
-app.use('/api/accounts', accountsRouter);
-app.use('/api/categories', categoriesRouter);
-app.use('/api/budgets', budgetsRouter);
+
+// Protected Routes
+app.use('/api/transactions', authenticateToken, transactionsRouter);
+app.use('/api/accounts', authenticateToken, accountsRouter);
+app.use('/api/categories', authenticateToken, categoriesRouter);
+app.use('/api/budgets', authenticateToken, budgetsRouter);
 
 // Initial data endpoint
-app.get('/api/initial-data', async (req, res, next) => {
+app.get('/api/initial-data', authenticateToken, async (req, res, next) => {
     try {
         const userId = (req as any).userId;
         const prisma = (req as any).prisma;
@@ -55,7 +57,7 @@ app.get('/api/initial-data', async (req, res, next) => {
 
         // Calculate spent for each budget
         const budgetsWithSpent = await Promise.all(
-            budgets.map(async (budget) => {
+            budgets.map(async (budget: any) => {
                 const spent = await prisma.transaction.aggregate({
                     where: {
                         userId,
@@ -92,25 +94,9 @@ app.use(errorHandler);
 // Initialize default user and start server
 async function startServer() {
     try {
-        // Ensure default user exists
-        const userId = process.env.DEFAULT_USER_ID || 'default-user-123';
-        const userEmail = process.env.DEFAULT_USER_EMAIL || 'user@expensevision.local';
-        const userName = process.env.DEFAULT_USER_NAME || 'Personal User';
-
-        await prisma.user.upsert({
-            where: { id: userId },
-            update: {},
-            create: {
-                id: userId,
-                email: userEmail,
-                name: userName
-            }
-        });
-
         app.listen(PORT, () => {
             console.log(`✅ ExpenseVision API server running on http://localhost:${PORT}`);
             console.log(`📊 Database: SQLite (${process.env.DATABASE_URL})`);
-            console.log(`👤 User: ${userName} (${userEmail})`);
         });
     } catch (error) {
         console.error('Failed to start server:', error);

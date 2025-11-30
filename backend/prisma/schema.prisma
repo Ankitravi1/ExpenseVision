@@ -16,6 +16,7 @@ model User {
   password        String?  // Null for Google OAuth users
   name            String
   country         String?
+  timezone        String   @default("UTC")
   currency        String?  // Null until profile completion
   theme           String?  @default("light")
   googleId        String?  @unique
@@ -63,6 +64,7 @@ model Account {
   name      String
   type      String
   balance   Float    @default(0)
+  color     String?
   icon      String?
   logo      String?
   createdAt DateTime @default(now())

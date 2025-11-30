@@ -10,6 +10,7 @@ export const Profile: React.FC = () => {
     const context = useContext(AppContext);
     const [clearConfirm, setClearConfirm] = useState(false);
     const [currency, setCurrency] = useState('INR');
+    const [timezone, setTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone);
     const [user, setUser] = useState<User | null>(null);
 
     useEffect(() => {
@@ -17,7 +18,9 @@ export const Profile: React.FC = () => {
         setUser(currentUser);
         if (currentUser) {
             setName(currentUser.name);
-            setCountry(currentUser.country || '');
+            if (currentUser.timezone) {
+                setTimezone(currentUser.timezone);
+            }
             if (currentUser.currency) {
                 setCurrency(currentUser.currency);
             }
@@ -29,7 +32,7 @@ export const Profile: React.FC = () => {
         try {
             const updatedUser = await authService.updateProfile({
                 name,
-                country,
+                timezone,
                 currency
             });
             setUser(updatedUser.user);
@@ -47,7 +50,6 @@ export const Profile: React.FC = () => {
 
     const { transactions, clearAllTransactions, setActivePage, currency: globalCurrency, setCurrency: setGlobalCurrency } = context;
     const [name, setName] = useState('');
-    const [country, setCountry] = useState('');
     const [isSaving, setIsSaving] = useState(false);
 
     const handleClearAllTransactions = () => {
@@ -55,8 +57,32 @@ export const Profile: React.FC = () => {
         setClearConfirm(false);
     };
 
-    const handleExportData = () => {
-        setActivePage('Transactions');
+    const handleExportData = async () => {
+        try {
+            const token = authService.getToken();
+            if (!token) return;
+
+            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/transactions/export`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (!response.ok) throw new Error('Export failed');
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `transactions_${new Date().toISOString().split('T')[0]}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('Export failed:', error);
+            alert('Failed to export data');
+        }
     };
 
     const handleCurrencyChange = async (newCurrency: string) => {
@@ -97,15 +123,17 @@ export const Profile: React.FC = () => {
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                Country
+                                Timezone
                             </label>
-                            <input
-                                type="text"
-                                value={country}
-                                onChange={(e) => setCountry(e.target.value)}
+                            <select
+                                value={timezone}
+                                onChange={(e) => setTimezone(e.target.value)}
                                 className="input w-full"
-                                placeholder="Your country"
-                            />
+                            >
+                                {Intl.supportedValuesOf('timeZone').map(tz => (
+                                    <option key={tz} value={tz}>{tz}</option>
+                                ))}
+                            </select>
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">

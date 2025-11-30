@@ -2,6 +2,7 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { AppContext } from '../App';
 import { Icon } from './Icon';
+import { getCurrencySymbol } from '../utils/currency';
 
 interface SetBudgetModalProps {
     isOpen: boolean;
@@ -49,7 +50,7 @@ export const SetBudgetModal: React.FC<SetBudgetModalProps> = ({ isOpen, onClose,
     }
 
     if (!context) return null;
-    const { setBudget, categories, budgets } = context;
+    const { setBudget, categories, budgets, currency } = context;
 
     const expenseCategories = categories.filter(c => c.type === 'expense');
     const existingBudget = budgets.find(b => b.categoryId === categoryId);
@@ -58,11 +59,18 @@ export const SetBudgetModal: React.FC<SetBudgetModalProps> = ({ isOpen, onClose,
         e.preventDefault();
         if (!amount || !categoryId) return;
 
-        setBudget({
+        const budgetPayload = {
             categoryId,
             amount: parseFloat(amount),
-            spent: 0, // In a real app we'd calc this, but App.tsx handles preserving spent for existing budgets
-            id: '' // Filled in App
+            // Don't send id or spent, let App/API handle it
+        };
+
+        // We need to cast to any or fix the type in AppContext to accept Omit<Budget, ...>
+        // For now, we'll construct a compatible object but we know the API ignores id/spent
+        setBudget({
+            ...budgetPayload,
+            spent: 0,
+            id: ''
         });
 
         setAmount('');
@@ -114,7 +122,7 @@ export const SetBudgetModal: React.FC<SetBudgetModalProps> = ({ isOpen, onClose,
                         <div>
                             <label htmlFor="budgetAmount" className={labelStyles}>Monthly Limit</label>
                             <div className="relative">
-                                <span className="absolute left-3 top-3.5 text-gray-500">₹</span>
+                                <span className="absolute left-3 top-3.5 text-gray-500">{getCurrencySymbol(currency)}</span>
                                 <input
                                     type="number"
                                     id="budgetAmount"

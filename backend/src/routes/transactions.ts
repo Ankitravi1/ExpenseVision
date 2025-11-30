@@ -40,6 +40,72 @@ router.get('/', async (req, res, next) => {
     }
 });
 
+// POST /api/transactions/bulk - Bulk create transactions
+router.post('/bulk', async (req, res, next) => {
+    try {
+        const prisma = (req as any).prisma;
+        const userId = (req as any).userId;
+        const { transactions } = req.body;
+
+        if (!Array.isArray(transactions) || transactions.length === 0) {
+            return res.status(400).json({ error: 'Invalid transactions data' });
+        }
+
+        const result = await prisma.$transaction(async (tx: any) => {
+            let createdCount = 0;
+
+            for (const data of transactions) {
+                // Create transaction
+                await tx.transaction.create({
+                    data: {
+                        ...data,
+                        userId
+                    }
+                });
+
+                // Update source account balance
+                const sourceAccount = await tx.account.findUnique({
+                    where: { id: data.accountId }
+                });
+
+                if (sourceAccount) {
+                    let newSourceBalance = sourceAccount.balance;
+                    if (data.type === 'expense' || data.type === 'transfer') {
+                        newSourceBalance -= data.amount;
+                    } else if (data.type === 'income') {
+                        newSourceBalance += data.amount;
+                    }
+
+                    await tx.account.update({
+                        where: { id: data.accountId },
+                        data: { balance: newSourceBalance }
+                    });
+                }
+
+                // Update destination account for transfers
+                if (data.type === 'transfer' && data.transferToAccountId) {
+                    const destAccount = await tx.account.findUnique({
+                        where: { id: data.transferToAccountId }
+                    });
+
+                    if (destAccount) {
+                        await tx.account.update({
+                            where: { id: data.transferToAccountId },
+                            data: { balance: destAccount.balance + data.amount }
+                        });
+                    }
+                }
+                createdCount++;
+            }
+            return createdCount;
+        });
+
+        res.status(201).json({ count: result });
+    } catch (error) {
+        next(error);
+    }
+});
+
 // POST /api/transactions - Create new transaction
 router.post('/', async (req, res, next) => {
     try {
@@ -214,6 +280,62 @@ router.put('/:id', async (req, res, next) => {
     }
 });
 
+// DELETE /api/transactions/all - Delete all transactions for user
+router.delete('/all', async (req, res, next) => {
+    try {
+        const prisma = (req as any).prisma;
+        const userId = (req as any).userId;
+
+        await prisma.$transaction(async (tx: any) => {
+            // Get all transactions
+            const transactions = await tx.transaction.findMany({
+                where: { userId }
+            });
+
+            // Calculate balance adjustments per account
+            const accountAdjustments = new Map<string, number>();
+
+            for (const t of transactions) {
+                // Reverse source account
+                const currentSourceAdj = accountAdjustments.get(t.accountId) || 0;
+                let sourceChange = 0;
+
+                if (t.type === 'expense' || t.type === 'transfer') {
+                    sourceChange = t.amount; // Add back
+                } else if (t.type === 'income') {
+                    sourceChange = -t.amount; // Remove
+                }
+                accountAdjustments.set(t.accountId, currentSourceAdj + sourceChange);
+
+                // Reverse destination account (for transfers)
+                if (t.type === 'transfer' && t.transferToAccountId) {
+                    const currentDestAdj = accountAdjustments.get(t.transferToAccountId) || 0;
+                    accountAdjustments.set(t.transferToAccountId, currentDestAdj - t.amount);
+                }
+            }
+
+            // Apply adjustments
+            for (const [accountId, adjustment] of accountAdjustments.entries()) {
+                if (adjustment !== 0) {
+                    await tx.account.update({
+                        where: { id: accountId },
+                        data: { balance: { increment: adjustment } }
+                    });
+                }
+            }
+
+            // Delete all transactions
+            await tx.transaction.deleteMany({
+                where: { userId }
+            });
+        });
+
+        res.status(204).send();
+    } catch (error) {
+        next(error);
+    }
+});
+
 // DELETE /api/transactions/:id - Delete transaction
 router.delete('/:id', async (req, res, next) => {
     try {
@@ -298,7 +420,24 @@ router.get('/export', async (req, res, next) => {
             t.transferToAccount?.name || ''
         ]);
 
-        const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+        // Calculate summary
+        let totalIncome = 0;
+        let totalExpense = 0;
+        transactions.forEach((t: any) => {
+            if (t.type === 'income') totalIncome += t.amount;
+            if (t.type === 'expense') totalExpense += t.amount;
+        });
+        const netBalance = totalIncome - totalExpense;
+
+        const csv = [
+            headers.join(','),
+            ...rows.map(r => r.join(',')),
+            '',
+            'Summary',
+            `Total Income,${totalIncome.toFixed(2)}`,
+            `Total Expenses,${totalExpense.toFixed(2)}`,
+            `Net Balance,${netBalance.toFixed(2)}`
+        ].join('\n');
 
         res.setHeader('Content-Type', 'text/csv');
         res.setHeader('Content-Disposition', `attachment; filename=transactions_${new Date().toISOString().split('T')[0]}.csv`);

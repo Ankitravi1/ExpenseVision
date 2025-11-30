@@ -5,12 +5,16 @@ import { Icon } from './Icon';
 import { TransactionType } from '../types';
 import { getCurrencySymbol, formatCurrency } from '../utils/currency';
 
+import { Transaction } from '../types';
+
 interface NewTransactionModalProps {
     isOpen: boolean;
     onClose: () => void;
+    transaction?: Transaction;
+    onDelete?: (id: string) => void;
 }
 
-export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen, onClose }) => {
+export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen, onClose, transaction, onDelete }) => {
     const context = useContext(AppContext);
 
     const [type, setType] = useState<TransactionType>('expense');
@@ -37,15 +41,43 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
     }, [context?.accounts, accountId, transferToAccountId]);
 
     useEffect(() => {
-        if (context?.categories && type !== 'transfer') {
-            const firstCat = context.categories.find(c => c.type === type);
-            if (firstCat) setCategoryId(firstCat.id);
+        if (transaction) {
+            setType(transaction.type);
+            setAmount(transaction.amount.toString());
+            setDescription(transaction.description);
+            const dateObj = new Date(transaction.date);
+            setDate(dateObj.toISOString().split('T')[0]);
+            setTime(dateObj.toTimeString().slice(0, 5));
+            setAccountId(transaction.accountId);
+            setCategoryId(transaction.categoryId || '');
+            setTransferToAccountId(transaction.transferToAccountId || '');
+        } else {
+            // Reset to defaults for new transaction
+            setType('expense');
+            setAmount('');
+            setDescription('');
+            const now = new Date();
+            setDate(now.toISOString().split('T')[0]);
+            setTime(now.toTimeString().slice(0, 5));
+            setCategoryId('');
+            setTransferToAccountId('');
+            // Account ID defaults handled by other useEffect
         }
-    }, [context?.categories, type]);
+    }, [transaction, isOpen]); // Reset when opening
+
+    // Removed auto-select category useEffect to allow blank default
+    // useEffect(() => {
+    //     if (!transaction && context?.categories && type !== 'transfer') {
+    //         const firstCat = context.categories.find(c => c.type === type);
+    //         if (firstCat) setCategoryId(firstCat.id);
+    //     }
+    // }, [context?.categories, type, transaction]);
 
     if (!isMounted || !context) return null;
 
-    const { accounts, categories, addTransaction, currency } = context;
+    if (!isMounted || !context) return null;
+
+    const { accounts, categories, addTransaction, updateTransaction, currency } = context;
 
     const filteredCategories = categories.filter(c => c.type === type);
 
@@ -74,23 +106,32 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
 
         const dateTimeString = `${date}T${time}`;
 
-        addTransaction({
+        const transactionData = {
             date: dateTimeString,
             description,
             amount: parseFloat(amount),
             type,
-            categoryId: type === 'transfer' ? '' : categoryId,
+            categoryId: (type === 'transfer' || !categoryId) ? undefined : categoryId,
             accountId,
             transferToAccountId: type === 'transfer' ? transferToAccountId : undefined
-        });
+        };
+
+        if (transaction) {
+            updateTransaction(transaction.id, transactionData);
+        } else {
+            addTransaction(transactionData);
+        }
 
         // Reset form and close
-        setAmount('');
-        setDescription('');
-        const now = new Date();
-        setDate(now.toISOString().split('T')[0]);
-        setTime(now.toTimeString().slice(0, 5));
-        setType('expense');
+        // Reset form and close
+        if (!transaction) {
+            setAmount('');
+            setDescription('');
+            const now = new Date();
+            setDate(now.toISOString().split('T')[0]);
+            setTime(now.toTimeString().slice(0, 5));
+            setType('expense');
+        }
         onClose();
     };
 
@@ -110,7 +151,7 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
                 className={`fixed top-0 right-0 h-full bg-white shadow-2xl w-full max-w-md transform transition-transform duration-300 z-50 flex flex-col dark:bg-gray-800 ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
             >
                 <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-                    <h3 className="text-xl font-bold dark:text-gray-50">New Transaction</h3>
+                    <h3 className="text-xl font-bold dark:text-gray-50">{transaction ? 'Edit Transaction' : 'New Transaction'}</h3>
                     <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700">
                         <Icon name="X" size={24} />
                     </button>
@@ -126,8 +167,8 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
                                     type="button"
                                     onClick={() => setType(t)}
                                     className={`px-3 py-2 text-sm font-semibold rounded-lg capitalize transition-all ${type === t
-                                            ? 'bg-white dark:bg-gray-700 shadow-sm text-primary dark:text-primary-light'
-                                            : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                                        ? 'bg-white dark:bg-gray-700 shadow-sm text-primary dark:text-primary-light'
+                                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
                                         }`}
                                 >
                                     {t}
@@ -198,6 +239,7 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
                                 <div>
                                     <label htmlFor="category" className={labelStyles}>Category</label>
                                     <select id="category" value={categoryId} onChange={e => setCategoryId(e.target.value)} className={inputStyles}>
+                                        <option value="">Select Category</option>
                                         {filteredCategories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
                                     </select>
                                 </div>
@@ -206,9 +248,24 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
                     </div>
                     <div className="px-6 py-4 border-t border-gray-100 dark:border-gray-700 mt-auto bg-gray-50 dark:bg-gray-800/50">
                         <button type="submit" className="bg-primary text-white font-semibold px-4 py-3 rounded-lg shadow-sm hover:bg-primary-hover transition-colors w-full text-base flex justify-center items-center">
-                            <Icon name="Plus" size={20} className="mr-2" />
-                            {type === 'transfer' ? 'Transfer Funds' : 'Add Transaction'}
+                            <Icon name={transaction ? "Save" : "Plus"} size={20} className="mr-2" />
+                            {transaction ? 'Save Changes' : (type === 'transfer' ? 'Transfer Funds' : 'Add Transaction')}
                         </button>
+                        {transaction && onDelete && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (window.confirm('Are you sure you want to delete this transaction?')) {
+                                        onDelete(transaction.id);
+                                        onClose();
+                                    }
+                                }}
+                                className="mt-3 w-full bg-red-50 text-red-600 font-semibold px-4 py-3 rounded-lg shadow-sm hover:bg-red-100 transition-colors dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30 flex justify-center items-center"
+                            >
+                                <Icon name="Trash2" size={20} className="mr-2" />
+                                Delete Transaction
+                            </button>
+                        )}
                     </div>
                 </form>
             </div>

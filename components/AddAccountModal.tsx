@@ -1,8 +1,9 @@
 
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import { AppContext } from '../App';
 import { Icon, iconList } from './Icon';
 import { AccountType } from '../types';
+import { getCurrencySymbol } from '../utils/currency';
 
 interface AddAccountModalProps {
     isOpen: boolean;
@@ -18,7 +19,7 @@ const predefinedAccountTypes: { type: AccountType; icon: string; label: string }
     { type: 'Liability', icon: 'TrendingDown', label: 'Loan' },
 ];
 
-export const AddAccountModal: React.FC<AddAccountModalProps> = ({ isOpen, onClose }) => {
+export const AddAccountModal: React.FC<AddAccountModalProps> = ({ isOpen, onClose, account, onDelete }) => { // Modified
     const context = useContext(AppContext);
     const [name, setName] = useState('');
     const [balance, setBalance] = useState('');
@@ -27,24 +28,58 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ isOpen, onClos
     const [selectedIcon, setSelectedIcon] = useState('Wallet');
     const [showIconPicker, setShowIconPicker] = useState(false);
 
+    useEffect(() => {
+        if (isOpen) { // Only reset/fill when modal opens
+            if (account) {
+                setName(account.name);
+                setBalance(account.balance.toString());
+
+                const isPredefined = predefinedAccountTypes.some(t => t.type === account.type);
+                if (isPredefined) {
+                    setSelectedType(account.type);
+                    setCustomTypeName('');
+                    setSelectedIcon(predefinedAccountTypes.find(t => t.type === account.type)?.icon || 'Wallet');
+                } else {
+                    setSelectedType('Custom');
+                    setCustomTypeName(account.type);
+                    setSelectedIcon(account.icon || 'Wallet');
+                }
+            } else {
+                // Reset form for new account
+                setName('');
+                setBalance('');
+                setSelectedType('Checking');
+                setCustomTypeName('');
+                setSelectedIcon('Wallet');
+                setShowIconPicker(false);
+            }
+        }
+    }, [account, isOpen]); // Dependency array includes account and isOpen
+
     if (!context) return null;
-    const { addAccount } = context;
+    const { addAccount, updateAccount, currency } = context; // Added updateAccount
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!name || !balance) return;
 
         const finalType = selectedType === 'Custom' ? customTypeName : selectedType;
-        const finalIcon = selectedType === 'Custom' ? selectedIcon : undefined;
+        const finalIcon = selectedType === 'Custom' ? selectedIcon : (predefinedAccountTypes.find(t => t.type === selectedType)?.icon || 'Wallet');
 
-        addAccount({
+        const accountData = {
             name,
             balance: parseFloat(balance),
             type: finalType || 'Custom',
             icon: finalIcon
-        });
+        };
 
-        // Reset form
+        if (account) {
+            updateAccount(account.id, accountData); // Handle update
+        } else {
+            addAccount(accountData); // Handle add
+        }
+
+        // Reset form (for add or after update)
         setName('');
         setBalance('');
         setSelectedType('Checking');
@@ -70,7 +105,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ isOpen, onClos
             >
                 <div className={`bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md pointer-events-auto transform transition-all ${isOpen ? 'scale-100' : 'scale-95'} flex flex-col max-h-[90vh]`}>
                     <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center shrink-0">
-                        <h3 className="text-xl font-bold dark:text-gray-50">Add New Account</h3>
+                        <h3 className="text-xl font-bold dark:text-gray-50">{account ? 'Edit Account' : 'Add New Account'}</h3> {/* Modified title */}
                         <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700">
                             <Icon name="X" size={24} />
                         </button>
@@ -160,7 +195,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ isOpen, onClos
                         <div>
                             <label htmlFor="initialBalance" className={labelStyles}>Initial Balance</label>
                             <div className="relative">
-                                <span className="absolute left-3 top-3.5 text-gray-500">₹</span>
+                                <span className="absolute left-3 top-3.5 text-gray-500">{getCurrencySymbol(currency)}</span>
                                 <input
                                     type="number"
                                     id="initialBalance"
@@ -176,8 +211,22 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ isOpen, onClos
 
                         <div className="pt-2">
                             <button type="submit" className="w-full bg-primary text-white font-semibold px-4 py-3 rounded-lg shadow-sm hover:bg-primary-hover transition-colors">
-                                Create Account
+                                {account ? 'Save Changes' : 'Create Account'}
                             </button>
+                            {account && onDelete && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (window.confirm('Are you sure you want to delete this account?')) {
+                                            onDelete(account.id);
+                                            onClose();
+                                        }
+                                    }}
+                                    className="mt-3 w-full bg-red-50 text-red-600 font-semibold px-4 py-3 rounded-lg shadow-sm hover:bg-red-100 transition-colors dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30"
+                                >
+                                    Delete Account
+                                </button>
+                            )}
                         </div>
                     </form>
                 </div>

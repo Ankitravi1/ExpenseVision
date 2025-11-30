@@ -3,12 +3,11 @@ import React, { useContext, useMemo, useState } from 'react';
 import { AppContext } from '../App';
 import { Card } from '../components/Card';
 import { Icon } from '../components/Icon';
-import { Account, AccountType } from '../types';
+import { Account } from '../types';
 import { AddAccountModal } from '../components/AddAccountModal';
-import { ConfirmDialog } from '../components/ConfirmDialog';
 import { formatCurrency } from '../utils/currency';
 
-const AccountCard: React.FC<{ account: Account; onDelete: () => void }> = ({ account, onDelete }) => {
+const AccountCard: React.FC<{ account: Account; onEdit: () => void }> = ({ account, onEdit }) => {
     const { currency } = useContext(AppContext)!;
     const isNegative = account.balance < 0;
 
@@ -44,11 +43,11 @@ const AccountCard: React.FC<{ account: Account; onDelete: () => void }> = ({ acc
                     </p>
                 </div>
                 <button
-                    onClick={onDelete}
-                    className="p-2 text-gray-400 hover:text-danger dark:hover:text-red-400 transition-colors rounded-full hover:bg-red-50 dark:hover:bg-red-900/20"
-                    title="Delete account"
+                    onClick={onEdit}
+                    className="p-2 text-gray-400 hover:text-primary dark:hover:text-primary-light transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+                    title="Edit account"
                 >
-                    <Icon name="Trash2" size={18} />
+                    <Icon name="Edit2" size={18} />
                 </button>
             </div>
         </Card>
@@ -58,18 +57,23 @@ const AccountCard: React.FC<{ account: Account; onDelete: () => void }> = ({ acc
 export const Accounts: React.FC = () => {
     const { accounts, deleteAccount, currency } = useContext(AppContext)!;
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; accountId: string | null }>({ isOpen: false, accountId: null });
+    const [editAccount, setEditAccount] = useState<Account | null>(null);
 
     const totalBalance = useMemo(() => accounts.reduce((sum, acc) => sum + acc.balance, 0), [accounts]);
 
-    const handleDelete = (id: string) => {
-        setDeleteConfirm({ isOpen: true, accountId: id });
+    const handleEdit = (account: Account) => {
+        setEditAccount(account);
+        setIsModalOpen(true);
     };
 
-    const confirmDelete = () => {
-        if (deleteConfirm.accountId) {
-            deleteAccount(deleteConfirm.accountId);
-        }
+    const handleAdd = () => {
+        setEditAccount(null);
+        setIsModalOpen(true);
+    };
+
+    const handleDelete = async (id: string) => {
+        await deleteAccount(id);
+        setIsModalOpen(false);
     };
 
     return (
@@ -87,7 +91,7 @@ export const Accounts: React.FC = () => {
                     <div className="flex justify-between items-center mb-4">
                         <h3 className="text-xl font-bold text-gray-darkest dark:text-gray-100">My Accounts</h3>
                         <button
-                            onClick={() => setIsModalOpen(true)}
+                            onClick={handleAdd}
                             className="btn btn-primary flex items-center gap-2"
                         >
                             <Icon name="Plus" size={20} />
@@ -99,24 +103,18 @@ export const Accounts: React.FC = () => {
                             <AccountCard
                                 key={account.id}
                                 account={account}
-                                onDelete={() => handleDelete(account.id)}
+                                onEdit={() => handleEdit(account)}
                             />
                         ))}
                     </div>
                 </div>
             </div>
 
-            <AddAccountModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
-
-            <ConfirmDialog
-                isOpen={deleteConfirm.isOpen}
-                onClose={() => setDeleteConfirm({ isOpen: false, accountId: null })}
-                onConfirm={confirmDelete}
-                title="Delete Account"
-                message="Are you sure you want to delete this account? You cannot delete accounts that have transactions."
-                confirmText="Delete"
-                cancelText="Cancel"
-                variant="danger"
+            <AddAccountModal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                account={editAccount || undefined}
+                onDelete={editAccount ? handleDelete : undefined}
             />
         </>
     );

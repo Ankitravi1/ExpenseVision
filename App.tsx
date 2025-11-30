@@ -15,10 +15,12 @@ import { VerifyEmail } from './pages/VerifyEmail';
 import { ForgotPassword } from './pages/ForgotPassword';
 import { ResetPassword } from './pages/ResetPassword';
 import { ProfileCompletion } from './components/ProfileCompletion';
-import { mockAccounts, mockCategories, mockTransactions, mockBudgets } from './data/mockData';
-import { Account, Budget, Category, Transaction, Page, TransactionType } from './types';
+import { Account, Budget, Category, Transaction, Page, User } from './types';
 import { NewTransactionModal } from './components/NewTransactionModal';
 import { authService } from './services/auth';
+import { api } from './services/api';
+import { Icon } from './components/Icon';
+import { useToast } from './context/ToastContext';
 
 export const AppContext = React.createContext<{
   accounts: Account[];
@@ -29,22 +31,25 @@ export const AppContext = React.createContext<{
   setCurrency: (currency: string) => void;
   theme: 'light' | 'dark';
   setTheme: (theme: 'light' | 'dark') => void;
-  addTransaction: (transaction: Omit<Transaction, 'id'>) => void;
-  updateTransaction: (id: string, transaction: Partial<Transaction>) => void;
-  deleteTransaction: (id: string) => void;
-  addAccount: (account: Omit<Account, 'id'>) => void;
-  updateAccount: (id: string, account: Partial<Account>) => void;
-  deleteAccount: (id: string) => void;
-  addCategory: (category: Omit<Category, 'id'>) => void;
-  updateCategory: (id: string, category: Partial<Category>) => void;
-  deleteCategory: (id: string) => void;
-  setBudget: (budget: Budget) => void;
-  deleteBudget: (id: string) => void;
+  addTransaction: (transaction: Omit<Transaction, 'id'>) => Promise<void>;
+  updateTransaction: (id: string, transaction: Partial<Transaction>) => Promise<void>;
+  deleteTransaction: (id: string) => Promise<void>;
+  addAccount: (account: Omit<Account, 'id'>) => Promise<void>;
+  updateAccount: (id: string, account: Partial<Account>) => Promise<void>;
+  deleteAccount: (id: string) => Promise<void>;
+  addCategory: (category: Omit<Category, 'id'>) => Promise<void>;
+  updateCategory: (id: string, category: Partial<Category>) => Promise<void>;
+  deleteCategory: (id: string) => Promise<void>;
+  setBudget: (budget: Budget) => Promise<void>;
+  deleteBudget: (id: string) => Promise<void>;
   clearAllTransactions: () => void;
   setActivePage: (page: Page) => void;
+  refreshData: () => Promise<void>;
+  user: User | null;
 } | null>(null);
 
 const App: React.FC = () => {
+  const { showToast } = useToast();
   const [isAuthenticated, setIsAuthenticated] = useState(authService.isAuthenticated());
   const [needsProfileCompletion, setNeedsProfileCompletion] = useState(false);
   const [authView, setAuthView] = useState<'landing' | 'login' | 'signup' | 'verify-email' | 'forgot-password' | 'reset-password'>('landing');
@@ -52,10 +57,19 @@ const App: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [currency, setCurrencyState] = useState('INR');
+  const [user, setUser] = useState<User | null>(null);
   const [theme, setThemeState] = useState<'light' | 'dark'>(() => {
     const savedTheme = localStorage.getItem('theme');
     return (savedTheme as 'light' | 'dark') || 'light';
   });
+
+  // Data States
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const setTheme = useCallback((newTheme: 'light' | 'dark') => {
     setThemeState(newTheme);
@@ -80,11 +94,6 @@ const App: React.FC = () => {
     }
   }, [isAuthenticated]);
 
-  const [transactions, setTransactions] = useState<Transaction[]>(mockTransactions);
-  const [accounts, setAccounts] = useState<Account[]>(mockAccounts);
-  const [categories, setCategories] = useState<Category[]>(mockCategories);
-  const [budgets, setBudgets] = useState<Budget[]>(mockBudgets);
-
   useEffect(() => {
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
@@ -102,238 +111,200 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // Check profile completion status on mount
+  // Fetch Initial Data
+  const fetchData = useCallback(async () => {
+    if (!isAuthenticated) return;
+
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await api.getInitialData();
+      setTransactions(data.transactions);
+      setAccounts(data.accounts);
+      setCategories(data.categories);
+      setBudgets(data.budgets);
+    } catch (err) {
+      console.error('Failed to fetch data:', err);
+      setError('Failed to load data. Please try refreshing.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isAuthenticated]);
+
   useEffect(() => {
     if (isAuthenticated) {
       const user = authService.getUser();
       if (user) {
-        // Check profileComplete field from database
+        setUser(user);
         const profileComplete = user.profileComplete === true;
         setNeedsProfileCompletion(!profileComplete);
-
-        // Load user preferences
         if (user.currency) setCurrencyState(user.currency);
         if (user.theme) setThemeState(user.theme as 'light' | 'dark');
       }
+      fetchData();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, fetchData]);
 
-  const addTransaction = useCallback((transaction: Omit<Transaction, 'id'>) => {
-    const newTransaction: Transaction = {
-      ...transaction,
-      id: `t${Date.now()}`
-    };
+  const addTransaction = useCallback(async (transaction: Omit<Transaction, 'id'>) => {
+    try {
+      const newTransaction = await api.createTransaction(transaction);
+      setTransactions(prev => [newTransaction, ...prev].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+      await fetchData(); // Refresh all data to ensure consistency (accounts, budgets)
+    } catch (err) {
+      console.error('Failed to add transaction:', err);
+      showToast('Failed to add transaction', 'error');
+    }
+  }, [fetchData, showToast]);
 
-    setTransactions(prev => [newTransaction, ...prev].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+  const updateTransaction = useCallback(async (id: string, updatedData: Partial<Transaction>) => {
+    try {
+      await api.updateTransaction(id, updatedData);
+      await fetchData(); // Refresh all data
+    } catch (err) {
+      console.error('Failed to update transaction:', err);
+      showToast('Failed to update transaction', 'error');
+    }
+  }, [fetchData, showToast]);
 
-    setAccounts(prevAccounts => {
-      return prevAccounts.map(acc => {
-        // Handle Source Account
-        if (acc.id === newTransaction.accountId) {
-          let newBalance = acc.balance;
-          if (newTransaction.type === 'expense' || newTransaction.type === 'transfer') {
-            newBalance -= newTransaction.amount;
-          } else if (newTransaction.type === 'income') {
-            newBalance += newTransaction.amount;
-          }
-          return { ...acc, balance: newBalance };
+  const deleteTransaction = useCallback(async (id: string) => {
+    try {
+      await api.deleteTransaction(id);
+      await fetchData(); // Refresh all data
+    } catch (err) {
+      console.error('Failed to delete transaction:', err);
+      showToast('Failed to delete transaction', 'error');
+    }
+  }, [fetchData, showToast]);
+
+  const clearAllTransactions = useCallback(async () => {
+    try {
+      await api.clearAllTransactions();
+      await fetchData();
+      showToast('All transactions cleared successfully', 'success');
+    } catch (err) {
+      console.error('Failed to clear transactions:', err);
+      showToast('Failed to clear transactions', 'error');
+    }
+  }, [fetchData, showToast]);
+
+  const addAccount = useCallback(async (account: Omit<Account, 'id'>) => {
+    try {
+      const newAccount = await api.createAccount(account);
+      setAccounts(prev => [...prev, newAccount]);
+      await fetchData();
+    } catch (err) {
+      console.error('Failed to add account:', err);
+      showToast('Failed to add account', 'error');
+    }
+  }, [showToast, fetchData]);
+
+  const updateAccount = useCallback(async (id: string, updatedData: Partial<Account>) => {
+    try {
+      const updatedAccount = await api.updateAccount(id, updatedData);
+      setAccounts(prev => prev.map(acc => acc.id === id ? updatedAccount : acc));
+      await fetchData();
+    } catch (err) {
+      console.error('Failed to update account:', err);
+      showToast('Failed to update account', 'error');
+    }
+  }, [showToast, fetchData]);
+
+  const deleteAccount = useCallback(async (id: string) => {
+    try {
+      await api.deleteAccount(id);
+      setAccounts(prev => prev.filter(acc => acc.id !== id));
+      await fetchData();
+    } catch (err: any) {
+      console.error('Failed to delete account:', err);
+      const message = err.message?.includes('Foreign key constraint')
+        ? 'This account is in use and cannot be deleted.'
+        : (err.message || 'Failed to delete account');
+      showToast(message, 'error');
+    }
+  }, [showToast, fetchData]);
+
+  const addCategory = useCallback(async (category: Omit<Category, 'id'>) => {
+    try {
+      const newCategory = await api.createCategory(category);
+      setCategories(prev => [...prev, newCategory]);
+      await fetchData();
+    } catch (err) {
+      console.error('Failed to add category:', err);
+      showToast('Failed to add category', 'error');
+    }
+  }, [showToast, fetchData]);
+
+  const updateCategory = useCallback(async (id: string, updatedData: Partial<Category>) => {
+    try {
+      const updatedCategory = await api.updateCategory(id, updatedData);
+      setCategories(prev => prev.map(cat => cat.id === id ? updatedCategory : cat));
+      await fetchData();
+    } catch (err) {
+      console.error('Failed to update category:', err);
+      showToast('Failed to update category', 'error');
+    }
+  }, [showToast, fetchData]);
+
+  const deleteCategory = useCallback(async (id: string) => {
+    try {
+      await api.deleteCategory(id);
+      setCategories(prev => prev.filter(cat => cat.id !== id));
+      await fetchData();
+    } catch (err: any) {
+      console.error('Failed to delete category:', err);
+      const message = err.message?.includes('Foreign key constraint')
+        ? 'This category is in use and cannot be deleted.'
+        : (err.message || 'Failed to delete category');
+      showToast(message, 'error');
+    }
+  }, [showToast, fetchData]);
+
+  const setBudget = useCallback(async (budget: Budget) => {
+    try {
+      const newBudget = await api.createBudget(budget);
+      setBudgets(prev => {
+        const existing = prev.find(b => b.categoryId === budget.categoryId);
+        if (existing) {
+          return prev.map(b => b.categoryId === budget.categoryId ? newBudget : b);
         }
-        // Handle Destination Account for Transfers
-        if (newTransaction.type === 'transfer' && acc.id === newTransaction.transferToAccountId) {
-          return { ...acc, balance: acc.balance + newTransaction.amount };
-        }
-        return acc;
+        return [...prev, newBudget];
       });
-    });
-
-    // Update budgets if expense
-    if (newTransaction.type === 'expense') {
-      setBudgets(prevBudgets => prevBudgets.map(b => {
-        if (b.categoryId === newTransaction.categoryId) {
-          return { ...b, spent: b.spent + newTransaction.amount };
-        }
-        return b;
-      }));
+      await fetchData(); // Refresh to get correct spent amounts if backend calculates it
+    } catch (err) {
+      console.error('Failed to set budget:', err);
+      showToast('Failed to set budget', 'error');
     }
+  }, [fetchData, showToast]);
 
-  }, []);
-
-  const updateTransaction = useCallback((id: string, updatedData: Partial<Transaction>) => {
-    setTransactions(prev => {
-      const oldTransaction = prev.find(t => t.id === id);
-      if (!oldTransaction) return prev;
-
-      const newTransaction = { ...oldTransaction, ...updatedData };
-
-      // Reverse old transaction effects
-      setAccounts(prevAccounts => {
-        return prevAccounts.map(acc => {
-          let newBalance = acc.balance;
-
-          // Reverse old source account
-          if (acc.id === oldTransaction.accountId) {
-            if (oldTransaction.type === 'expense' || oldTransaction.type === 'transfer') {
-              newBalance += oldTransaction.amount;
-            } else if (oldTransaction.type === 'income') {
-              newBalance -= oldTransaction.amount;
-            }
-          }
-
-          // Reverse old destination account for transfers
-          if (oldTransaction.type === 'transfer' && acc.id === oldTransaction.transferToAccountId) {
-            newBalance -= oldTransaction.amount;
-          }
-
-          // Apply new source account
-          if (acc.id === newTransaction.accountId) {
-            if (newTransaction.type === 'expense' || newTransaction.type === 'transfer') {
-              newBalance -= newTransaction.amount;
-            } else if (newTransaction.type === 'income') {
-              newBalance += newTransaction.amount;
-            }
-          }
-
-          // Apply new destination account for transfers
-          if (newTransaction.type === 'transfer' && acc.id === newTransaction.transferToAccountId) {
-            newBalance += newTransaction.amount;
-          }
-
-          return { ...acc, balance: newBalance };
-        });
-      });
-
-      // Update budgets
-      if (oldTransaction.type === 'expense') {
-        setBudgets(prevBudgets => prevBudgets.map(b => {
-          if (b.categoryId === oldTransaction.categoryId) {
-            return { ...b, spent: b.spent - oldTransaction.amount };
-          }
-          return b;
-        }));
-      }
-
-      if (newTransaction.type === 'expense') {
-        setBudgets(prevBudgets => prevBudgets.map(b => {
-          if (b.categoryId === newTransaction.categoryId) {
-            return { ...b, spent: b.spent + newTransaction.amount };
-          }
-          return b;
-        }));
-      }
-
-      return prev.map(t => t.id === id ? newTransaction : t)
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    });
-  }, []);
-
-  const deleteTransaction = useCallback((id: string) => {
-    setTransactions(prev => {
-      const transaction = prev.find(t => t.id === id);
-      if (!transaction) return prev;
-
-      // Reverse transaction effects on accounts
-      setAccounts(prevAccounts => {
-        return prevAccounts.map(acc => {
-          let newBalance = acc.balance;
-
-          // Reverse source account
-          if (acc.id === transaction.accountId) {
-            if (transaction.type === 'expense' || transaction.type === 'transfer') {
-              newBalance += transaction.amount;
-            } else if (transaction.type === 'income') {
-              newBalance -= transaction.amount;
-            }
-          }
-
-          // Reverse destination account for transfers
-          if (transaction.type === 'transfer' && acc.id === transaction.transferToAccountId) {
-            newBalance -= transaction.amount;
-          }
-
-          return { ...acc, balance: newBalance };
-        });
-      });
-
-      // Reverse budget effects
-      if (transaction.type === 'expense') {
-        setBudgets(prevBudgets => prevBudgets.map(b => {
-          if (b.categoryId === transaction.categoryId) {
-            return { ...b, spent: b.spent - transaction.amount };
-          }
-          return b;
-        }));
-      }
-
-      return prev.filter(t => t.id !== id);
-    });
-  }, []);
-
-  const clearAllTransactions = useCallback(() => {
-    setTransactions([]);
-    // Reset all budget spent amounts to 0
-    setBudgets(prev => prev.map(b => ({ ...b, spent: 0 })));
-  }, []);
-
-  const addAccount = useCallback((account: Omit<Account, 'id'>) => {
-    const newAccount = { ...account, id: `acc${Date.now()}` };
-    setAccounts(prev => [...prev, newAccount]);
-  }, []);
-
-  const updateAccount = useCallback((id: string, updatedData: Partial<Account>) => {
-    setAccounts(prev => prev.map(acc => acc.id === id ? { ...acc, ...updatedData } : acc));
-  }, []);
-
-  const deleteAccount = useCallback((id: string) => {
-    // Check if account has transactions
-    const hasTransactions = transactions.some(t =>
-      t.accountId === id || t.transferToAccountId === id
-    );
-
-    if (hasTransactions) {
-      alert('Cannot delete account with existing transactions. Please delete or reassign transactions first.');
-      return;
+  const deleteBudget = useCallback(async (id: string) => {
+    try {
+      await api.deleteBudget(id);
+      setBudgets(prev => prev.filter(b => b.id !== id));
+    } catch (err) {
+      console.error('Failed to delete budget:', err);
+      showToast('Failed to delete budget', 'error');
     }
-
-    setAccounts(prev => prev.filter(acc => acc.id !== id));
-  }, [transactions]);
-
-  const addCategory = useCallback((category: Omit<Category, 'id'>) => {
-    const newCategory = { ...category, id: `cat${Date.now()}` };
-    setCategories(prev => [...prev, newCategory]);
-  }, []);
-
-  const updateCategory = useCallback((id: string, updatedData: Partial<Category>) => {
-    setCategories(prev => prev.map(cat => cat.id === id ? { ...cat, ...updatedData } : cat));
-  }, []);
-
-  const deleteCategory = useCallback((id: string) => {
-    // Check if category has transactions or budgets
-    const hasTransactions = transactions.some(t => t.categoryId === id);
-    const hasBudgets = budgets.some(b => b.categoryId === id);
-
-    if (hasTransactions || hasBudgets) {
-      alert('Cannot delete category with existing transactions or budgets. Please delete or reassign them first.');
-      return;
-    }
-
-    setCategories(prev => prev.filter(cat => cat.id !== id));
-  }, [transactions, budgets]);
-
-  const setBudget = useCallback((budget: Budget) => {
-    setBudgets(prev => {
-      const existing = prev.find(b => b.categoryId === budget.categoryId);
-      if (existing) {
-        return prev.map(b => b.categoryId === budget.categoryId ? { ...b, amount: budget.amount } : b);
-      }
-      return [...prev, { ...budget, id: `b${Date.now()}`, spent: 0 }]; // Logic to calculate spent for existing transactions could be added here
-    });
-  }, []);
-
-  const deleteBudget = useCallback((id: string) => {
-    setBudgets(prev => prev.filter(b => b.id !== id));
-  }, []);
+  }, [showToast]);
 
   const pageComponent = useMemo(() => {
+    if (isLoading && transactions.length === 0 && accounts.length === 0) {
+      return (
+        <div className="flex items-center justify-center h-full">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        </div>
+      );
+    }
+
+    if (error) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full text-red-500">
+          <Icon name="AlertTriangle" size={48} className="mb-4" />
+          <p className="text-lg">{error}</p>
+          <button onClick={fetchData} className="mt-4 btn btn-primary">Retry</button>
+        </div>
+      );
+    }
+
     switch (activePage) {
       case 'Dashboard':
         return <Dashboard />;
@@ -352,7 +323,7 @@ const App: React.FC = () => {
       default:
         return <Dashboard />;
     }
-  }, [activePage]);
+  }, [activePage, isLoading, error, transactions.length, accounts.length, fetchData]);
 
   const appContextValue = useMemo(() => ({
     accounts,
@@ -376,7 +347,9 @@ const App: React.FC = () => {
     deleteBudget,
     clearAllTransactions,
     setActivePage,
-  }), [accounts, categories, transactions, budgets, currency, setCurrency, theme, setTheme, addTransaction, updateTransaction, deleteTransaction, clearAllTransactions, addAccount, updateAccount, deleteAccount, addCategory, updateCategory, deleteCategory, setBudget, deleteBudget]);
+    refreshData: fetchData,
+    user,
+  }), [accounts, categories, transactions, budgets, currency, setCurrency, theme, setTheme, addTransaction, updateTransaction, deleteTransaction, clearAllTransactions, addAccount, updateAccount, deleteAccount, addCategory, updateCategory, deleteCategory, setBudget, deleteBudget, fetchData, user]);
 
   // Auth handlers
   const handleLoginSuccess = () => {
@@ -394,6 +367,10 @@ const App: React.FC = () => {
     setIsAuthenticated(false);
     setAuthView('landing');
     setActivePage('Dashboard');
+    setTransactions([]);
+    setAccounts([]);
+    setCategories([]);
+    setBudgets([]);
   };
 
   // Show auth views if not authenticated

@@ -138,8 +138,26 @@ const COLORS = {
 const DEFAULT_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#f43f5e', '#3b82f6', '#8b5cf6', '#ec4899', '#64748b'];
 
 export const Dashboard: React.FC = () => {
-  const { transactions, categories, setActivePage, currency } = useContext(AppContext)!;
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const { transactions, categories, accounts, setActivePage, currency, user } = useContext(AppContext)!;
+
+  // Helper to get current date in user's timezone
+  const getNowInTimezone = (timezone?: string | null) => {
+    if (!timezone) return new Date();
+    try {
+      const str = new Date().toLocaleString('en-US', { timeZone: timezone });
+      return new Date(str);
+    } catch (e) {
+      console.error('Invalid timezone:', timezone);
+      return new Date();
+    }
+  };
+
+  const [currentDate, setCurrentDate] = useState(getNowInTimezone(user?.timezone));
+
+  // Update currentDate if user timezone changes (e.g. after profile update)
+  React.useEffect(() => {
+    setCurrentDate(getNowInTimezone(user?.timezone));
+  }, [user?.timezone]);
 
   const changeMonth = (offset: number) => {
     setCurrentDate(prevDate => {
@@ -149,15 +167,25 @@ export const Dashboard: React.FC = () => {
     });
   };
 
+  const netWorth = useMemo(() => accounts.reduce((sum, acc) => sum + acc.balance, 0), [accounts]);
+
   const { totalIncome, totalExpenses, netFlow, recentTransactions, expenseByCategory } = useMemo(() => {
-    const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-    startOfMonth.setUTCHours(0, 0, 0, 0);
-    const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-    endOfMonth.setUTCHours(23, 59, 59, 999);
+    const currentMonth = currentDate.getMonth();
+    const currentYear = currentDate.getFullYear();
 
     const currentTransactions = transactions.filter(t => {
       const tDate = new Date(t.date);
-      return tDate >= startOfMonth && tDate <= endOfMonth;
+      // Convert transaction date to user's timezone to check if it belongs to the current month
+      let tDateInUserTZ = tDate;
+      if (user?.timezone) {
+        try {
+          const str = tDate.toLocaleString('en-US', { timeZone: user.timezone });
+          tDateInUserTZ = new Date(str);
+        } catch (e) {
+          // Fallback to local/UTC if timezone invalid
+        }
+      }
+      return tDateInUserTZ.getMonth() === currentMonth && tDateInUserTZ.getFullYear() === currentYear;
     });
 
     const totalIncome = currentTransactions
@@ -195,10 +223,26 @@ export const Dashboard: React.FC = () => {
     <div className="space-y-8 max-w-7xl mx-auto">
       {/* Header & Month Selector */}
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
-          <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Overview of your financial health</p>
+        <div className="flex items-center gap-6">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
+            <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Overview of your financial health</p>
+          </div>
+          {/* Net Worth Card */}
+          <div className="hidden sm:block px-4 py-2 bg-gray-900 dark:bg-white rounded-xl shadow-lg transform hover:scale-105 transition-transform">
+            <p className="text-xs font-medium text-gray-400 dark:text-gray-600 uppercase tracking-wider">Net Worth</p>
+            <p className="text-lg font-bold text-white dark:text-gray-900">{formatCurrency(netWorth, currency)}</p>
+          </div>
         </div>
+
+        {/* Mobile Net Worth (visible only on small screens) */}
+        <div className="sm:hidden w-full px-4 py-3 bg-gray-900 dark:bg-white rounded-xl shadow-lg mb-2">
+          <div className="flex justify-between items-center">
+            <p className="text-sm font-medium text-gray-400 dark:text-gray-600 uppercase tracking-wider">Net Worth</p>
+            <p className="text-xl font-bold text-white dark:text-gray-900">{formatCurrency(netWorth, currency)}</p>
+          </div>
+        </div>
+
         <div className="flex items-center bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-1">
           <button
             onClick={() => changeMonth(-1)}

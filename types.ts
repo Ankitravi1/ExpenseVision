@@ -31,6 +31,7 @@ export interface Account {
   name: string;
   type: AccountType;
   balance: number;
+  color?: string;
   icon?: string; // Added icon support
   logo?: string;
 }
@@ -47,6 +48,7 @@ export interface User {
   email: string;
   name: string;
   country?: string | null;
+  timezone?: string | null;
   currency?: string | null;
   theme?: string | null;
   profilePicture?: string | null;

@@ -69,22 +69,30 @@ router.post('/', async (req, res, next) => {
         const data = budgetSchema.parse(req.body);
 
         // Upsert budget
-        const budget = await prisma.budget.upsert({
+        // Check if budget exists
+        const existingBudget = await prisma.budget.findFirst({
             where: {
-                userId_categoryId_month: {
-                    userId,
-                    categoryId: data.categoryId,
-                    month: data.month || null
-                }
-            },
-            update: {
-                amount: data.amount
-            },
-            create: {
-                ...data,
-                userId
+                userId,
+                categoryId: data.categoryId,
+                month: data.month || null
             }
         });
+
+        let budget;
+        if (existingBudget) {
+            budget = await prisma.budget.update({
+                where: { id: existingBudget.id },
+                data: { amount: data.amount }
+            });
+        } else {
+            budget = await prisma.budget.create({
+                data: {
+                    ...data,
+                    userId,
+                    month: data.month || null
+                }
+            });
+        }
 
         // Calculate spent
         const whereClause: any = {

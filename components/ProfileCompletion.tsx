@@ -8,7 +8,7 @@ interface ProfileCompletionProps {
 }
 
 export const ProfileCompletion: React.FC<ProfileCompletionProps> = ({ onComplete }) => {
-    const [country, setCountry] = useState('');
+    const [timezone, setTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone);
     const [currency, setCurrency] = useState('INR');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -17,8 +17,8 @@ export const ProfileCompletion: React.FC<ProfileCompletionProps> = ({ onComplete
         e.preventDefault();
         setError('');
 
-        if (!country.trim()) {
-            setError('Country is required');
+        if (!timezone) {
+            setError('Timezone is required');
             return;
         }
 
@@ -27,7 +27,7 @@ export const ProfileCompletion: React.FC<ProfileCompletionProps> = ({ onComplete
         try {
             // Use generic completeProfile for all users
             await authService.completeProfile({
-                country,
+                timezone,
                 currency,
             });
             onComplete();
@@ -60,16 +60,17 @@ export const ProfileCompletion: React.FC<ProfileCompletionProps> = ({ onComplete
             <form onSubmit={handleSubmit} className="space-y-6">
                 <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Country *
+                        Timezone *
                     </label>
-                    <input
-                        type="text"
-                        value={country}
-                        onChange={(e) => setCountry(e.target.value)}
-                        required
+                    <select
+                        value={timezone}
+                        onChange={(e) => setTimezone(e.target.value)}
                         className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                        placeholder="India"
-                    />
+                    >
+                        {Intl.supportedValuesOf('timeZone').map(tz => (
+                            <option key={tz} value={tz}>{tz}</option>
+                        ))}
+                    </select>
                 </div>
 
                 <div>

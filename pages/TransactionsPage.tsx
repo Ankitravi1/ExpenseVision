@@ -5,10 +5,10 @@ import { Card } from '../components/Card';
 import { Icon } from '../components/Icon';
 import { Transaction } from '../types';
 import { ExportButton } from '../components/ExportButton';
-import { ConfirmDialog } from '../components/ConfirmDialog';
 import { formatCurrency } from '../utils/currency';
+import { NewTransactionModal } from '../components/NewTransactionModal';
 
-const TransactionRow: React.FC<{ transaction: Transaction; onEdit: () => void; onDelete: () => void }> = ({ transaction, onEdit, onDelete }) => {
+const TransactionRow: React.FC<{ transaction: Transaction; onEdit: () => void }> = ({ transaction, onEdit }) => {
     const { categories, accounts, currency } = useContext(AppContext)!;
     const category = categories.find(c => c.id === transaction.categoryId);
     const account = accounts.find(a => a.id === transaction.accountId);
@@ -74,17 +74,21 @@ const TransactionRow: React.FC<{ transaction: Transaction; onEdit: () => void; o
             </td>
             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                 <button
-                    onClick={onDelete}
-                    className="text-danger hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors p-2 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20"
-                    title="Delete transaction"
+                    onClick={onEdit}
+                    className="text-gray-500 hover:text-primary dark:text-gray-400 dark:hover:text-primary-light transition-colors p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+                    title="Edit transaction"
                 >
-                    <Icon name="Trash2" size={18} />
+                    <Icon name="Edit2" size={18} />
                 </button>
             </td>
         </tr>
     );
 }
 
+
+import { ImportTransactionsModal } from '../components/ImportTransactionsModal';
+
+// ... (existing imports)
 
 export const TransactionsPage: React.FC = () => {
     const { transactions, deleteTransaction } = useContext(AppContext)!;
@@ -104,7 +108,11 @@ export const TransactionsPage: React.FC = () => {
     const [startDate, setStartDate] = useState(getLocalDateString(firstDayOfMonth));
     const [endDate, setEndDate] = useState(getLocalDateString(today));
     const [sortConfig, setSortConfig] = useState<{ key: keyof Transaction | 'accountName'; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
-    const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; transactionId: string | null }>({ isOpen: false, transactionId: null });
+
+    // Edit Modal State
+    const [editTransaction, setEditTransaction] = useState<Transaction | null>(null);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
     const requestSort = (key: keyof Transaction | 'accountName') => {
         let direction: 'asc' | 'desc' = 'asc';
@@ -114,23 +122,25 @@ export const TransactionsPage: React.FC = () => {
         setSortConfig({ key, direction });
     };
 
-    const handleDelete = (id: string) => {
-        setDeleteConfirm({ isOpen: true, transactionId: id });
+    const handleEdit = (transaction: Transaction) => {
+        setEditTransaction(transaction);
+        setIsEditModalOpen(true);
     };
 
-    const confirmDelete = () => {
-        if (deleteConfirm.transactionId) {
-            deleteTransaction(deleteConfirm.transactionId);
-        }
+    const handleDelete = async (id: string) => {
+        await deleteTransaction(id);
+        setIsEditModalOpen(false);
     };
 
     const filteredAndSortedTransactions = useMemo(() => {
-        const start = new Date(startDate);
-        start.setHours(0, 0, 0, 0);
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);
-
         const filtered = transactions.filter(t => {
+            if (!startDate || !endDate) return true;
+
+            const start = new Date(startDate);
+            start.setHours(0, 0, 0, 0);
+            const end = new Date(endDate);
+            end.setHours(23, 59, 59, 999);
+
             const tDate = new Date(t.date);
             return tDate >= start && tDate <= end;
         });
@@ -175,6 +185,11 @@ export const TransactionsPage: React.FC = () => {
         </th>
     );
 
+    const handleImportSuccess = (minDate: string, maxDate: string) => {
+        setStartDate(minDate);
+        setEndDate(maxDate);
+    };
+
     return (
         <>
             <Card>
@@ -182,6 +197,7 @@ export const TransactionsPage: React.FC = () => {
                     <h2 className="text-2xl font-bold text-gray-darkest dark:text-gray-50">All Transactions</h2>
                     <div className="flex items-center gap-3 flex-wrap">
                         <div className="flex items-center gap-2">
+                            {/* ... Date inputs ... */}
                             <label htmlFor="start-date" className="text-sm font-medium text-gray-medium dark:text-gray-400">From</label>
                             <input
                                 type="date"
@@ -198,12 +214,30 @@ export const TransactionsPage: React.FC = () => {
                                 onChange={e => setEndDate(e.target.value)}
                                 className="input text-sm"
                             />
+                            <button
+                                onClick={() => { setStartDate(''); setEndDate(''); }}
+                                className="px-3 py-2 text-sm font-medium text-primary hover:text-primary-dark hover:bg-primary/10 rounded-lg transition-colors whitespace-nowrap"
+                            >
+                                Show All
+                            </button>
                         </div>
+                        <button
+                            onClick={() => setIsImportModalOpen(true)}
+                            className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors text-sm font-medium text-gray-700 dark:text-gray-200"
+                        >
+                            <Icon name="Upload" size={16} />
+                            Import CSV
+                        </button>
                         <ExportButton />
                     </div>
                 </div>
+                {/* ... Table ... */}
                 <div className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                    Showing transactions from {formatDateForDisplay(startDate)} to {formatDateForDisplay(endDate)}
+                    {startDate && endDate ? (
+                        <>Showing transactions from {formatDateForDisplay(startDate)} to {formatDateForDisplay(endDate)}</>
+                    ) : (
+                        <>Showing all transactions</>
+                    )}
                 </div>
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
@@ -231,8 +265,7 @@ export const TransactionsPage: React.FC = () => {
                                     <TransactionRow
                                         key={transaction.id}
                                         transaction={transaction}
-                                        onEdit={() => {/* TODO: Implement edit modal */ }}
-                                        onDelete={() => handleDelete(transaction.id)}
+                                        onEdit={() => handleEdit(transaction)}
                                     />
                                 ))
                             )}
@@ -241,15 +274,19 @@ export const TransactionsPage: React.FC = () => {
                 </div>
             </Card>
 
-            <ConfirmDialog
-                isOpen={deleteConfirm.isOpen}
-                onClose={() => setDeleteConfirm({ isOpen: false, transactionId: null })}
-                onConfirm={confirmDelete}
-                title="Delete Transaction"
-                message="Are you sure you want to delete this transaction? This action cannot be undone."
-                confirmText="Delete"
-                cancelText="Cancel"
-                variant="danger"
+            {isEditModalOpen && editTransaction && (
+                <NewTransactionModal
+                    isOpen={isEditModalOpen}
+                    onClose={() => setIsEditModalOpen(false)}
+                    transaction={editTransaction}
+                    onDelete={handleDelete}
+                />
+            )}
+
+            <ImportTransactionsModal
+                isOpen={isImportModalOpen}
+                onClose={() => setIsImportModalOpen(false)}
+                onImportSuccess={handleImportSuccess}
             />
         </>
     );

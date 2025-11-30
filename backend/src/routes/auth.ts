@@ -13,6 +13,44 @@ const router = express.Router();
 const prisma = new PrismaClient();
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
+// Helper to seed default data for new users
+const seedUserData = async (userId: string, prismaClient: PrismaClient) => {
+    const defaultCategories = [
+        { name: 'Salary', type: 'income', icon: 'Wallet' },
+        { name: 'Freelance', type: 'income', icon: 'Briefcase' },
+        { name: 'Investments', type: 'income', icon: 'TrendingUp' },
+        { name: 'Rent', type: 'expense', icon: 'Home' },
+        { name: 'Groceries', type: 'expense', icon: 'ShoppingCart' },
+        { name: 'Utilities', type: 'expense', icon: 'Zap' },
+        { name: 'Dining Out', type: 'expense', icon: 'Coffee' },
+        { name: 'Transportation', type: 'expense', icon: 'Car' },
+        { name: 'Entertainment', type: 'expense', icon: 'Film' },
+        { name: 'Health', type: 'expense', icon: 'Activity' },
+        { name: 'Shopping', type: 'expense', icon: 'ShoppingBag' },
+        { name: 'Education', type: 'expense', icon: 'Book' },
+        { name: 'Travel', type: 'expense', icon: 'Plane' },
+    ];
+
+    await prismaClient.category.createMany({
+        data: defaultCategories.map(cat => ({
+            ...cat,
+            userId
+        }))
+    });
+
+    // Create default Savings Account
+    await prismaClient.account.create({
+        data: {
+            name: 'Savings Account',
+            type: 'savings',
+            balance: 0,
+            userId,
+            icon: 'PiggyBank',
+            color: '#10b981'
+        }
+    });
+};
+
 // Validation schemas
 const signupSchema = z.object({
     email: z.string().email(),
@@ -32,6 +70,7 @@ const googleAuthSchema = z.object({
 const updateUserSchema = z.object({
     name: z.string().min(1).optional(),
     country: z.string().optional(),
+    timezone: z.string().optional(),
     currency: z.string().optional(),
     theme: z.string().optional(),
 });
@@ -74,6 +113,7 @@ router.post('/signup', async (req, res) => {
                 email: true,
                 name: true,
                 country: true,
+                timezone: true,
                 currency: true,
                 theme: true,
                 profilePicture: true,
@@ -105,6 +145,9 @@ router.post('/signup', async (req, res) => {
 
         // Send verification email (async, don't wait)
         sendVerificationEmail(user.email, verificationToken).catch(console.error);
+
+        // Seed default data
+        seedUserData(user.id, prisma).catch(console.error);
     } catch (error) {
         if (error instanceof z.ZodError) {
             return res.status(400).json({ error: error.errors });
@@ -162,6 +205,7 @@ router.post('/login', async (req, res) => {
                 email: user.email,
                 name: user.name,
                 country: user.country,
+                timezone: user.timezone,
                 currency: user.currency,
                 theme: user.theme,
                 profilePicture: user.profilePicture,
@@ -227,6 +271,8 @@ router.post('/google', async (req, res) => {
                 },
             });
             isNewUser = true;
+            // Seed default data for new Google user
+            seedUserData(user.id, prisma).catch(console.error);
         } else if (!user.googleId) {
             // Link Google account to existing user
             user = await prisma.user.update({
@@ -258,6 +304,7 @@ router.post('/google', async (req, res) => {
                 email: user.email,
                 name: user.name,
                 country: user.country,
+                timezone: user.timezone,
                 currency: user.currency,
                 theme: user.theme,
                 profilePicture: user.profilePicture,
@@ -291,14 +338,15 @@ router.put('/complete-profile', async (req, res) => {
             return res.status(401).json({ error: 'Invalid token' });
         }
 
-        const { country, currency } = req.body;
+        const { country, timezone, currency } = req.body;
 
         if (!currency) {
             return res.status(400).json({ error: 'Currency is required' });
         }
 
-        if (!country) {
-            return res.status(400).json({ error: 'Country is required' });
+        // Timezone is now preferred over country
+        if (!timezone && !country) {
+            return res.status(400).json({ error: 'Timezone is required' });
         }
 
         // Update user profile
@@ -306,6 +354,7 @@ router.put('/complete-profile', async (req, res) => {
             where: { id: decoded.userId },
             data: {
                 country,
+                timezone: timezone || 'UTC',
                 currency,
                 profileComplete: true,
                 onboardingStage: 2,
@@ -315,6 +364,7 @@ router.put('/complete-profile', async (req, res) => {
                 email: true,
                 name: true,
                 country: true,
+                timezone: true,
                 currency: true,
                 theme: true,
                 profilePicture: true,
@@ -356,6 +406,7 @@ router.put('/update-profile', async (req, res) => {
                 email: true,
                 name: true,
                 country: true,
+                timezone: true,
                 currency: true,
                 theme: true,
                 profilePicture: true,
@@ -599,6 +650,7 @@ router.post('/2fa/login', async (req, res) => {
                 email: user.email,
                 name: user.name,
                 country: user.country,
+                timezone: user.timezone,
                 currency: user.currency,
                 theme: user.theme,
                 profilePicture: user.profilePicture,

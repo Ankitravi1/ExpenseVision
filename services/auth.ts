@@ -1,10 +1,11 @@
-const API_URL = 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 export interface User {
     id: string;
     email: string;
     name: string;
     country?: string | null;
+    timezone?: string | null;
     currency?: string | null;
     theme?: string | null;
     profilePicture?: string | null;
@@ -76,7 +77,7 @@ export const authService = {
         return json;
     },
 
-    completeProfile: async (data: { country?: string; currency: string }): Promise<{ user: User }> => {
+    completeProfile: async (data: { country?: string; timezone?: string; currency: string }): Promise<{ user: User }> => {
         const token = authService.getToken();
         if (!token) throw new Error('No token found');
 
@@ -88,6 +89,7 @@ export const authService = {
             },
             body: JSON.stringify({
                 country: data.country,
+                timezone: data.timezone,
                 currency: data.currency,
             }),
         });
@@ -102,7 +104,7 @@ export const authService = {
         return json;
     },
 
-    updateProfile: async (data: { name?: string; country?: string; currency?: string; theme?: string }): Promise<{ user: User }> => {
+    updateProfile: async (data: { name?: string; country?: string; timezone?: string; currency?: string; theme?: string }): Promise<{ user: User }> => {
         const token = authService.getToken();
         if (!token) throw new Error('No token found');
 
@@ -129,8 +131,6 @@ export const authService = {
         localStorage.removeItem('token');
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
-        const user = localStorage.getItem('user');
-        return user ? JSON.parse(user) : null;
     },
 
     isAuthenticated: (): boolean => {
