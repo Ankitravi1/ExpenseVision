@@ -1,17 +1,14 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "mongodb"
   url      = env("DATABASE_URL")
 }
 
 model User {
-  id              String   @id @default(uuid())
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
   email           String   @unique
   password        String?  // Null for Google OAuth users
   name            String
@@ -45,12 +42,22 @@ model User {
   transactions    Transaction[]
   budgets         Budget[]
   refreshTokens   RefreshToken[]
+  pushSubscriptions PushSubscription[]
+}
+
+model PushSubscription {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  endpoint  String   @unique
+  keys      String   // JSON string of { p256dh, auth }
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model RefreshToken {
-  id          String   @id @default(uuid())
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
   token       String   @unique
-  userId      String
+  userId      String   @db.ObjectId
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt   DateTime
   revoked     Boolean  @default(false)
@@ -59,8 +66,8 @@ model RefreshToken {
 }
 
 model Account {
-  id        String   @id @default(uuid())
-  userId    String
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
   name      String
   type      String
   balance   Float    @default(0)
@@ -76,8 +83,8 @@ model Account {
 }
 
 model Category {
-  id        String   @id @default(uuid())
-  userId    String
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
   name      String
   type      String   // 'income' | 'expense' | 'transfer'
   icon      String?
@@ -90,11 +97,11 @@ model Category {
 }
 
 model Transaction {
-  id                   String   @id @default(uuid())
-  userId               String
-  accountId            String
-  transferToAccountId  String?
-  categoryId           String?
+  id                   String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId               String   @db.ObjectId
+  accountId            String   @db.ObjectId
+  transferToAccountId  String?  @db.ObjectId
+  categoryId           String?  @db.ObjectId
   amount               Float
   type                 String   // 'income' | 'expense' | 'transfer'
   date                 String   // Stored as ISO date string
@@ -109,9 +116,9 @@ model Transaction {
 }
 
 model Budget {
-  id         String   @id @default(uuid())
-  userId     String
-  categoryId String
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId     String   @db.ObjectId
+  categoryId String   @db.ObjectId
   amount     Float
   month      String?  // YYYY-MM format
   createdAt  DateTime @default(now())

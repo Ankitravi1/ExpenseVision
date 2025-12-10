@@ -7,6 +7,7 @@ import accountsRouter from './routes/accounts.js';
 import categoriesRouter from './routes/categories.js';
 import budgetsRouter from './routes/budgets.js';
 import authRouter from './routes/auth.js';
+import pushRouter from './routes/push.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { authenticateToken } from './middleware/auth.js';
 
@@ -38,6 +39,7 @@ app.use('/api/transactions', authenticateToken, transactionsRouter);
 app.use('/api/accounts', authenticateToken, accountsRouter);
 app.use('/api/categories', authenticateToken, categoriesRouter);
 app.use('/api/budgets', authenticateToken, budgetsRouter);
+app.use('/api/push', authenticateToken, pushRouter);
 
 // Initial data endpoint
 app.get('/api/initial-data', authenticateToken, async (req, res, next) => {
@@ -96,7 +98,7 @@ async function startServer() {
     try {
         app.listen(PORT, () => {
             console.log(`✅ ExpenseVision API server running on http://localhost:${PORT}`);
-            console.log(`📊 Database: SQLite (${process.env.DATABASE_URL})`);
+            console.log(`📊 Database: MongoDB (${process.env.DATABASE_URL})`);
         });
     } catch (error) {
         console.error('Failed to start server:', error);

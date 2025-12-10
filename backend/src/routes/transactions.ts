@@ -168,10 +168,46 @@ router.post('/', async (req, res, next) => {
                     where: {
                         userId,
                         categoryId: data.categoryId
+                    },
+                    include: {
+                        category: true
                     }
                 });
 
-                // Note: Budget spent is calculated dynamically, not stored
+                if (budget) {
+                    // Calculate total spent for this category in the current month
+                    const date = new Date(data.date);
+                    const monthStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+                    const spent = await tx.transaction.aggregate({
+                        where: {
+                            userId,
+                            categoryId: data.categoryId,
+                            type: 'expense',
+                            date: {
+                                gte: `${monthStr}-01`,
+                                lte: `${monthStr}-31`
+                            }
+                        },
+                        _sum: { amount: true }
+                    });
+
+                    const totalSpent = (spent._sum.amount || 0);
+
+                    // Check if over budget
+                    if (totalSpent > budget.amount) {
+                        // Send push notification
+                        // We need to do this OUTSIDE the transaction or use a side-effect
+                        // But for simplicity we'll call it here, errors won't rollback tx
+                        import('./push.js').then(({ sendNotification }) => {
+                            sendNotification(userId, {
+                                title: 'Budget Alert 🚨',
+                                body: `You've exceeded your budget for ${budget.category.name}! Spent: ${totalSpent}, Limit: ${budget.amount}`,
+                                icon: '/pwa-192x192.png'
+                            });
+                        });
+                    }
+                }
             }
 
             return transaction;
