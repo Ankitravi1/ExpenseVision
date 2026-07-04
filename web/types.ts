@@ -1,6 +1,6 @@
 
 
-export type Page = 'Dashboard' | 'Transactions' | 'Budgets' | 'Accounts' | 'Categories' | 'Profile' | 'Settings';
+export type Page = 'Dashboard' | 'Transactions' | 'Budgets' | 'Accounts' | 'Categories' | 'Reports' | 'Profile' | 'Settings';
 
 
 export type TransactionType = 'income' | 'expense' | 'transfer';

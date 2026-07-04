@@ -4,6 +4,8 @@ import { authService } from '../services/auth';
 import { GoogleLogin } from '@react-oauth/google';
 import { ProfileCompletion } from '../components/ProfileCompletion';
 
+const googleEnabled = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
+
 interface SignupProps {
     onSuccess: () => void;
     onBackToLanding: () => void;
@@ -92,7 +94,9 @@ export const Signup: React.FC<SignupProps> = ({ onSuccess, onBackToLanding, onSw
                                 </div>
                             )}
 
-                            {/* Google Signup */}
+                            {/* Google Signup (hidden when VITE_GOOGLE_CLIENT_ID is not configured) */}
+                            {googleEnabled && (
+                            <>
                             <div className="mb-6 flex justify-center">
                                 <GoogleLogin
                                     onSuccess={async (credentialResponse) => {
@@ -128,6 +132,8 @@ export const Signup: React.FC<SignupProps> = ({ onSuccess, onBackToLanding, onSw
                                     <span className="px-2 bg-white dark:bg-gray-800 text-gray-500">Or sign up with email</span>
                                 </div>
                             </div>
+                            </>
+                            )}
 
                             <form onSubmit={handleSignup} className="space-y-6">
                                 <div>

@@ -1,29 +1,13 @@
 import nodemailer from 'nodemailer';
 
-// Create a test account for development
-// In production, use environment variables for real SMTP service
-const createTransporter = async () => {
-    // For development, use Ethereal
-    if (process.env.NODE_ENV !== 'production') {
-        const testAccount = await nodemailer.createTestAccount();
+const APP_URL = process.env.APP_URL || 'http://localhost:3000';
 
-        console.log('Ethereal Email Credentials:', {
-            user: testAccount.user,
-            pass: testAccount.pass,
-        });
+// Email is optional: when SMTP is not configured, callers should skip
+// sending and treat users as auto-verified.
+export const isEmailEnabled = (): boolean =>
+    Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
 
-        return nodemailer.createTransport({
-            host: 'smtp.ethereal.email',
-            port: 587,
-            secure: false,
-            auth: {
-                user: testAccount.user,
-                pass: testAccount.pass,
-            },
-        });
-    }
-
-    // For production (configure in .env)
+const createTransporter = () => {
     return nodemailer.createTransport({
         host: process.env.SMTP_HOST,
         port: parseInt(process.env.SMTP_PORT || '587'),
@@ -36,8 +20,13 @@ const createTransporter = async () => {
 };
 
 export const sendVerificationEmail = async (email: string, token: string) => {
-    const transporter = await createTransporter();
-    const verificationUrl = `http://localhost:3000/verify-email?token=${token}`;
+    if (!isEmailEnabled()) {
+        console.log(`[email] SMTP not configured — skipping verification email to ${email}`);
+        return null;
+    }
+
+    const transporter = createTransporter();
+    const verificationUrl = `${APP_URL}/verify-email?token=${token}`;
 
     const info = await transporter.sendMail({
         from: '"ExpenseVision" <noreply@expensevision.com>',
@@ -56,14 +45,17 @@ export const sendVerificationEmail = async (email: string, token: string) => {
     });
 
     console.log('Verification email sent: %s', info.messageId);
-    console.log('Preview URL: %s', nodemailer.getTestMessageUrl(info));
-
     return info;
 };
 
 export const sendPasswordResetEmail = async (email: string, token: string) => {
-    const transporter = await createTransporter();
-    const resetUrl = `http://localhost:3000/reset-password?token=${token}`;
+    if (!isEmailEnabled()) {
+        console.log(`[email] SMTP not configured — skipping password reset email to ${email}`);
+        return null;
+    }
+
+    const transporter = createTransporter();
+    const resetUrl = `${APP_URL}/reset-password?token=${token}`;
 
     const info = await transporter.sendMail({
         from: '"ExpenseVision" <noreply@expensevision.com>',
@@ -83,7 +75,5 @@ export const sendPasswordResetEmail = async (email: string, token: string) => {
     });
 
     console.log('Password reset email sent: %s', info.messageId);
-    console.log('Preview URL: %s', nodemailer.getTestMessageUrl(info));
-
     return info;
 };

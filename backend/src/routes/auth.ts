@@ -4,13 +4,13 @@ import { PrismaClient } from '@prisma/client';
 import { hashPassword, comparePassword, generateToken, generateRefreshToken } from '../utils/auth';
 import { OAuth2Client } from 'google-auth-library';
 import crypto from 'crypto';
-import { sendVerificationEmail, sendPasswordResetEmail } from '../services/email';
+import { sendVerificationEmail, sendPasswordResetEmail, isEmailEnabled } from '../services/email';
 import speakeasy from 'speakeasy';
 import qrcode from 'qrcode';
 import { authLimiter } from '../middleware/rateLimit';
+import { prisma } from '../lib/prisma';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // Helper to seed default data for new users
@@ -95,7 +95,9 @@ router.post('/signup', async (req, res) => {
         // Hash password
         const hashedPassword = await hashPassword(data.password);
 
-        // Generate verification token
+        // Generate verification token (skipped when SMTP is not configured —
+        // in that case the user is auto-verified)
+        const emailEnabled = isEmailEnabled();
         const verificationToken = crypto.randomBytes(32).toString('hex');
 
         // Create user with Stage 1 data only
@@ -104,7 +106,8 @@ router.post('/signup', async (req, res) => {
                 email: data.email,
                 password: hashedPassword,
                 name: data.name,
-                verificationToken,
+                verificationToken: emailEnabled ? verificationToken : null,
+                emailVerified: !emailEnabled,
                 onboardingStage: 1,
                 profileComplete: false,
             },
@@ -136,6 +139,10 @@ router.post('/signup', async (req, res) => {
             },
         });
 
+        // Seed default data BEFORE responding so the client's first
+        // initial-data fetch already sees the default categories/account
+        await seedUserData(user.id, prisma);
+
         res.status(201).json({
             user,
             token,
@@ -144,10 +151,9 @@ router.post('/signup', async (req, res) => {
         });
 
         // Send verification email (async, don't wait)
-        sendVerificationEmail(user.email, verificationToken).catch(console.error);
-
-        // Seed default data
-        seedUserData(user.id, prisma).catch(console.error);
+        if (emailEnabled) {
+            sendVerificationEmail(user.email, verificationToken).catch(console.error);
+        }
     } catch (error) {
         if (error instanceof z.ZodError) {
             return res.status(400).json({ error: error.errors });
@@ -228,6 +234,10 @@ router.post('/login', async (req, res) => {
 // POST /api/auth/google
 router.post('/google', async (req, res) => {
     try {
+        if (!process.env.GOOGLE_CLIENT_ID) {
+            return res.status(503).json({ error: 'Google sign-in is not configured on this server' });
+        }
+
         const { googleToken } = googleAuthSchema.parse(req.body);
 
         // Verify Google token
@@ -272,7 +282,7 @@ router.post('/google', async (req, res) => {
             });
             isNewUser = true;
             // Seed default data for new Google user
-            seedUserData(user.id, prisma).catch(console.error);
+            await seedUserData(user.id, prisma);
         } else if (!user.googleId) {
             // Link Google account to existing user
             user = await prisma.user.update({

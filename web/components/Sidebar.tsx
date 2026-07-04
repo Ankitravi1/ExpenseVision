@@ -57,6 +57,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activePage, setActivePage, isC
     { icon: 'Target', label: 'Budgets' },
     { icon: 'Wallet', label: 'Accounts' },
     { icon: 'Tags', label: 'Categories' },
+    { icon: 'PieChart', label: 'Reports' },
   ];
 
   useEffect(() => {
@@ -159,11 +160,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ activePage, setActivePage, isC
             </div>
           )}
           <button onClick={() => setIsUserMenuOpen(o => !o)} className={`flex items-center w-full p-3 rounded-xl hover:bg-white/10 transition-colors ${isCollapsed ? 'justify-center' : ''}`}>
-            <img
-              src={user?.profilePicture || "https://i.pravatar.cc/150?u=jane_doe"}
-              alt="User Avatar"
-              className="h-9 w-9 rounded-full ring-2 ring-white/20"
-            />
+            {user?.profilePicture ? (
+              <img
+                src={user.profilePicture}
+                alt="User Avatar"
+                className="h-9 w-9 rounded-full ring-2 ring-white/20"
+              />
+            ) : (
+              <div className="h-9 w-9 rounded-full ring-2 ring-white/20 bg-primary flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
+                {(user?.name || 'U').trim().charAt(0).toUpperCase()}
+              </div>
+            )}
             {!isCollapsed &&
               <div className="ml-3 text-left overflow-hidden">
                 <p className="font-semibold text-white text-sm truncate">{user?.name || 'User'}</p>

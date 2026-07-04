@@ -3,6 +3,50 @@ import { z } from 'zod';
 
 const router = Router();
 
+// First day of the month after "YYYY-MM" (exclusive upper bound for month filters,
+// correct for all month lengths unlike the old `lte: "YYYY-MM-31"`)
+const nextMonthStart = (month: string): string => {
+    const [y, m] = month.split('-').map(Number);
+    const next = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
+    return `${next}-01`;
+};
+
+// Fires a push notification when an expense pushes a category over budget.
+// Called after the DB transaction commits.
+const checkBudgetAlert = async (prisma: any, userId: string, categoryId: string, dateStr: string) => {
+    const budget = await prisma.budget.findFirst({
+        where: { userId, categoryId },
+        include: { category: true }
+    });
+    if (!budget) return;
+
+    const date = new Date(dateStr);
+    const monthStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+    const spent = await prisma.transaction.aggregate({
+        where: {
+            userId,
+            categoryId,
+            type: 'expense',
+            date: {
+                gte: `${monthStr}-01`,
+                lt: nextMonthStart(monthStr)
+            }
+        },
+        _sum: { amount: true }
+    });
+
+    const totalSpent = spent._sum.amount || 0;
+    if (totalSpent > budget.amount) {
+        const { sendNotification } = await import('./push.js');
+        await sendNotification(userId, {
+            title: 'Budget Alert 🚨',
+            body: `You've exceeded your budget for ${budget.category.name}! Spent: ${totalSpent}, Limit: ${budget.amount}`,
+            icon: '/pwa-192x192.png'
+        });
+    }
+};
+
 // Validation schema
 const transactionSchema = z.object({
     accountId: z.string(),
@@ -162,58 +206,16 @@ router.post('/', async (req, res, next) => {
                 });
             }
 
-            // Update budget spent for expenses
-            if (data.type === 'expense' && data.categoryId) {
-                const budget = await tx.budget.findFirst({
-                    where: {
-                        userId,
-                        categoryId: data.categoryId
-                    },
-                    include: {
-                        category: true
-                    }
-                });
-
-                if (budget) {
-                    // Calculate total spent for this category in the current month
-                    const date = new Date(data.date);
-                    const monthStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-
-                    const spent = await tx.transaction.aggregate({
-                        where: {
-                            userId,
-                            categoryId: data.categoryId,
-                            type: 'expense',
-                            date: {
-                                gte: `${monthStr}-01`,
-                                lte: `${monthStr}-31`
-                            }
-                        },
-                        _sum: { amount: true }
-                    });
-
-                    const totalSpent = (spent._sum.amount || 0);
-
-                    // Check if over budget
-                    if (totalSpent > budget.amount) {
-                        // Send push notification
-                        // We need to do this OUTSIDE the transaction or use a side-effect
-                        // But for simplicity we'll call it here, errors won't rollback tx
-                        import('./push.js').then(({ sendNotification }) => {
-                            sendNotification(userId, {
-                                title: 'Budget Alert 🚨',
-                                body: `You've exceeded your budget for ${budget.category.name}! Spent: ${totalSpent}, Limit: ${budget.amount}`,
-                                icon: '/pwa-192x192.png'
-                            });
-                        });
-                    }
-                }
-            }
-
             return transaction;
         });
 
         res.status(201).json(result);
+
+        // Budget alert check runs AFTER the transaction has committed so the
+        // notification can never fire for a rolled-back transaction
+        if (data.type === 'expense' && data.categoryId) {
+            checkBudgetAlert(prisma, userId, data.categoryId, data.date).catch(console.error);
+        }
     } catch (error) {
         if (error instanceof z.ZodError) {
             res.status(400).json({ error: 'Validation error', details: error.errors });
@@ -248,6 +250,10 @@ router.put('/:id', async (req, res, next) => {
                 where: { id: oldTransaction.accountId }
             });
 
+            if (!oldSourceAccount) {
+                throw new Error('Source account not found');
+            }
+
             let reversedBalance = oldSourceAccount.balance;
             if (oldTransaction.type === 'expense' || oldTransaction.type === 'transfer') {
                 reversedBalance += oldTransaction.amount;
@@ -264,10 +270,12 @@ router.put('/:id', async (req, res, next) => {
                 const oldDestAccount = await tx.account.findUnique({
                     where: { id: oldTransaction.transferToAccountId }
                 });
-                await tx.account.update({
-                    where: { id: oldTransaction.transferToAccountId },
-                    data: { balance: oldDestAccount.balance - oldTransaction.amount }
-                });
+                if (oldDestAccount) {
+                    await tx.account.update({
+                        where: { id: oldTransaction.transferToAccountId },
+                        data: { balance: oldDestAccount.balance - oldTransaction.amount }
+                    });
+                }
             }
 
             // Update transaction
@@ -280,6 +288,10 @@ router.put('/:id', async (req, res, next) => {
             const newSourceAccount = await tx.account.findUnique({
                 where: { id: newTransaction.accountId }
             });
+
+            if (!newSourceAccount) {
+                throw new Error('Source account not found');
+            }
 
             let newBalance = newSourceAccount.balance;
             if (newTransaction.type === 'expense' || newTransaction.type === 'transfer') {
@@ -297,6 +309,9 @@ router.put('/:id', async (req, res, next) => {
                 const newDestAccount = await tx.account.findUnique({
                     where: { id: newTransaction.transferToAccountId }
                 });
+                if (!newDestAccount) {
+                    throw new Error('Destination account not found');
+                }
                 await tx.account.update({
                     where: { id: newTransaction.transferToAccountId },
                     data: { balance: newDestAccount.balance + newTransaction.amount }
@@ -394,6 +409,10 @@ router.delete('/:id', async (req, res, next) => {
                 where: { id: transaction.accountId }
             });
 
+            if (!sourceAccount) {
+                throw new Error('Source account not found');
+            }
+
             let reversedBalance = sourceAccount.balance;
             if (transaction.type === 'expense' || transaction.type === 'transfer') {
                 reversedBalance += transaction.amount;
@@ -410,10 +429,12 @@ router.delete('/:id', async (req, res, next) => {
                 const destAccount = await tx.account.findUnique({
                     where: { id: transaction.transferToAccountId }
                 });
-                await tx.account.update({
-                    where: { id: transaction.transferToAccountId },
-                    data: { balance: destAccount.balance - transaction.amount }
-                });
+                if (destAccount) {
+                    await tx.account.update({
+                        where: { id: transaction.transferToAccountId },
+                        data: { balance: destAccount.balance - transaction.amount }
+                    });
+                }
             }
 
             // Delete transaction
@@ -467,7 +488,7 @@ router.get('/export', async (req, res, next) => {
 
         const csv = [
             headers.join(','),
-            ...rows.map(r => r.join(',')),
+            ...rows.map((r: string[]) => r.join(',')),
             '',
             'Summary',
             `Total Income,${totalIncome.toFixed(2)}`,

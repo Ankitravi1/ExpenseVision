@@ -4,6 +4,8 @@ import { authService } from '../services/auth';
 import { GoogleLogin } from '@react-oauth/google';
 import { ProfileCompletion } from '../components/ProfileCompletion';
 
+const googleEnabled = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
+
 interface LoginProps {
     onSuccess: () => void;
     onBackToLanding: () => void;
@@ -89,7 +91,9 @@ export const Login: React.FC<LoginProps> = ({ onSuccess, onBackToLanding, onSwit
                         <ProfileCompletion onComplete={onSuccess} />
                     ) : (
                         <>
-                            {/* Google Login */}
+                            {/* Google Login (hidden when VITE_GOOGLE_CLIENT_ID is not configured) */}
+                            {googleEnabled && (
+                            <>
                             <div className="mb-6 flex justify-center">
                                 <GoogleLogin
                                     onSuccess={async (credentialResponse) => {
@@ -124,6 +128,8 @@ export const Login: React.FC<LoginProps> = ({ onSuccess, onBackToLanding, onSwit
                                     <span className="px-2 bg-white dark:bg-gray-800 text-gray-500">Or continue with email</span>
                                 </div>
                             </div>
+                            </>
+                            )}
 
                             {/* Login Form */}
                             <form onSubmit={handleSubmit} className="space-y-6">

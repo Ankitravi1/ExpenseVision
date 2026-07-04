@@ -1,117 +1,129 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Text, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
+import { Input, Button } from '../../components/ui';
+import { spacing } from '../../theme';
 
 export default function LoginScreen({ navigation }: any) {
+    const { login, login2FA } = useAuth();
+    const { theme } = useTheme();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [twoFACode, setTwoFACode] = useState('');
+    const [twoFAUserId, setTwoFAUserId] = useState<string | null>(null);
+    const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
 
-    const handleLogin = () => {
-        // TODO: Implement actual login logic
-        console.log('Login with:', email, password);
-        // For now, just navigate to Main
-        navigation.replace('Main');
+    const handleLogin = async () => {
+        if (!email.trim() || !password) {
+            setError('Enter your email and password.');
+            return;
+        }
+        setError('');
+        setLoading(true);
+        try {
+            const res = await login(email.trim().toLowerCase(), password);
+            if (res.require2FA && res.userId) {
+                setTwoFAUserId(res.userId);
+            }
+            // On success AuthContext flips isAuthenticated and the navigator switches
+        } catch (err: any) {
+            setError(err.message || 'Login failed');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handle2FA = async () => {
+        if (!twoFACode.trim() || !twoFAUserId) return;
+        setError('');
+        setLoading(true);
+        try {
+            await login2FA(twoFAUserId, twoFACode.trim());
+        } catch (err: any) {
+            setError(err.message || '2FA verification failed');
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
-        <SafeAreaView style={styles.container}>
-            <View style={styles.content}>
-                <Text style={styles.title}>ExpenseVision</Text>
-                <Text style={styles.subtitle}>Sign in to your account</Text>
+        <KeyboardAvoidingView style={{ flex: 1, backgroundColor: theme.colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+                <Text style={[styles.logo, { color: theme.colors.primary }]}>ExpenseVision</Text>
+                <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>Welcome back — sign in to continue</Text>
 
-                <View style={styles.form}>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Email"
-                        value={email}
-                        onChangeText={setEmail}
-                        autoCapitalize="none"
-                        keyboardType="email-address"
-                    />
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Password"
-                        value={password}
-                        onChangeText={setPassword}
-                        secureTextEntry
-                    />
+                {error ? <Text style={[styles.error, { color: theme.colors.danger }]}>{error}</Text> : null}
 
-                    <TouchableOpacity style={styles.button} onPress={handleLogin}>
-                        <Text style={styles.buttonText}>Sign In</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity style={[styles.button, styles.googleButton]} onPress={() => console.log('Google Login')}>
-                        <Text style={[styles.buttonText, styles.googleButtonText]}>Sign in with Google</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity onPress={() => navigation.navigate('Signup')}>
-                        <Text style={styles.link}>Don't have an account? Sign up</Text>
-                    </TouchableOpacity>
-                </View>
-            </View>
-        </SafeAreaView>
+                {twoFAUserId ? (
+                    <>
+                        <Input
+                            label="Two-factor code"
+                            value={twoFACode}
+                            onChangeText={setTwoFACode}
+                            keyboardType="number-pad"
+                            placeholder="123456"
+                            maxLength={6}
+                        />
+                        <Button title="Verify" onPress={handle2FA} loading={loading} />
+                        <TouchableOpacity onPress={() => setTwoFAUserId(null)} style={styles.link}>
+                            <Text style={{ color: theme.colors.primary }}>Back to login</Text>
+                        </TouchableOpacity>
+                    </>
+                ) : (
+                    <>
+                        <Input
+                            label="Email"
+                            value={email}
+                            onChangeText={setEmail}
+                            autoCapitalize="none"
+                            keyboardType="email-address"
+                            placeholder="you@example.com"
+                        />
+                        <Input
+                            label="Password"
+                            value={password}
+                            onChangeText={setPassword}
+                            secureTextEntry
+                            placeholder="••••••••"
+                        />
+                        <Button title="Sign In" onPress={handleLogin} loading={loading} />
+                        <TouchableOpacity onPress={() => navigation.navigate('Signup')} style={styles.link}>
+                            <Text style={{ color: theme.colors.textSecondary }}>
+                                Don't have an account? <Text style={{ color: theme.colors.primary, fontWeight: '600' }}>Sign up</Text>
+                            </Text>
+                        </TouchableOpacity>
+                    </>
+                )}
+            </ScrollView>
+        </KeyboardAvoidingView>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
-        flex: 1,
-        backgroundColor: '#fff',
-    },
-    content: {
-        flex: 1,
-        padding: 24,
+        flexGrow: 1,
         justifyContent: 'center',
+        padding: spacing.lg,
     },
-    title: {
+    logo: {
         fontSize: 32,
-        fontWeight: 'bold',
-        color: '#333',
-        marginBottom: 8,
+        fontWeight: '800',
         textAlign: 'center',
+        marginBottom: 8,
     },
     subtitle: {
-        fontSize: 16,
-        color: '#666',
-        marginBottom: 32,
+        fontSize: 15,
         textAlign: 'center',
+        marginBottom: spacing.xl,
     },
-    form: {
-        gap: 16,
-    },
-    input: {
-        borderWidth: 1,
-        borderColor: '#ddd',
-        padding: 16,
-        borderRadius: 12,
-        fontSize: 16,
-        backgroundColor: '#f9f9f9',
-    },
-    button: {
-        backgroundColor: '#000',
-        padding: 16,
-        borderRadius: 12,
-        alignItems: 'center',
-        marginTop: 8,
-    },
-    buttonText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: 'bold',
-    },
-    googleButton: {
-        backgroundColor: '#fff',
-        borderWidth: 1,
-        borderColor: '#ddd',
-        marginTop: 16,
-    },
-    googleButtonText: {
-        color: '#333',
+    error: {
+        textAlign: 'center',
+        marginBottom: spacing.md,
     },
     link: {
-        color: '#007AFF',
-        textAlign: 'center',
-        marginTop: 16,
-        fontSize: 14,
+        marginTop: spacing.lg,
+        alignItems: 'center',
     },
 });

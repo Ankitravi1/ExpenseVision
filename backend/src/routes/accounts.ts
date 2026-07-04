@@ -8,6 +8,7 @@ const accountSchema = z.object({
     name: z.string().min(1),
     type: z.string(),
     balance: z.number().default(0),
+    color: z.string().optional(),
     icon: z.string().optional(),
     logo: z.string().optional()
 });

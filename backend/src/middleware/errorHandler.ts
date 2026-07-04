@@ -9,13 +9,11 @@ export function errorHandler(
     console.error('Error:', err);
 
     const status = err.status || 500;
-    const message = err.message || 'Internal Server Error';
+    const message = err.status ? err.message : 'Internal Server Error';
 
+    // Frontend expects { error: string }
     res.status(status).json({
-        error: {
-            message,
-            status,
-            ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
-        }
+        error: message,
+        ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
     });
 }

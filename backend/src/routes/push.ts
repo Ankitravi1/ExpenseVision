@@ -1,24 +1,27 @@
 import express from 'express';
 import webpush from 'web-push';
 import { authenticateToken } from '../middleware/auth';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
-// Configure web-push
-if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
-    console.error('VAPID keys are missing!');
+// Configure web-push (optional feature — disabled when keys are missing)
+export const isPushEnabled = Boolean(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
+if (!isPushEnabled) {
+    console.log('[push] VAPID keys not set — web push notifications disabled');
 } else {
     webpush.setVapidDetails(
         'mailto:support@expensevision.local',
-        process.env.VAPID_PUBLIC_KEY,
-        process.env.VAPID_PRIVATE_KEY
+        process.env.VAPID_PUBLIC_KEY!,
+        process.env.VAPID_PRIVATE_KEY!
     );
 }
 
 // GET /api/push/vapid-key
 router.get('/vapid-key', authenticateToken, (req, res) => {
+    if (!isPushEnabled) {
+        return res.status(503).json({ error: 'Push notifications are not configured on this server' });
+    }
     res.json({ publicKey: process.env.VAPID_PUBLIC_KEY });
 });
 
@@ -55,6 +58,7 @@ router.post('/subscribe', authenticateToken, async (req, res) => {
 
 // Helper to send notification (can be imported elsewhere)
 export const sendNotification = async (userId: string, payload: any) => {
+    if (!isPushEnabled) return;
     try {
         const subscriptions = await prisma.pushSubscription.findMany({
             where: { userId }

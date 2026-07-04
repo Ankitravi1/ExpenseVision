@@ -1,123 +1,93 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Text, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
+import { Input, Button } from '../../components/ui';
+import { spacing } from '../../theme';
 
 export default function SignupScreen({ navigation }: any) {
+    const { signup } = useAuth();
+    const { theme } = useTheme();
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
 
-    const handleSignup = () => {
-        // TODO: Implement actual signup logic
-        console.log('Signup with:', name, email, password);
-        navigation.replace('Main');
+    const handleSignup = async () => {
+        if (!name.trim() || !email.trim() || !password) {
+            setError('Fill in all fields.');
+            return;
+        }
+        if (password.length < 6) {
+            setError('Password must be at least 6 characters.');
+            return;
+        }
+        if (password !== confirmPassword) {
+            setError('Passwords do not match.');
+            return;
+        }
+        setError('');
+        setLoading(true);
+        try {
+            await signup(name.trim(), email.trim().toLowerCase(), password);
+            // AuthContext flips isAuthenticated; profile completion is handled by the navigator
+        } catch (err: any) {
+            setError(err.message || 'Signup failed');
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
-        <SafeAreaView style={styles.container}>
-            <View style={styles.content}>
-                <Text style={styles.title}>Create Account</Text>
-                <Text style={styles.subtitle}>Start tracking your expenses today</Text>
+        <KeyboardAvoidingView style={{ flex: 1, backgroundColor: theme.colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+                <Text style={[styles.logo, { color: theme.colors.primary }]}>Create Account</Text>
+                <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>Start tracking your money in minutes</Text>
 
-                <View style={styles.form}>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Full Name"
-                        value={name}
-                        onChangeText={setName}
-                    />
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Email"
-                        value={email}
-                        onChangeText={setEmail}
-                        autoCapitalize="none"
-                        keyboardType="email-address"
-                    />
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Password"
-                        value={password}
-                        onChangeText={setPassword}
-                        secureTextEntry
-                    />
+                {error ? <Text style={[styles.error, { color: theme.colors.danger }]}>{error}</Text> : null}
 
-                    <TouchableOpacity style={styles.button} onPress={handleSignup}>
-                        <Text style={styles.buttonText}>Sign Up</Text>
-                    </TouchableOpacity>
+                <Input label="Name" value={name} onChangeText={setName} placeholder="Your name" />
+                <Input label="Email" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" placeholder="you@example.com" />
+                <Input label="Password" value={password} onChangeText={setPassword} secureTextEntry placeholder="Min 6 characters" />
+                <Input label="Confirm password" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry placeholder="Repeat password" />
 
-                    <TouchableOpacity style={[styles.button, styles.googleButton]} onPress={() => console.log('Google Signup')}>
-                        <Text style={[styles.buttonText, styles.googleButtonText]}>Sign up with Google</Text>
-                    </TouchableOpacity>
+                <Button title="Sign Up" onPress={handleSignup} loading={loading} />
 
-                    <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-                        <Text style={styles.link}>Already have an account? Sign in</Text>
-                    </TouchableOpacity>
-                </View>
-            </View>
-        </SafeAreaView>
+                <TouchableOpacity onPress={() => navigation.navigate('Login')} style={styles.link}>
+                    <Text style={{ color: theme.colors.textSecondary }}>
+                        Already have an account? <Text style={{ color: theme.colors.primary, fontWeight: '600' }}>Sign in</Text>
+                    </Text>
+                </TouchableOpacity>
+            </ScrollView>
+        </KeyboardAvoidingView>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
-        flex: 1,
-        backgroundColor: '#fff',
-    },
-    content: {
-        flex: 1,
-        padding: 24,
+        flexGrow: 1,
         justifyContent: 'center',
+        padding: spacing.lg,
     },
-    title: {
-        fontSize: 32,
-        fontWeight: 'bold',
-        color: '#333',
-        marginBottom: 8,
+    logo: {
+        fontSize: 28,
+        fontWeight: '800',
         textAlign: 'center',
+        marginBottom: 8,
     },
     subtitle: {
-        fontSize: 16,
-        color: '#666',
-        marginBottom: 32,
+        fontSize: 15,
         textAlign: 'center',
+        marginBottom: spacing.xl,
     },
-    form: {
-        gap: 16,
-    },
-    input: {
-        borderWidth: 1,
-        borderColor: '#ddd',
-        padding: 16,
-        borderRadius: 12,
-        fontSize: 16,
-        backgroundColor: '#f9f9f9',
-    },
-    button: {
-        backgroundColor: '#000',
-        padding: 16,
-        borderRadius: 12,
-        alignItems: 'center',
-        marginTop: 8,
-    },
-    buttonText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: 'bold',
-    },
-    googleButton: {
-        backgroundColor: '#fff',
-        borderWidth: 1,
-        borderColor: '#ddd',
-        marginTop: 16,
-    },
-    googleButtonText: {
-        color: '#333',
+    error: {
+        textAlign: 'center',
+        marginBottom: spacing.md,
     },
     link: {
-        color: '#007AFF',
-        textAlign: 'center',
-        marginTop: 16,
-        fontSize: 14,
+        marginTop: spacing.lg,
+        alignItems: 'center',
     },
 });
