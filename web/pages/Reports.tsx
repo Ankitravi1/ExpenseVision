@@ -52,9 +52,9 @@ const CategoryDetailRow: React.FC<{ name: string; value: string; percentage: num
 
 export const Reports: React.FC = () => {
     const [currentDate, setCurrentDate] = useState(new Date());
-    const { transactions, categories, currency } = useContext(AppContext)!;
+    const { transactions, categories, budgets, currency } = useContext(AppContext)!;
 
-    const { totalIncome, totalExpenses, netFlow, expenseData } = useMemo(() => {
+    const { totalIncome, totalExpenses, netFlow, expenseData, insights } = useMemo(() => {
         // Filter transactions for the selected month
         const monthStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
         const monthlyTransactions = transactions.filter(t => t.date.startsWith(monthStr));
@@ -79,12 +79,96 @@ export const Reports: React.FC = () => {
             .map(([name, value]) => ({ name, value, icon: categories.find(c=>c.name===name)?.icon || 'Tags' }))
             .sort((a, b) => b.value - a.value);
 
-        return { totalIncome, totalExpenses, netFlow: totalIncome - totalExpenses, expenseData };
-    }, [currentDate, transactions, categories]);
+        // ---- Insights ----
+        const prevDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
+        const prevMonthStr = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+        const prevMonthLabel = prevDate.toLocaleString('default', { month: 'long' });
+        const prevTransactions = transactions.filter(t => t.date.startsWith(prevMonthStr) && t.type === 'expense');
+        const prevTotal = prevTransactions.reduce((sum: number, t) => sum + t.amount, 0);
+
+        // 1. Total spend vs previous month
+        const totalDeltaPct = prevTotal > 0 ? ((totalExpenses - prevTotal) / prevTotal) * 100 : null;
+
+        // 2. Biggest category change vs previous month
+        const spentByCat = (list: typeof transactions) =>
+            list.reduce((acc: { [key: string]: number }, t) => {
+                const key = t.categoryId || 'uncategorized';
+                acc[key] = (acc[key] || 0) + t.amount;
+                return acc;
+            }, {} as { [key: string]: number });
+        const curByCat = spentByCat(monthlyTransactions.filter(t => t.type === 'expense'));
+        const prevByCat = spentByCat(prevTransactions);
+        let biggestChange: { name: string; delta: number } | null = null;
+        for (const id of new Set([...Object.keys(curByCat), ...Object.keys(prevByCat)])) {
+            const delta = (curByCat[id] || 0) - (prevByCat[id] || 0);
+            if (!biggestChange || Math.abs(delta) > Math.abs(biggestChange.delta)) {
+                biggestChange = { name: categories.find(c => c.id === id)?.name || 'Uncategorized', delta };
+            }
+        }
+
+        // 3. Spending pace vs total budget (current month only)
+        const now = new Date();
+        const isCurrentMonth = currentDate.getFullYear() === now.getFullYear() && currentDate.getMonth() === now.getMonth();
+        let pace: { projected: number; totalBudget: number } | null = null;
+        if (isCurrentMonth) {
+            const totalBudget = budgets
+                .filter(b => !b.month || b.month === monthStr)
+                .reduce((sum: number, b) => sum + (b.effectiveAmount ?? b.amount), 0);
+            if (totalBudget > 0 && now.getDate() > 0) {
+                const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+                pace = { projected: (totalExpenses / now.getDate()) * daysInMonth, totalBudget };
+            }
+        }
+
+        const insights = { totalDeltaPct, prevTotal, prevMonthLabel, biggestChange, pace };
+        return { totalIncome, totalExpenses, netFlow: totalIncome - totalExpenses, expenseData, insights };
+    }, [currentDate, transactions, categories, budgets]);
+
+    const hasInsights = insights.totalDeltaPct !== null || (insights.biggestChange && insights.biggestChange.delta !== 0) || insights.pace;
 
     return (
         <div className="space-y-6">
             <PeriodNavigator date={currentDate} setDate={setCurrentDate} />
+
+            {hasInsights && (
+                <Card>
+                    <h3 className="text-lg font-semibold mb-3 dark:text-gray-50">Insights</h3>
+                    <div className="space-y-2.5 text-sm text-gray-600 dark:text-gray-300">
+                        {insights.totalDeltaPct !== null && (
+                            <div className="flex items-start gap-2.5">
+                                <Icon
+                                    name={insights.totalDeltaPct >= 0 ? 'TrendingUp' : 'TrendingDown'}
+                                    size={18}
+                                    className={insights.totalDeltaPct >= 0 ? 'text-danger mt-0.5' : 'text-success mt-0.5'}
+                                />
+                                <span>
+                                    Spending is <strong>{Math.abs(insights.totalDeltaPct).toFixed(0)}% {insights.totalDeltaPct >= 0 ? 'higher' : 'lower'}</strong> than {insights.prevMonthLabel} ({formatCurrency(insights.prevTotal, currency)})
+                                </span>
+                            </div>
+                        )}
+                        {insights.biggestChange && insights.biggestChange.delta !== 0 && (
+                            <div className="flex items-start gap-2.5">
+                                <Icon name="ArrowLeftRight" size={18} className="text-primary mt-0.5" />
+                                <span>
+                                    Biggest change: <strong>{insights.biggestChange.name}</strong> ({insights.biggestChange.delta > 0 ? '+' : '−'}{formatCurrency(Math.abs(insights.biggestChange.delta), currency)} vs last month)
+                                </span>
+                            </div>
+                        )}
+                        {insights.pace && (
+                            <div className="flex items-start gap-2.5">
+                                <Icon
+                                    name="Gauge"
+                                    size={18}
+                                    className={insights.pace.projected > insights.pace.totalBudget ? 'text-danger mt-0.5' : 'text-success mt-0.5'}
+                                />
+                                <span>
+                                    At this pace you'll spend <strong>~{formatCurrency(insights.pace.projected, currency)}</strong> this month — {insights.pace.projected > insights.pace.totalBudget ? 'over' : 'within'} your {formatCurrency(insights.pace.totalBudget, currency)} total budget
+                                </span>
+                            </div>
+                        )}
+                    </div>
+                </Card>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                  <Card>

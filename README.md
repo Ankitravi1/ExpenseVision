@@ -15,39 +15,54 @@ This project is organized as a monorepo:
 
 ## 🚀 Features
 
-- **Dashboard**: Real-time financial overview with charts, Net Worth tracking, and timezone-aware insights.
-- **Transactions**: Advanced filtering, search, Bulk CSV Import, and Export.
-- **Accounts**: Track balances across multiple accounts (Checking, Savings, Credit Cards).
-- **Categories**: Manage income and expense categories with custom icons.
-- **Budgets**: Set monthly budgets and track progress.
-- **Profile & Settings**: Customization options including Dark Mode, Currency, and Timezone preferences.
-- **Data Management**: "Clear All" functionality to reset data and robust CSV import handling.
+Web and mobile share the same backend, so **the same account logs into both and data syncs across them** (refresh / pull-to-refresh to see the latest).
+
+- **Dashboard**: Net Worth, monthly income/expense, 6-month trend chart, recent transactions. Web dashboard has a month navigator.
+- **Transactions**: Add/edit/delete income, expense and transfers; search, type + month filters, notes/tags, CSV import (web) and CSV export (web + mobile).
+- **Recurring transactions**: Rules for rent, EMI, salary, subscriptions (daily/weekly/monthly/yearly). Due occurrences are auto-created when the app loads, with month-length-aware day anchoring (an EMI on the 31st lands on the 28th in February).
+- **Accounts**: Track balances across multiple accounts (Checking, Savings, Credit Cards); balances update atomically on every transaction.
+- **Categories**: Income/expense categories with lucide icons shared across web and mobile.
+- **Budgets**: Monthly limits with **roll-over of unused budget** and a **per-budget alert threshold (%)**; progress bars use the effective (rolled-over) amount.
+- **Reports & Insights**: Category breakdown by month plus insights — spend vs last month, biggest category change, and projected month-end pace vs total budget.
+- **AI quick entry**: Optional natural-language → transaction parsing with a user-selected provider and user-provided API key (web + mobile).
+- **Profile & Settings**: Dark Mode, Currency, Timezone; category manager, recurring manager, clear-all, export.
+- **Interactive API docs**: Swagger UI at `/api/docs` — authorize with a token and try every endpoint.
+
+## 📖 API Documentation
+
+With the backend running, open **http://localhost:5000/api/docs** for interactive Swagger UI:
+1. Call `POST /auth/signup` or `/auth/login` and copy the `token` from the response.
+2. Click **Authorize** (top right) and paste the token.
+3. Try any 🔒 endpoint — every route documents its description, required fields and examples.
+
+The raw OpenAPI spec is served at `http://localhost:5000/api/docs.json`.
 
 ## 🗺️ Roadmap
 
-### v0.1: Web Foundation (Current)
-- [x] Core CRUD Features
-- [x] Bulk Import/Export
-- [x] Timezone Support
-- [x] Web Push Notifications (Budget Alerts)
+### v0.1 — Web Foundation ✅
+- [x] Core CRUD (accounts, categories, transactions, budgets)
+- [x] Bulk CSV Import/Export
+- [x] Timezone support
+- [x] Web Push Notifications (budget alerts)
 
-### v0.2: Mobile & Transaction Entry
-- [ ] Android Mobile App (React Native + Expo)
-- [x] Backend and web test flow for voice-typed transaction notes
-- [x] Add transactions in mobile using Android voice typing/live caption-style speech-to-text
-- [x] Optional AI-assisted voice-to-transaction parsing with user-selected provider and user-provided API key
+### v0.2 — Mobile & Transaction Entry ✅
+- [x] Android mobile app (React Native + Expo) at full feature parity with web
+- [x] Native date picker, bottom-sheet pickers, haptics, swipe-to-delete
+- [x] Optional AI-assisted voice/text-to-transaction parsing (user-provided API key)
 
-### v0.3: Intelligence (Premium)
-- [ ] AI-Based Smart Import (PDF/Image parsing)
-- [ ] Voice and manual transaction/payment entry wizard
-- [ ] User interface rethink and improved UX
+### v0.3 — Recurring, Budgets & Insights ✅ (Current)
+- [x] Recurring transactions (rent, EMI, salary, subscriptions) with auto-materialization
+- [x] Budget roll-over + per-budget alert thresholds
+- [x] Reports insights (month-over-month change, spending pace vs budget)
+- [x] Transaction notes/tags (foundation for future import reconciliation)
+- [x] Swagger / OpenAPI documentation with bearer auth
 
-### v0.4: Polish & Reliability
-- [ ] Cross-platform UX refinements
-- [ ] Notification preferences and reliability improvements
-- [ ] Import and transaction review workflow hardening
+### v0.4 — Intelligence (Premium)
+- [ ] AI-based smart import (PDF / image statement parsing)
+- [ ] Real-time sync (refresh on focus / websockets)
+- [ ] Mobile push notifications (expo-notifications) for budget alerts
 
-### v0.5: Payments & Integrations
+### v0.5 — Payments & Integrations
 - [ ] UPI Payment Integration (Intent Flow)
 - [ ] Bank Account Aggregator Integration
 
@@ -68,19 +83,17 @@ No database server is needed — the backend uses a local SQLite file (`backend/
 
 ### Installation & Running
 
-Start the web and backend together in the same VS Code terminal on Windows:
+**In VS Code (recommended)** — run everything as separate integrated terminal tabs:
+`Ctrl+Shift+P` → **Tasks: Run Task** → **Start ExpenseVision (all)** (or *web + backend*). Each service gets its own dedicated terminal tab. See `.vscode/tasks.json`.
+
+**Or via the script** — opens each service in its own separate terminal window (Windows Terminal tabs when available):
 
 ```powershell
-.\start-expensevision.ps1
+.\start-expensevision.ps1            # backend + web
+.\start-expensevision.ps1 -WithMobile   # also Expo Android (emulator required)
 ```
 
-Include the Android Expo app too:
-
-```powershell
-.\start-expensevision.ps1 -WithMobile
-```
-
-1.  **Backend** (http://localhost:5000)
+1.  **Backend** (http://localhost:5000 · API docs at http://localhost:5000/api/docs)
     ```bash
     cd backend
     npm install

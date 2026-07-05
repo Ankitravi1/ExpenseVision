@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -18,6 +19,7 @@ export default function DashboardScreen() {
     const { accounts, transactions, categories, isLoading, refresh } = useData();
     const { user } = useAuth();
     const { theme } = useTheme();
+    const navigation = useNavigation();
     const [showForm, setShowForm] = useState(false);
     const currency = user?.currency || 'INR';
 
@@ -67,12 +69,20 @@ export default function DashboardScreen() {
                         <Text style={[styles.greeting, { color: theme.colors.textSecondary }]}>Hi {user?.name?.split(' ')[0] || 'there'} 👋</Text>
                         <Text style={[styles.title, { color: theme.colors.text }]}>Dashboard</Text>
                     </View>
-                    <TouchableOpacity
-                        onPress={() => setShowForm(true)}
-                        style={[styles.addButton, { backgroundColor: theme.colors.primary }]}
-                    >
-                        <MaterialCommunityIcons name="plus" size={24} color="#fff" />
-                    </TouchableOpacity>
+                    <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                        <TouchableOpacity
+                            onPress={() => (navigation as any).navigate('Reports')}
+                            style={[styles.addButton, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder, borderWidth: 1 }]}
+                        >
+                            <MaterialCommunityIcons name="chart-pie" size={22} color={theme.colors.textSecondary} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            onPress={() => setShowForm(true)}
+                            style={[styles.addButton, { backgroundColor: theme.colors.primary }]}
+                        >
+                            <MaterialCommunityIcons name="plus" size={24} color="#fff" />
+                        </TouchableOpacity>
+                    </View>
                 </View>
 
                 {/* Net worth */}

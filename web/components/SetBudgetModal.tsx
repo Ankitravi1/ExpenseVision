@@ -16,6 +16,14 @@ export const SetBudgetModal: React.FC<SetBudgetModalProps> = ({ isOpen, onClose,
     const context = useContext(AppContext);
     const [amount, setAmount] = useState('');
     const [categoryId, setCategoryId] = useState('');
+    const [rollover, setRollover] = useState(false);
+    const [alertThreshold, setAlertThreshold] = useState('100');
+
+    const applyBudgetFields = (budget?: { amount: number; rollover?: boolean; alertThreshold?: number }) => {
+        setAmount(budget ? budget.amount.toString() : '');
+        setRollover(budget?.rollover ?? false);
+        setAlertThreshold(String(budget?.alertThreshold ?? 100));
+    };
 
     useEffect(() => {
         if (!context || !isOpen) return;
@@ -29,19 +37,12 @@ export const SetBudgetModal: React.FC<SetBudgetModalProps> = ({ isOpen, onClose,
 
         if (preSelectedCategoryId) {
             setCategoryId(preSelectedCategoryId);
-            const existingBudget = findBudget(preSelectedCategoryId);
-            if (existingBudget) {
-                setAmount(existingBudget.amount.toString());
-            } else {
-                setAmount('');
-            }
+            applyBudgetFields(findBudget(preSelectedCategoryId));
         } else if (context.categories) {
             const firstExpense = context.categories.find(c => c.type === 'expense');
             if (firstExpense) {
                 setCategoryId(firstExpense.id);
-                const existingBudget = findBudget(firstExpense.id);
-                if (existingBudget) setAmount(existingBudget.amount.toString());
-                else setAmount('');
+                applyBudgetFields(findBudget(firstExpense.id));
             }
         }
     }, [isOpen, preSelectedCategoryId, month, context?.categories, context?.budgets]);
@@ -57,8 +58,7 @@ export const SetBudgetModal: React.FC<SetBudgetModalProps> = ({ isOpen, onClose,
             existingBudget = context?.budgets.find(b => b.categoryId === newCatId);
         }
 
-        if (existingBudget) setAmount(existingBudget.amount.toString());
-        else setAmount('');
+        applyBudgetFields(existingBudget);
     }
 
     if (!context) return null;
@@ -73,10 +73,13 @@ export const SetBudgetModal: React.FC<SetBudgetModalProps> = ({ isOpen, onClose,
         e.preventDefault();
         if (!amount || !categoryId) return;
 
+        const threshold = parseFloat(alertThreshold);
         const budgetPayload = {
             categoryId,
             amount: parseFloat(amount),
             month: month || undefined,
+            rollover,
+            alertThreshold: threshold >= 1 && threshold <= 500 ? threshold : 100,
         };
 
         setBudget({
@@ -152,6 +155,33 @@ export const SetBudgetModal: React.FC<SetBudgetModalProps> = ({ isOpen, onClose,
                                 />
                             </div>
                         </div>
+
+                        <div>
+                            <label htmlFor="budgetThreshold" className={labelStyles}>Alert at % of budget</label>
+                            <input
+                                type="number"
+                                id="budgetThreshold"
+                                value={alertThreshold}
+                                onChange={e => setAlertThreshold(e.target.value)}
+                                min={1}
+                                max={500}
+                                step={5}
+                                className={inputStyles}
+                            />
+                        </div>
+
+                        <label className="flex items-center justify-between gap-3 cursor-pointer">
+                            <div>
+                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Roll over unused budget</span>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">Last month's leftover (or overspend) carries into this month's limit</p>
+                            </div>
+                            <input
+                                type="checkbox"
+                                checked={rollover}
+                                onChange={e => setRollover(e.target.checked)}
+                                className="h-5 w-5 rounded text-primary focus:ring-primary"
+                            />
+                        </label>
 
                         <div className="pt-2 space-y-3">
                             <button type="submit" className="w-full bg-primary text-white font-semibold px-4 py-3 rounded-lg shadow-sm hover:bg-primary-hover transition-colors">

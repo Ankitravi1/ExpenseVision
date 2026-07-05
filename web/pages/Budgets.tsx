@@ -35,9 +35,11 @@ const BudgetCard: React.FC<{ budget: Budget; onEdit: () => void }> = ({ budget, 
     const category = categories.find(c => c.id === budget.categoryId);
     if (!category) return null;
 
-    const percentage = (budget.spent / budget.amount) * 100;
+    const limit = budget.effectiveAmount ?? budget.amount;
+    const percentage = limit > 0 ? (budget.spent / limit) * 100 : 100;
     const progressBarColor = percentage > 100 ? 'bg-danger' : percentage > 75 ? 'bg-warning' : 'bg-success';
-    const remaining = budget.amount - budget.spent;
+    const remaining = limit - budget.spent;
+    const carryover = budget.rollover ? (budget.carryover ?? 0) : 0;
 
     return (
         <Card>
@@ -60,8 +62,15 @@ const BudgetCard: React.FC<{ budget: Budget; onEdit: () => void }> = ({ budget, 
             </div>
             <div className="flex justify-between items-baseline mb-1">
                 <span className="font-bold text-xl text-gray-darkest dark:text-gray-50">{formatCurrency(budget.spent, currency)}</span>
-                <span className="text-gray-medium dark:text-gray-400">of {formatCurrency(budget.amount, currency)}</span>
+                <span className="text-gray-medium dark:text-gray-400">of {formatCurrency(limit, currency)}</span>
             </div>
+            {carryover !== 0 && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                    {carryover > 0
+                        ? `Includes ${formatCurrency(carryover, currency)} rolled over from last month`
+                        : `Reduced by ${formatCurrency(Math.abs(carryover), currency)} overspent last month`}
+                </p>
+            )}
             <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-600 mb-2">
                 <div className={`${progressBarColor} h-2.5 rounded-full transition-all`} style={{ width: `${Math.min(percentage, 100)}%` }}></div>
             </div>
@@ -100,15 +109,30 @@ export const Budgets: React.FC = () => {
     const [selectedCategoryId, setSelectedCategoryId] = useState<string | undefined>(undefined);
     const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; budgetId: string | null }>({ isOpen: false, budgetId: null });
 
-    const { budgets, categories, deleteBudget, currency } = useContext(AppContext)!;
+    const { budgets, categories, transactions, deleteBudget, currency } = useContext(AppContext)!;
 
+    const now = new Date();
     const currentMonthStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+    const isCurrentMonth = currentDate.getFullYear() === now.getFullYear() && currentDate.getMonth() === now.getMonth();
 
-    const filteredBudgets = budgets.filter(b => b.month === currentMonthStr);
+    // Month-scoped budgets for this month, plus repeating (month-less) budgets.
+    // Repeating budgets come from the API with current-month spent; recompute
+    // spent client-side when viewing another month. Rollover only applies to
+    // the current month.
+    const repeatingBudgets = budgets
+        .filter(b => !b.month)
+        .map(b => {
+            if (isCurrentMonth) return b;
+            const spent = transactions
+                .filter(t => t.type === 'expense' && t.categoryId === b.categoryId && t.date.startsWith(currentMonthStr))
+                .reduce((sum, t) => sum + t.amount, 0);
+            return { ...b, spent, carryover: 0, effectiveAmount: b.amount };
+        });
+    const filteredBudgets = [...budgets.filter(b => b.month === currentMonthStr), ...repeatingBudgets];
 
     const { totalBudget, totalSpent } = filteredBudgets.reduce(
         (acc, budget) => ({
-            totalBudget: acc.totalBudget + budget.amount,
+            totalBudget: acc.totalBudget + (budget.effectiveAmount ?? budget.amount),
             totalSpent: acc.totalSpent + budget.spent,
         }),
         { totalBudget: 0, totalSpent: 0 }

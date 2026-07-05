@@ -7,11 +7,13 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import LoginScreen from '../screens/auth/LoginScreen';
 import SignupScreen from '../screens/auth/SignupScreen';
+import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
 import CompleteProfileScreen from '../screens/auth/CompleteProfileScreen';
 import DashboardScreen from '../screens/main/DashboardScreen';
 import TransactionsScreen from '../screens/main/TransactionsScreen';
 import AccountsScreen from '../screens/main/AccountsScreen';
 import BudgetsScreen from '../screens/main/BudgetsScreen';
+import ReportsScreen from '../screens/main/ReportsScreen';
 import SettingsScreen from '../screens/main/SettingsScreen';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -76,11 +78,15 @@ export default function AppNavigator() {
                     <>
                         <Stack.Screen name="Login" component={LoginScreen} />
                         <Stack.Screen name="Signup" component={SignupScreen} />
+                        <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
                     </>
                 ) : needsProfileCompletion ? (
                     <Stack.Screen name="CompleteProfile" component={CompleteProfileScreen} />
                 ) : (
-                    <Stack.Screen name="Main" component={MainTabs} />
+                    <>
+                        <Stack.Screen name="Main" component={MainTabs} />
+                        <Stack.Screen name="Reports" component={ReportsScreen} />
+                    </>
                 )}
             </Stack.Navigator>
         </NavigationContainer>

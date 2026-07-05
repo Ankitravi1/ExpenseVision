@@ -5,22 +5,36 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { useTheme } from '../../context/ThemeContext';
-import { Card, SheetModal, ChipSelector, FieldLabel, Input, Button } from '../../components/ui';
+import { Card, SheetModal, ChipSelector, FieldLabel, Input, Button, OptionSheet, warningHaptic } from '../../components/ui';
 import { CategoryIcon } from '../../components/CategoryIcon';
 import { CategoryForm } from '../../components/CategoryForm';
-import { CURRENCIES } from '../../utils/currency';
+import { RecurringForm } from '../../components/RecurringForm';
+import { CURRENCIES, formatCurrency } from '../../utils/currency';
+import { isoDateToDisplay } from '../../utils/date';
+import { shareTransactionsCsv } from '../../utils/exportCsv';
 import { spacing } from '../../theme';
-import { Category } from '../../types';
+import { Category, RecurringRule } from '../../types';
+
+const COMMON_TIMEZONES = [
+    'Asia/Kolkata', 'Asia/Dubai', 'Asia/Singapore', 'Asia/Tokyo', 'Asia/Shanghai',
+    'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Europe/Moscow',
+    'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
+    'America/Sao_Paulo', 'Australia/Sydney', 'Pacific/Auckland', 'UTC',
+];
 import { AiProvider, AiSettings, defaultAiSettings, getAiSettings, providerModels, saveAiSettings } from '../../services/aiSettings';
 
 export default function SettingsScreen() {
     const { user, logout, updateProfile } = useAuth();
-    const { categories, deleteCategory } = useData();
+    const { categories, recurring, deleteCategory, deleteRecurring, clearAllTransactions, transactions } = useData();
     const { theme, mode, toggleTheme } = useTheme();
     const [showCurrency, setShowCurrency] = useState(false);
     const [showCategories, setShowCategories] = useState(false);
     const [showCategoryForm, setShowCategoryForm] = useState(false);
     const [showAiSettings, setShowAiSettings] = useState(false);
+    const [showRecurring, setShowRecurring] = useState(false);
+    const [showRecurringForm, setShowRecurringForm] = useState(false);
+    const [editingRule, setEditingRule] = useState<RecurringRule | null>(null);
+    const [exporting, setExporting] = useState(false);
     const [editingCategory, setEditingCategory] = useState<Category | null>(null);
     const [showEditName, setShowEditName] = useState(false);
     const [name, setName] = useState(user?.name || '');
@@ -73,6 +87,52 @@ export default function SettingsScreen() {
         } finally {
             setSavingAiSettings(false);
         }
+    };
+
+    const handleTimezoneChange = async (tz: string) => {
+        try {
+            await updateProfile({ timezone: tz });
+        } catch (err: any) {
+            Alert.alert('Error', err.message || 'Failed to update timezone');
+        }
+    };
+
+    const handleExport = async () => {
+        setExporting(true);
+        try {
+            await shareTransactionsCsv();
+        } catch (err: any) {
+            Alert.alert('Export failed', err.message || 'Could not export transactions');
+        } finally {
+            setExporting(false);
+        }
+    };
+
+    const confirmClearAll = () => {
+        warningHaptic();
+        Alert.alert(
+            'Clear all transactions',
+            `This deletes all ${transactions.length} transactions and resets account balances. This cannot be undone.`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete everything',
+                    style: 'destructive',
+                    onPress: () => clearAllTransactions().catch(err => Alert.alert('Error', err.message)),
+                },
+            ]
+        );
+    };
+
+    const confirmDeleteRule = (r: RecurringRule) => {
+        Alert.alert('Delete recurring', `Delete "${r.description}"? Already-created transactions stay.`, [
+            { text: 'Cancel', style: 'cancel' },
+            {
+                text: 'Delete',
+                style: 'destructive',
+                onPress: () => deleteRecurring(r.id).catch(err => Alert.alert('Error', err.message)),
+            },
+        ]);
     };
 
     const confirmLogout = () => {
@@ -128,12 +188,31 @@ export default function SettingsScreen() {
                     <Row icon="account-edit" label="Edit name" onPress={() => { setName(user?.name || ''); setShowEditName(true); }} />
                     <Row icon="currency-usd" label="Currency" value={user?.currency || 'INR'} onPress={() => setShowCurrency(true)} />
                     <Row icon="tag-multiple" label="Manage categories" value={`${categories.length}`} onPress={() => setShowCategories(true)} />
+                    <Row icon="repeat" label="Recurring transactions" value={`${recurring.length}`} onPress={() => setShowRecurring(true)} />
                     <Row icon="creation" label="AI transaction parsing" value={aiSettings.enabled ? aiSettings.model : 'Off'} onPress={() => setShowAiSettings(true)} />
                     <Row
                         icon="theme-light-dark"
                         label="Dark mode"
                         right={<Switch value={mode === 'dark'} onValueChange={toggleTheme} trackColor={{ true: theme.colors.primary }} />}
                     />
+                </Card>
+
+                <Card style={{ marginBottom: spacing.md, paddingVertical: 0 }}>
+                    <View style={{ paddingVertical: spacing.sm }}>
+                        <OptionSheet
+                            label="Timezone"
+                            options={[
+                                ...(user?.timezone && !COMMON_TIMEZONES.includes(user.timezone)
+                                    ? [{ value: user.timezone, label: user.timezone }]
+                                    : []),
+                                ...COMMON_TIMEZONES.map(tz => ({ value: tz, label: tz })),
+                            ]}
+                            value={user?.timezone || 'UTC'}
+                            onChange={handleTimezoneChange}
+                        />
+                    </View>
+                    <Row icon="export-variant" label={exporting ? 'Exporting…' : 'Export transactions (CSV)'} onPress={exporting ? undefined : handleExport} />
+                    <Row icon="delete-sweep" label="Clear all transactions" onPress={confirmClearAll} danger />
                 </Card>
 
                 <Card style={{ paddingVertical: 0 }}>
@@ -266,6 +345,65 @@ export default function SettingsScreen() {
                     setEditingCategory(null);
                 }}
                 editing={editingCategory}
+            />
+
+            {/* Recurring rules manager */}
+            <SheetModal visible={showRecurring} onClose={() => setShowRecurring(false)} title="Recurring transactions">
+                <Button
+                    title="+ New Recurring"
+                    variant="secondary"
+                    onPress={() => {
+                        setEditingRule(null);
+                        setShowRecurringForm(true);
+                    }}
+                    style={{ marginBottom: spacing.md }}
+                />
+                {recurring.length === 0 ? (
+                    <Text style={{ color: theme.colors.textTertiary, textAlign: 'center', paddingVertical: spacing.md }}>
+                        Set up rent, EMI, salary and other repeating transactions — they'll be added automatically when due.
+                    </Text>
+                ) : (
+                    recurring.map(r => (
+                        <TouchableOpacity
+                            key={r.id}
+                            onPress={() => {
+                                setEditingRule(r);
+                                setShowRecurringForm(true);
+                            }}
+                            onLongPress={() => confirmDeleteRule(r)}
+                            style={[styles.categoryRow, { borderBottomColor: theme.colors.separator, opacity: r.active ? 1 : 0.5 }]}
+                        >
+                            <View style={{ flex: 1 }}>
+                                <Text style={{ color: theme.colors.text, fontWeight: '600' }}>{r.description}</Text>
+                                <Text style={{ color: theme.colors.textTertiary, fontSize: 12 }}>
+                                    {r.frequency} · next {isoDateToDisplay(r.nextRun)}{r.active ? '' : ' · paused'}
+                                </Text>
+                            </View>
+                            <Text
+                                style={{
+                                    fontWeight: '700',
+                                    color: r.type === 'income' ? theme.colors.success : r.type === 'expense' ? theme.colors.danger : theme.colors.textSecondary,
+                                }}
+                            >
+                                {r.type === 'income' ? '+' : r.type === 'expense' ? '-' : ''}{formatCurrency(r.amount, user?.currency || 'INR')}
+                            </Text>
+                        </TouchableOpacity>
+                    ))
+                )}
+                {recurring.length > 0 ? (
+                    <Text style={{ color: theme.colors.textTertiary, fontSize: 12, marginTop: spacing.sm, textAlign: 'center' }}>
+                        Tap to edit · long-press to delete
+                    </Text>
+                ) : null}
+            </SheetModal>
+
+            <RecurringForm
+                visible={showRecurringForm}
+                onClose={() => {
+                    setShowRecurringForm(false);
+                    setEditingRule(null);
+                }}
+                editing={editingRule}
             />
         </SafeAreaView>
     );

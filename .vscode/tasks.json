@@ -1,0 +1,66 @@
+{
+  // Run all three in their own SEPARATE VS Code integrated terminal tabs:
+  //   Ctrl+Shift+P  →  "Tasks: Run Task"  →  "Start ExpenseVision (all)"
+  // Or without mobile: "Start ExpenseVision (web + backend)".
+  //
+  // Each task uses a dedicated panel and NO shared group, so they open as
+  // separate terminal TABS (not split panes). Switch between them with the
+  // dropdown at the top-right of the terminal panel.
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "backend",
+      "type": "shell",
+      "command": "npm run dev",
+      "options": { "cwd": "${workspaceFolder}/backend" },
+      "isBackground": true,
+      "presentation": {
+        "panel": "dedicated",
+        "reveal": "always",
+        "focus": false,
+        "showReuseMessage": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "web",
+      "type": "shell",
+      "command": "npm run dev",
+      "options": { "cwd": "${workspaceFolder}/web" },
+      "isBackground": true,
+      "presentation": {
+        "panel": "dedicated",
+        "reveal": "always",
+        "focus": false,
+        "showReuseMessage": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "mobile",
+      "type": "shell",
+      "command": "npx expo start --android",
+      "options": { "cwd": "${workspaceFolder}/mobile" },
+      "isBackground": true,
+      "presentation": {
+        "panel": "dedicated",
+        "reveal": "always",
+        "focus": false,
+        "showReuseMessage": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Start ExpenseVision (web + backend)",
+      "dependsOn": ["backend", "web"],
+      "dependsOrder": "parallel",
+      "problemMatcher": []
+    },
+    {
+      "label": "Start ExpenseVision (all)",
+      "dependsOn": ["backend", "web", "mobile"],
+      "dependsOrder": "parallel",
+      "problemMatcher": []
+    }
+  ]
+}

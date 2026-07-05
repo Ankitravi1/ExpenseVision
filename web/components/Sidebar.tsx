@@ -84,17 +84,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ activePage, setActivePage, isC
         background: 'var(--gradient-sidebar)',
         boxShadow: 'var(--shadow-sidebar)',
         height: '100vh',
-        // Physical widths preserved from the old zoom-based layout
-        // (body zoom 0.8 * aside zoom 1.25 = 1.0 of the declared px width).
         width: isCollapsed ? 64 : 208,
       }}
     >
-      {/* Replaces the old inner `zoom: 0.64` (net 0.8x of the page scale):
-          lay out at 125% size, then scale down by 0.8. */}
-      <div
-        style={{ width: '125%', height: '125%', transform: 'scale(0.8)', transformOrigin: 'top left' }}
-        className="flex flex-col"
-      >
         <div className="px-6 py-6 flex items-center justify-between">
           {!isCollapsed && <h1 className="text-2xl font-bold text-white tracking-tight">ExpenseVision</h1>}
           {isCollapsed &&
@@ -109,7 +101,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ activePage, setActivePage, isC
           }
         </div>
 
-        <nav className="flex-1 px-4 py-2">
+        {/* flex-1 pushes the profile block below to the bottom of the sidebar
+            at every window size and browser zoom level */}
+        <nav className="flex-1 overflow-y-auto px-4 py-2">
           {isCollapsed &&
             <div className="mb-4">
               <button onClick={() => setCollapsed(false)} className="w-full flex justify-center text-gray-400 hover:text-white p-3 rounded-xl hover:bg-white/10 transition-colors" aria-label="Expand sidebar">
@@ -195,7 +189,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ activePage, setActivePage, isC
             }
           </button>
         </div>
-      </div>
     </aside>
   );
 };
