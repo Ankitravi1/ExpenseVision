@@ -5,6 +5,7 @@ import { AppContext } from '../App';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { authService } from '../services/auth';
 import { pushService } from '../services/push';
+import { AiProvider, AiSettings, defaultAiSettings, getAiSettings, providerModels, saveAiSettings } from '../services/aiSettings';
 
 export const Settings: React.FC = () => {
     const context = useContext(AppContext);
@@ -12,9 +13,11 @@ export const Settings: React.FC = () => {
     const { theme, setTheme, transactions, clearAllTransactions } = context;
 
     const [notifications, setNotifications] = useState(false); // Default to false until checked
-    const [budgetAlerts, setBudgetAlerts] = useState(true);
+    const [budgetAlerts, setBudgetAlerts] = useState(false);
     const [emailReports, setEmailReports] = useState(false);
     const [clearConfirm, setClearConfirm] = useState(false);
+    const [aiSettings, setAiSettings] = useState<AiSettings>(defaultAiSettings);
+    const [aiSaved, setAiSaved] = useState(false);
 
     useEffect(() => {
         // Check if push is supported and subscribed
@@ -22,9 +25,11 @@ export const Settings: React.FC = () => {
             navigator.serviceWorker.ready.then(reg => {
                 reg.pushManager.getSubscription().then(sub => {
                     setNotifications(!!sub);
+                    setBudgetAlerts(!!sub);
                 });
             });
         }
+        setAiSettings(getAiSettings());
     }, []);
 
     const handleThemeChange = (newTheme: 'light' | 'dark') => {
@@ -42,8 +47,10 @@ export const Settings: React.FC = () => {
                     throw new Error('Permission denied');
                 }
                 await pushService.subscribeUser();
+                setBudgetAlerts(true);
             } else {
                 await pushService.unsubscribeUser();
+                setBudgetAlerts(false);
             }
         } catch (error: any) {
             console.error('Notification toggle failed:', error);
@@ -53,11 +60,25 @@ export const Settings: React.FC = () => {
             let message = 'Failed to update notification settings.';
             if (error.message === 'Permission denied') {
                 message = 'Notification permission was denied. Please enable notifications in your browser settings.';
-            } else if (error.message.includes('VAPID')) {
-                message = 'Push notification configuration is missing (VAPID Key).';
+            } else if (error.message.includes('Push notifications are not configured')) {
+                message = 'Push notification configuration is missing on the backend.';
             }
 
             alert(message);
+        }
+    };
+
+    const handleBudgetAlertsToggle = async (checked: boolean) => {
+        setBudgetAlerts(checked);
+        try {
+            if (checked) {
+                await handleNotificationToggle(true);
+            } else {
+                await pushService.unsubscribeUser();
+                setNotifications(false);
+            }
+        } catch {
+            setBudgetAlerts(!checked);
         }
     };
 
@@ -92,6 +113,21 @@ export const Settings: React.FC = () => {
             console.error('Export failed:', error);
             alert('Failed to export data');
         }
+    };
+
+    const handleAiProviderChange = (provider: AiProvider) => {
+        setAiSaved(false);
+        setAiSettings(prev => ({
+            ...prev,
+            provider,
+            model: providerModels[provider][0] || ''
+        }));
+    };
+
+    const handleSaveAiSettings = () => {
+        saveAiSettings(aiSettings);
+        setAiSaved(true);
+        window.setTimeout(() => setAiSaved(false), 2500);
     };
 
     return (
@@ -146,7 +182,7 @@ export const Settings: React.FC = () => {
                                 <h4 className="font-medium text-gray-darkest dark:text-gray-50">Enable Notifications</h4>
                             </div>
                             <p className="text-sm text-gray-600 dark:text-gray-400">
-                                Receive notifications about your financial activity
+                                Allow this browser to receive ExpenseVision notifications
                             </p>
                         </div>
                         <label className="relative inline-flex items-center cursor-pointer ml-4">
@@ -167,14 +203,14 @@ export const Settings: React.FC = () => {
                                 <h4 className="font-medium text-gray-darkest dark:text-gray-50">Budget Alerts</h4>
                             </div>
                             <p className="text-sm text-gray-600 dark:text-gray-400">
-                                Get notified when you're approaching or exceeding budget limits
+                                Get notified when a new expense pushes a category over budget
                             </p>
                         </div>
                         <label className="relative inline-flex items-center cursor-pointer ml-4">
                             <input
                                 type="checkbox"
                                 checked={budgetAlerts}
-                                onChange={(e) => setBudgetAlerts(e.target.checked)}
+                                onChange={(e) => handleBudgetAlertsToggle(e.target.checked)}
                                 className="sr-only peer"
                             />
                             <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 dark:peer-focus:ring-primary/40 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
@@ -200,6 +236,111 @@ export const Settings: React.FC = () => {
                             />
                             <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 dark:peer-focus:ring-primary/40 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
                         </label>
+                    </div>
+                </div>
+            </Card>
+
+            {/* AI */}
+            <Card>
+                <h3 className="text-xl font-semibold mb-4 text-gray-darkest dark:text-gray-50">AI</h3>
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                        <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                                <Icon name="Sparkles" size={18} className="text-gray-600 dark:text-gray-400" />
+                                <h4 className="font-medium text-gray-darkest dark:text-gray-50">AI Transaction Parsing</h4>
+                            </div>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                                Convert typed or dictated transaction notes into draft transactions.
+                            </p>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer ml-4">
+                            <input
+                                type="checkbox"
+                                checked={aiSettings.enabled}
+                                onChange={(e) => {
+                                    setAiSaved(false);
+                                    setAiSettings(prev => ({ ...prev, enabled: e.target.checked }));
+                                }}
+                                className="sr-only peer"
+                            />
+                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 dark:peer-focus:ring-primary/40 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
+                        </label>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label htmlFor="ai-provider" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Provider</label>
+                            <select
+                                id="ai-provider"
+                                value={aiSettings.provider}
+                                onChange={(e) => handleAiProviderChange(e.target.value as AiProvider)}
+                                className="block w-full bg-gray-100 border-transparent rounded-lg p-3 focus:ring-2 focus:ring-primary focus:bg-white text-base dark:bg-gray-700 dark:text-gray-100 dark:focus:bg-gray-600"
+                            >
+                                <option value="deepseek">DeepSeek</option>
+                                <option value="openai">OpenAI</option>
+                                <option value="openrouter">OpenRouter</option>
+                                <option value="custom">Custom OpenAI-compatible</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label htmlFor="ai-model" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Model</label>
+                            <input
+                                id="ai-model"
+                                value={aiSettings.model}
+                                list="ai-model-options"
+                                onChange={(e) => {
+                                    setAiSaved(false);
+                                    setAiSettings(prev => ({ ...prev, model: e.target.value }));
+                                }}
+                                placeholder="deepseek-v4-flash"
+                                className="block w-full bg-gray-100 border-transparent rounded-lg p-3 focus:ring-2 focus:ring-primary focus:bg-white text-base dark:bg-gray-700 dark:text-gray-100 dark:focus:bg-gray-600"
+                            />
+                            <datalist id="ai-model-options">
+                                {providerModels[aiSettings.provider].filter(Boolean).map(model => (
+                                    <option key={model} value={model} />
+                                ))}
+                            </datalist>
+                        </div>
+                    </div>
+
+                    {aiSettings.provider === 'custom' && (
+                        <div>
+                            <label htmlFor="ai-base-url" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Base URL</label>
+                            <input
+                                id="ai-base-url"
+                                value={aiSettings.baseUrl || ''}
+                                onChange={(e) => {
+                                    setAiSaved(false);
+                                    setAiSettings(prev => ({ ...prev, baseUrl: e.target.value }));
+                                }}
+                                placeholder="https://your-provider.example/v1"
+                                className="block w-full bg-gray-100 border-transparent rounded-lg p-3 focus:ring-2 focus:ring-primary focus:bg-white text-base dark:bg-gray-700 dark:text-gray-100 dark:focus:bg-gray-600"
+                            />
+                        </div>
+                    )}
+
+                    <div>
+                        <label htmlFor="ai-api-key" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">API Key</label>
+                        <input
+                            id="ai-api-key"
+                            type="password"
+                            value={aiSettings.apiKey}
+                            onChange={(e) => {
+                                setAiSaved(false);
+                                setAiSettings(prev => ({ ...prev, apiKey: e.target.value }));
+                            }}
+                            placeholder="sk-..."
+                            className="block w-full bg-gray-100 border-transparent rounded-lg p-3 focus:ring-2 focus:ring-primary focus:bg-white text-base dark:bg-gray-700 dark:text-gray-100 dark:focus:bg-gray-600"
+                        />
+                    </div>
+
+                    <div className="flex justify-end">
+                        <button onClick={handleSaveAiSettings} className="btn btn-primary">
+                            <Icon name="Save" size={16} className="mr-2" />
+                            {aiSaved ? 'Saved' : 'Save AI Settings'}
+                        </button>
                     </div>
                 </div>
             </Card>

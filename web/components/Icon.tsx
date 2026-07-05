@@ -57,7 +57,17 @@ import {
   Dumbbell,
   Trash2,
   Pencil,
-  AlertTriangle
+  AlertTriangle,
+  Sparkles,
+  Save,
+  Mic2,
+  Calendar,
+  Repeat,
+  Upload,
+  Check,
+  AlertCircle,
+  Info,
+  StickyNote
 } from 'lucide-react';
 
 export type IconName = string;
@@ -125,7 +135,17 @@ const iconComponents: { [key: string]: React.ComponentType<any> } = {
   Dumbbell,
   Trash2,
   Pencil,
-  AlertTriangle
+  AlertTriangle,
+  Sparkles,
+  Save,
+  Mic2,
+  Calendar,
+  Repeat,
+  Upload,
+  Check,
+  AlertCircle,
+  Info,
+  StickyNote
 };
 
 export const iconList = Object.keys(iconComponents);

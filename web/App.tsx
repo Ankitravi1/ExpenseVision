@@ -9,6 +9,7 @@ import { Budgets } from './pages/Budgets';
 import { Categories } from './pages/Categories';
 import { TransactionsPage } from './pages/TransactionsPage';
 import { Reports } from './pages/Reports';
+import { Recurring } from './pages/Recurring';
 import { Profile } from './pages/Profile';
 import { Settings } from './pages/Settings';
 import { LandingPage } from './pages/LandingPage';
@@ -18,13 +19,14 @@ import { VerifyEmail } from './pages/VerifyEmail';
 import { ForgotPassword } from './pages/ForgotPassword';
 import { ResetPassword } from './pages/ResetPassword';
 import { ProfileCompletion } from './components/ProfileCompletion';
-import { Account, Budget, Category, Transaction, Page, User } from './types';
+import { Account, Budget, Category, Transaction, Page, User, RecurringRule } from './types';
 import { NewTransactionModal } from './components/NewTransactionModal';
 import { authService } from './services/auth';
 import { api } from './services/api';
 import { Icon } from './components/Icon';
 import { useToast } from './context/ToastContext';
 import { AppContext } from './context/AppContext';
+import { transactionDateToIso } from './utils/date';
 
 // Re-export so existing `import { AppContext } from '../App'` keeps working
 export { AppContext };
@@ -32,6 +34,7 @@ export { AppContext };
 const PAGE_PATHS: Record<Page, string> = {
   Dashboard: '/',
   Transactions: '/transactions',
+  Recurring: '/recurring',
   Budgets: '/budgets',
   Accounts: '/accounts',
   Categories: '/categories',
@@ -65,6 +68,7 @@ const App: React.FC = () => {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [recurring, setRecurring] = useState<RecurringRule[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -127,6 +131,7 @@ const App: React.FC = () => {
       setAccounts(data.accounts);
       setCategories(data.categories);
       setBudgets(data.budgets);
+      setRecurring(data.recurring || []);
     } catch (err) {
       console.error('Failed to fetch data:', err);
       setError('Failed to load data. Please try refreshing.');
@@ -178,8 +183,9 @@ const App: React.FC = () => {
   const addTransaction = useCallback(async (transaction: Omit<Transaction, 'id'>) => {
     try {
       const newTransaction = await api.createTransaction(transaction);
-      setTransactions(prev => [newTransaction, ...prev].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+      setTransactions(prev => [newTransaction, ...prev].sort((a, b) => transactionDateToIso(b.date).localeCompare(transactionDateToIso(a.date))));
       await refreshFinancials();
+      showToast('Transaction added', 'success');
     } catch (err) {
       console.error('Failed to add transaction:', err);
       showToast('Failed to add transaction', 'error');
@@ -190,8 +196,9 @@ const App: React.FC = () => {
     try {
       const updated = await api.updateTransaction(id, updatedData);
       setTransactions(prev => prev.map(t => t.id === id ? updated : t)
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+        .sort((a, b) => transactionDateToIso(b.date).localeCompare(transactionDateToIso(a.date))));
       await refreshFinancials();
+      showToast('Transaction updated', 'success');
     } catch (err) {
       console.error('Failed to update transaction:', err);
       showToast('Failed to update transaction', 'error');
@@ -203,6 +210,7 @@ const App: React.FC = () => {
       await api.deleteTransaction(id);
       setTransactions(prev => prev.filter(t => t.id !== id));
       await refreshFinancials();
+      showToast('Transaction deleted', 'success');
     } catch (err) {
       console.error('Failed to delete transaction:', err);
       showToast('Failed to delete transaction', 'error');
@@ -225,6 +233,7 @@ const App: React.FC = () => {
     try {
       const newAccount = await api.createAccount(account);
       setAccounts(prev => [...prev, newAccount]);
+      showToast('Account added', 'success');
     } catch (err) {
       console.error('Failed to add account:', err);
       showToast('Failed to add account', 'error');
@@ -235,6 +244,7 @@ const App: React.FC = () => {
     try {
       const updatedAccount = await api.updateAccount(id, updatedData);
       setAccounts(prev => prev.map(acc => acc.id === id ? updatedAccount : acc));
+      showToast('Account updated', 'success');
     } catch (err) {
       console.error('Failed to update account:', err);
       showToast('Failed to update account', 'error');
@@ -245,6 +255,7 @@ const App: React.FC = () => {
     try {
       await api.deleteAccount(id);
       setAccounts(prev => prev.filter(acc => acc.id !== id));
+      showToast('Account deleted', 'success');
     } catch (err: any) {
       console.error('Failed to delete account:', err);
       const message = err.message?.includes('Foreign key constraint')
@@ -258,6 +269,7 @@ const App: React.FC = () => {
     try {
       const newCategory = await api.createCategory(category);
       setCategories(prev => [...prev, newCategory]);
+      showToast('Category added', 'success');
     } catch (err) {
       console.error('Failed to add category:', err);
       showToast('Failed to add category', 'error');
@@ -268,6 +280,7 @@ const App: React.FC = () => {
     try {
       const updatedCategory = await api.updateCategory(id, updatedData);
       setCategories(prev => prev.map(cat => cat.id === id ? updatedCategory : cat));
+      showToast('Category updated', 'success');
     } catch (err) {
       console.error('Failed to update category:', err);
       showToast('Failed to update category', 'error');
@@ -278,6 +291,7 @@ const App: React.FC = () => {
     try {
       await api.deleteCategory(id);
       setCategories(prev => prev.filter(cat => cat.id !== id));
+      showToast('Category deleted', 'success');
     } catch (err: any) {
       console.error('Failed to delete category:', err);
       const message = err.message?.includes('Foreign key constraint')
@@ -297,6 +311,7 @@ const App: React.FC = () => {
         }
         return [...prev, newBudget];
       });
+      showToast('Budget saved', 'success');
     } catch (err) {
       console.error('Failed to set budget:', err);
       showToast('Failed to set budget', 'error');
@@ -307,9 +322,45 @@ const App: React.FC = () => {
     try {
       await api.deleteBudget(id);
       setBudgets(prev => prev.filter(b => b.id !== id));
+      showToast('Budget deleted', 'success');
     } catch (err) {
       console.error('Failed to delete budget:', err);
       showToast('Failed to delete budget', 'error');
+    }
+  }, [showToast]);
+
+  const addRecurring = useCallback(async (rule: Partial<RecurringRule>) => {
+    try {
+      await api.createRecurring(rule);
+      // Due occurrences are materialized server-side on the next initial-data
+      // fetch, so refresh everything to pick up any generated transactions.
+      await fetchData();
+      showToast('Recurring rule added', 'success');
+    } catch (err: any) {
+      console.error('Failed to add recurring rule:', err);
+      showToast(err.message || 'Failed to add recurring rule', 'error');
+    }
+  }, [fetchData, showToast]);
+
+  const updateRecurring = useCallback(async (id: string, updatedData: Partial<RecurringRule>) => {
+    try {
+      await api.updateRecurring(id, updatedData);
+      await fetchData();
+      showToast('Recurring rule updated', 'success');
+    } catch (err: any) {
+      console.error('Failed to update recurring rule:', err);
+      showToast(err.message || 'Failed to update recurring rule', 'error');
+    }
+  }, [fetchData, showToast]);
+
+  const deleteRecurring = useCallback(async (id: string) => {
+    try {
+      await api.deleteRecurring(id);
+      setRecurring(prev => prev.filter(r => r.id !== id));
+      showToast('Recurring rule deleted', 'success');
+    } catch (err: any) {
+      console.error('Failed to delete recurring rule:', err);
+      showToast(err.message || 'Failed to delete recurring rule', 'error');
     }
   }, [showToast]);
 
@@ -318,6 +369,7 @@ const App: React.FC = () => {
     categories,
     transactions,
     budgets,
+    recurring,
     currency,
     setCurrency,
     theme,
@@ -333,11 +385,14 @@ const App: React.FC = () => {
     deleteCategory,
     setBudget,
     deleteBudget,
+    addRecurring,
+    updateRecurring,
+    deleteRecurring,
     clearAllTransactions,
     setActivePage,
     refreshData: fetchData,
     user,
-  }), [accounts, categories, transactions, budgets, currency, setCurrency, theme, setTheme, addTransaction, updateTransaction, deleteTransaction, clearAllTransactions, addAccount, updateAccount, deleteAccount, addCategory, updateCategory, deleteCategory, setBudget, deleteBudget, setActivePage, fetchData, user]);
+  }), [accounts, categories, transactions, budgets, recurring, currency, setCurrency, theme, setTheme, addTransaction, updateTransaction, deleteTransaction, clearAllTransactions, addAccount, updateAccount, deleteAccount, addCategory, updateCategory, deleteCategory, setBudget, deleteBudget, addRecurring, updateRecurring, deleteRecurring, setActivePage, fetchData, user]);
 
   // Auth handlers
   const handleAuthSuccess = () => {
@@ -360,6 +415,7 @@ const App: React.FC = () => {
       setAccounts([]);
       setCategories([]);
       setBudgets([]);
+      setRecurring([]);
     });
     navigate('/');
   };
@@ -465,6 +521,7 @@ const App: React.FC = () => {
     <Routes>
       <Route path="/" element={<Dashboard />} />
       <Route path="/transactions" element={<TransactionsPage />} />
+      <Route path="/recurring" element={<Recurring />} />
       <Route path="/budgets" element={<Budgets />} />
       <Route path="/accounts" element={<Accounts />} />
       <Route path="/categories" element={<Categories />} />

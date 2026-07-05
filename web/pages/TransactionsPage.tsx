@@ -7,6 +7,7 @@ import { Transaction } from '../types';
 import { ExportButton } from '../components/ExportButton';
 import { formatCurrency } from '../utils/currency';
 import { NewTransactionModal } from '../components/NewTransactionModal';
+import { displayDateToIso, formatTransactionDate, isoDateToDisplay, transactionDateToIso } from '../utils/date';
 
 const TransactionRow: React.FC<{ transaction: Transaction; onEdit: () => void }> = ({ transaction, onEdit }) => {
     const { categories, accounts, currency } = useContext(AppContext)!;
@@ -31,22 +32,11 @@ const TransactionRow: React.FC<{ transaction: Transaction; onEdit: () => void }>
         icon = 'ArrowLeftRight';
     }
 
-    // Format date as DD/MM/YYYY HH:MM
-    const formatDate = (dateStr: string) => {
-        const date = new Date(dateStr);
-        const day = String(date.getDate()).padStart(2, '0');
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const year = date.getFullYear();
-        const hours = String(date.getHours()).padStart(2, '0');
-        const minutes = String(date.getMinutes()).padStart(2, '0');
-        return `${day}/${month}/${year} ${hours}:${minutes}`;
-    };
-
     return (
         <tr className="border-b border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700/50">
             <td className="px-6 py-4 whitespace-nowrap">
                 <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                    {formatDate(transaction.date)}
+                    {formatTransactionDate(transaction.date, true)}
                 </div>
             </td>
             <td className="px-6 py-4 whitespace-nowrap">
@@ -105,8 +95,8 @@ export const TransactionsPage: React.FC = () => {
     const today = new Date();
     const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 
-    const [startDate, setStartDate] = useState(getLocalDateString(firstDayOfMonth));
-    const [endDate, setEndDate] = useState(getLocalDateString(today));
+    const [startDate, setStartDate] = useState(isoDateToDisplay(getLocalDateString(firstDayOfMonth)));
+    const [endDate, setEndDate] = useState(isoDateToDisplay(getLocalDateString(today)));
     const [sortConfig, setSortConfig] = useState<{ key: keyof Transaction | 'accountName'; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
 
     // Edit Modal State
@@ -133,16 +123,13 @@ export const TransactionsPage: React.FC = () => {
     };
 
     const filteredAndSortedTransactions = useMemo(() => {
+        const startIso = startDate ? displayDateToIso(startDate) : null;
+        const endIso = endDate ? displayDateToIso(endDate) : null;
+
         const filtered = transactions.filter(t => {
-            if (!startDate || !endDate) return true;
-
-            const start = new Date(startDate);
-            start.setHours(0, 0, 0, 0);
-            const end = new Date(endDate);
-            end.setHours(23, 59, 59, 999);
-
-            const tDate = new Date(t.date);
-            return tDate >= start && tDate <= end;
+            if (!startIso || !endIso) return true;
+            const tDate = transactionDateToIso(t.date);
+            return tDate >= startIso && tDate <= endIso;
         });
 
         return [...filtered].sort((a, b) => {
@@ -151,8 +138,8 @@ export const TransactionsPage: React.FC = () => {
             let valB = b[key];
 
             if (key === 'date') {
-                valA = new Date(valA).getTime();
-                valB = new Date(valB).getTime();
+                valA = transactionDateToIso(String(valA));
+                valB = transactionDateToIso(String(valB));
             }
 
             if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
@@ -160,15 +147,6 @@ export const TransactionsPage: React.FC = () => {
             return 0;
         });
     }, [transactions, startDate, endDate, sortConfig]);
-
-    // Format date for display (DD/MM/YYYY)
-    const formatDateForDisplay = (dateStr: string) => {
-        const date = new Date(dateStr);
-        const day = String(date.getDate()).padStart(2, '0');
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const year = date.getFullYear();
-        return `${day}/${month}/${year}`;
-    };
 
     const SortableHeader: React.FC<{
         columnKey: keyof Transaction | 'accountName',
@@ -186,8 +164,8 @@ export const TransactionsPage: React.FC = () => {
     );
 
     const handleImportSuccess = (minDate: string, maxDate: string) => {
-        setStartDate(minDate);
-        setEndDate(maxDate);
+        setStartDate(isoDateToDisplay(minDate));
+        setEndDate(isoDateToDisplay(maxDate));
     };
 
     return (
@@ -200,18 +178,22 @@ export const TransactionsPage: React.FC = () => {
                             {/* ... Date inputs ... */}
                             <label htmlFor="start-date" className="text-sm font-medium text-gray-medium dark:text-gray-400">From</label>
                             <input
-                                type="date"
+                                type="text"
                                 id="start-date"
                                 value={startDate}
                                 onChange={e => setStartDate(e.target.value)}
+                                placeholder="DD-MM-YYYY"
+                                inputMode="numeric"
                                 className="input text-sm"
                             />
                             <label htmlFor="end-date" className="text-sm font-medium text-gray-medium dark:text-gray-400">To</label>
                             <input
-                                type="date"
+                                type="text"
                                 id="end-date"
                                 value={endDate}
                                 onChange={e => setEndDate(e.target.value)}
+                                placeholder="DD-MM-YYYY"
+                                inputMode="numeric"
                                 className="input text-sm"
                             />
                             <button
@@ -234,7 +216,7 @@ export const TransactionsPage: React.FC = () => {
                 {/* ... Table ... */}
                 <div className="text-sm text-gray-500 dark:text-gray-400 mb-4">
                     {startDate && endDate ? (
-                        <>Showing transactions from {formatDateForDisplay(startDate)} to {formatDateForDisplay(endDate)}</>
+                        <>Showing transactions from {startDate} to {endDate}</>
                     ) : (
                         <>Showing all transactions</>
                     )}

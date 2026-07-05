@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -11,6 +11,7 @@ import { CategoryForm } from '../../components/CategoryForm';
 import { CURRENCIES } from '../../utils/currency';
 import { spacing } from '../../theme';
 import { Category } from '../../types';
+import { AiProvider, AiSettings, defaultAiSettings, getAiSettings, providerModels, saveAiSettings } from '../../services/aiSettings';
 
 export default function SettingsScreen() {
     const { user, logout, updateProfile } = useAuth();
@@ -19,10 +20,17 @@ export default function SettingsScreen() {
     const [showCurrency, setShowCurrency] = useState(false);
     const [showCategories, setShowCategories] = useState(false);
     const [showCategoryForm, setShowCategoryForm] = useState(false);
+    const [showAiSettings, setShowAiSettings] = useState(false);
     const [editingCategory, setEditingCategory] = useState<Category | null>(null);
     const [showEditName, setShowEditName] = useState(false);
     const [name, setName] = useState(user?.name || '');
     const [savingName, setSavingName] = useState(false);
+    const [aiSettings, setAiSettings] = useState<AiSettings>(defaultAiSettings);
+    const [savingAiSettings, setSavingAiSettings] = useState(false);
+
+    useEffect(() => {
+        getAiSettings().then(setAiSettings).catch(() => setAiSettings(defaultAiSettings));
+    }, []);
 
     const handleCurrencyChange = async (code: string) => {
         try {
@@ -43,6 +51,27 @@ export default function SettingsScreen() {
             Alert.alert('Error', err.message || 'Failed to update name');
         } finally {
             setSavingName(false);
+        }
+    };
+
+    const handleAiProviderChange = (provider: AiProvider) => {
+        setAiSettings(prev => ({
+            ...prev,
+            provider,
+            model: providerModels[provider][0] || '',
+        }));
+    };
+
+    const handleSaveAiSettings = async () => {
+        setSavingAiSettings(true);
+        try {
+            await saveAiSettings(aiSettings);
+            Alert.alert('Saved', 'AI settings updated.');
+            setShowAiSettings(false);
+        } catch (err: any) {
+            Alert.alert('Error', err.message || 'Failed to save AI settings');
+        } finally {
+            setSavingAiSettings(false);
         }
     };
 
@@ -99,6 +128,7 @@ export default function SettingsScreen() {
                     <Row icon="account-edit" label="Edit name" onPress={() => { setName(user?.name || ''); setShowEditName(true); }} />
                     <Row icon="currency-usd" label="Currency" value={user?.currency || 'INR'} onPress={() => setShowCurrency(true)} />
                     <Row icon="tag-multiple" label="Manage categories" value={`${categories.length}`} onPress={() => setShowCategories(true)} />
+                    <Row icon="creation" label="AI transaction parsing" value={aiSettings.enabled ? aiSettings.model : 'Off'} onPress={() => setShowAiSettings(true)} />
                     <Row
                         icon="theme-light-dark"
                         label="Dark mode"
@@ -129,6 +159,71 @@ export default function SettingsScreen() {
             <SheetModal visible={showEditName} onClose={() => setShowEditName(false)} title="Edit name">
                 <Input label="Name" value={name} onChangeText={setName} />
                 <Button title="Save" onPress={handleSaveName} loading={savingName} />
+            </SheetModal>
+
+            {/* AI settings */}
+            <SheetModal visible={showAiSettings} onClose={() => setShowAiSettings(false)} title="AI transaction parsing">
+                <View style={[styles.aiToggleRow, { borderBottomColor: theme.colors.separator }]}>
+                    <View style={{ flex: 1 }}>
+                        <Text style={{ color: theme.colors.text, fontWeight: '700' }}>Enable AI parsing</Text>
+                        <Text style={{ color: theme.colors.textTertiary, fontSize: 12, marginTop: 3 }}>
+                            Use typed or voice-dictated notes to fill transaction drafts.
+                        </Text>
+                    </View>
+                    <Switch
+                        value={aiSettings.enabled}
+                        onValueChange={enabled => setAiSettings(prev => ({ ...prev, enabled }))}
+                        trackColor={{ true: theme.colors.primary }}
+                    />
+                </View>
+
+                <FieldLabel>Provider</FieldLabel>
+                <ChipSelector
+                    options={[
+                        { value: 'deepseek', label: 'DeepSeek' },
+                        { value: 'openai', label: 'OpenAI' },
+                        { value: 'openrouter', label: 'OpenRouter' },
+                        { value: 'custom', label: 'Custom' },
+                    ]}
+                    value={aiSettings.provider}
+                    onChange={value => handleAiProviderChange(value as AiProvider)}
+                />
+
+                <FieldLabel>Model</FieldLabel>
+                {providerModels[aiSettings.provider].filter(Boolean).length > 0 ? (
+                    <ChipSelector
+                        options={providerModels[aiSettings.provider].filter(Boolean).map(model => ({ value: model, label: model }))}
+                        value={aiSettings.model}
+                        onChange={model => setAiSettings(prev => ({ ...prev, model }))}
+                    />
+                ) : null}
+                <Input
+                    value={aiSettings.model}
+                    onChangeText={model => setAiSettings(prev => ({ ...prev, model }))}
+                    placeholder="deepseek-v4-flash"
+                    autoCapitalize="none"
+                />
+
+                {aiSettings.provider === 'custom' ? (
+                    <Input
+                        label="Base URL"
+                        value={aiSettings.baseUrl || ''}
+                        onChangeText={baseUrl => setAiSettings(prev => ({ ...prev, baseUrl }))}
+                        placeholder="https://your-provider.example/v1"
+                        autoCapitalize="none"
+                    />
+                ) : null}
+
+                <Input
+                    label="API Key"
+                    value={aiSettings.apiKey}
+                    onChangeText={apiKey => setAiSettings(prev => ({ ...prev, apiKey }))}
+                    placeholder="sk-..."
+                    autoCapitalize="none"
+                    secureTextEntry
+                />
+
+                <Button title="Save AI Settings" onPress={handleSaveAiSettings} loading={savingAiSettings} />
             </SheetModal>
 
             {/* Categories manager */}
@@ -211,5 +306,13 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingVertical: 10,
         borderBottomWidth: StyleSheet.hairlineWidth,
+    },
+    aiToggleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingBottom: spacing.md,
+        marginBottom: spacing.md,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        gap: spacing.md,
     },
 });

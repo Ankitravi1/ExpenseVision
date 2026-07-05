@@ -2,6 +2,7 @@ import React, { useState, useContext, useRef } from 'react';
 import { AppContext } from '../App';
 import { Icon } from './Icon';
 import { api } from '../services/api';
+import { displayDateToIso, formatTransactionDate } from '../utils/date';
 
 interface ImportTransactionsModalProps {
     isOpen: boolean;
@@ -22,10 +23,11 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
     const { accounts, categories, refreshData } = context;
 
     const downloadTemplate = () => {
-        const headers = ['Type', 'Date (YYYY-MM-DD)', 'Time', 'Amount', 'Description', 'Account', 'Category', 'Transfer To'];
+        const headers = ['Date', 'Time', 'Description', 'Amount', 'Type', 'Category', 'Account', 'Transfer To'];
         const csvContent = headers.join(',') + '\n' +
-            'expense,2025-01-01,12:00,50.00,Groceries,Checking Account,Groceries,\n' +
-            'income,2025-01-02,09:00,2000.00,Salary,Checking Account,Salary,\n';
+            '01-01-2025,12:00,Groceries,50.00,expense,Groceries,Checking Account,\n' +
+            '02-01-2025,09:00,Salary,2000.00,income,Salary,Checking Account,\n' +
+            '03-01-2025,18:30,Credit card bill payment,1000.00,transfer,,Checking Account,Credit Card\n';
 
         const blob = new Blob([csvContent], { type: 'text/csv' });
         const url = window.URL.createObjectURL(blob);
@@ -75,17 +77,10 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
                 return;
             }
 
-            // Helper to format date to YYYY-MM-DD (Local Time)
+            // Helper to format date to YYYY-MM-DD for storage.
             const formatDateToISO = (dateStr: string) => {
                 if (!dateStr) return null;
-                const d = new Date(dateStr);
-                if (!isNaN(d.getTime())) {
-                    const year = d.getFullYear();
-                    const month = String(d.getMonth() + 1).padStart(2, '0');
-                    const day = String(d.getDate()).padStart(2, '0');
-                    return `${year}-${month}-${day}`;
-                }
-                return null;
+                return displayDateToIso(dateStr);
             };
 
             // Helper to parse time
@@ -298,7 +293,7 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
                                             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                                                 {previewData.slice(0, 5).map((row, i) => (
                                                     <tr key={i} className="text-gray-700 dark:text-gray-300">
-                                                        <td className="px-4 py-2">{row.date.split('T')[0]}</td>
+                                                        <td className="px-4 py-2">{formatTransactionDate(row.date)}</td>
                                                         <td className="px-4 py-2">{row.description}</td>
                                                         <td className="px-4 py-2">{row.amount}</td>
                                                         <td className="px-4 py-2">{accounts.find(a => a.id === row.accountId)?.name}</td>

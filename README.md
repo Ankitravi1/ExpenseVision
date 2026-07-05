@@ -29,15 +29,26 @@ This project is organized as a monorepo:
 - [x] Core CRUD Features
 - [x] Bulk Import/Export
 - [x] Timezone Support
-- [ ] Web Push Notifications (Budget Alerts)
+- [x] Web Push Notifications (Budget Alerts)
 
-### v0.2: Mobile & Payments
-- [ ] Android Mobile App (React Native)
-- [ ] UPI Payment Integration (Intent Flow)
-- [ ] Auto-tracking via SMS Parsing
+### v0.2: Mobile & Transaction Entry
+- [ ] Android Mobile App (React Native + Expo)
+- [x] Backend and web test flow for voice-typed transaction notes
+- [x] Add transactions in mobile using Android voice typing/live caption-style speech-to-text
+- [x] Optional AI-assisted voice-to-transaction parsing with user-selected provider and user-provided API key
 
 ### v0.3: Intelligence (Premium)
 - [ ] AI-Based Smart Import (PDF/Image parsing)
+- [ ] Voice and manual transaction/payment entry wizard
+- [ ] User interface rethink and improved UX
+
+### v0.4: Polish & Reliability
+- [ ] Cross-platform UX refinements
+- [ ] Notification preferences and reliability improvements
+- [ ] Import and transaction review workflow hardening
+
+### v0.5: Payments & Integrations
+- [ ] UPI Payment Integration (Intent Flow)
 - [ ] Bank Account Aggregator Integration
 
 ## 🛠 Tech Stack
@@ -56,6 +67,18 @@ This project is organized as a monorepo:
 No database server is needed — the backend uses a local SQLite file (`backend/prisma/dev.db`).
 
 ### Installation & Running
+
+Start the web and backend together in the same VS Code terminal on Windows:
+
+```powershell
+.\start-expensevision.ps1
+```
+
+Include the Android Expo app too:
+
+```powershell
+.\start-expensevision.ps1 -WithMobile
+```
 
 1.  **Backend** (http://localhost:5000)
     ```bash
@@ -85,7 +108,7 @@ No database server is needed — the backend uses a local SQLite file (`backend/
 ### Optional features (off by default, enable via `backend/.env`)
 - **Google sign-in**: set `GOOGLE_CLIENT_ID` (backend) and `VITE_GOOGLE_CLIENT_ID` (web).
 - **Email verification / password reset emails**: set the `SMTP_*` vars. Without SMTP, users are auto-verified.
-- **Web push (budget alerts)**: set `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY` (generate with `node generate-keys.cjs`) and `VITE_VAPID_PUBLIC_KEY` in web.
+- **Web push (budget alerts)**: set `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY` in `backend/.env` (generate with `node generate-keys.cjs`).
 
 ## 📝 Documentation
 Please refer to the [docs/](./docs) directory for detailed documentation on deployment, roadmap, and features.

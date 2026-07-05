@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
     View,
     Text,
@@ -13,8 +13,24 @@ import {
     TextInputProps,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from '../context/ThemeContext';
+import { CategoryIcon } from './CategoryIcon';
+import { isoDateToDisplay } from '../utils/date';
 import { radius, spacing } from '../theme';
+
+export const lightHaptic = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+};
+
+export const successHaptic = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+};
+
+export const warningHaptic = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+};
 
 export const Card: React.FC<{ children: React.ReactNode; style?: object }> = ({ children, style }) => {
     const { theme } = useTheme();
@@ -55,7 +71,10 @@ export const Button: React.FC<ButtonProps> = ({ title, onPress, variant = 'prima
 
     return (
         <TouchableOpacity
-            onPress={onPress}
+            onPress={() => {
+                lightHaptic();
+                onPress();
+            }}
             disabled={disabled || loading}
             activeOpacity={0.8}
             style={[
@@ -156,7 +175,8 @@ export const ChipSelector: React.FC<{
     options: { value: string; label: string }[];
     value: string | null | undefined;
     onChange: (value: string) => void;
-}> = ({ options, value, onChange }) => {
+    disabled?: boolean;
+}> = ({ options, value, onChange, disabled }) => {
     const { theme } = useTheme();
     return (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: spacing.md, height: 48, flexGrow: 0 }}>
@@ -167,11 +187,13 @@ export const ChipSelector: React.FC<{
                         <TouchableOpacity
                             key={opt.value}
                             onPress={() => onChange(opt.value)}
+                            disabled={disabled}
                             style={[
                                 styles.chip,
                                 {
                                     backgroundColor: selected ? theme.colors.primary : theme.colors.inputBg,
                                     borderColor: selected ? theme.colors.primary : theme.colors.inputBorder,
+                                    opacity: disabled ? 0.6 : 1,
                                 },
                             ]}
                         >
@@ -189,6 +211,157 @@ export const ChipSelector: React.FC<{
 export const FieldLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { theme } = useTheme();
     return <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{children}</Text>;
+};
+
+// Tappable field that opens a bottom-sheet list. Better than chip rows once
+// there are more than a few options (all options visible, supports icons).
+export interface SheetOption {
+    value: string;
+    label: string;
+    icon?: string; // lucide icon name, rendered via CategoryIcon
+    sublabel?: string;
+}
+
+export const OptionSheet: React.FC<{
+    label?: string;
+    placeholder?: string;
+    options: SheetOption[];
+    value: string | null | undefined;
+    onChange: (value: string) => void;
+    disabled?: boolean;
+}> = ({ label, placeholder = 'Select...', options, value, onChange, disabled }) => {
+    const { theme } = useTheme();
+    const [open, setOpen] = useState(false);
+    const selected = options.find(o => o.value === value);
+
+    return (
+        <View style={{ marginBottom: spacing.md }}>
+            {label ? <FieldLabel>{label}</FieldLabel> : null}
+            <TouchableOpacity
+                onPress={() => {
+                    if (disabled) return;
+                    lightHaptic();
+                    setOpen(true);
+                }}
+                activeOpacity={0.7}
+                style={[
+                    styles.pickerField,
+                    {
+                        backgroundColor: theme.colors.inputBg,
+                        borderColor: theme.colors.inputBorder,
+                        opacity: disabled ? 0.6 : 1,
+                    },
+                ]}
+            >
+                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: spacing.sm }}>
+                    {selected?.icon ? <CategoryIcon name={selected.icon} size={15} /> : null}
+                    <Text
+                        style={{ color: selected ? theme.colors.text : theme.colors.textTertiary, fontSize: 16 }}
+                        numberOfLines={1}
+                    >
+                        {selected?.label || placeholder}
+                    </Text>
+                </View>
+                <MaterialCommunityIcons name="chevron-down" size={20} color={theme.colors.textTertiary} />
+            </TouchableOpacity>
+
+            <SheetModal visible={open} title={label || 'Select'} onClose={() => setOpen(false)}>
+                {options.length === 0 ? (
+                    <Text style={{ color: theme.colors.textTertiary, paddingVertical: spacing.md }}>No options available.</Text>
+                ) : (
+                    options.map(opt => {
+                        const isSelected = opt.value === value;
+                        return (
+                            <TouchableOpacity
+                                key={opt.value}
+                                onPress={() => {
+                                    lightHaptic();
+                                    onChange(opt.value);
+                                    setOpen(false);
+                                }}
+                                style={[
+                                    styles.optionRow,
+                                    { borderBottomColor: theme.colors.separator },
+                                    isSelected && { backgroundColor: theme.colors.primaryLight, borderRadius: radius.md },
+                                ]}
+                            >
+                                {opt.icon ? <CategoryIcon name={opt.icon} size={16} /> : null}
+                                <View style={{ flex: 1, marginLeft: opt.icon ? spacing.sm : 0 }}>
+                                    <Text style={{ color: theme.colors.text, fontSize: 16, fontWeight: isSelected ? '700' : '400' }}>
+                                        {opt.label}
+                                    </Text>
+                                    {opt.sublabel ? (
+                                        <Text style={{ color: theme.colors.textTertiary, fontSize: 12 }}>{opt.sublabel}</Text>
+                                    ) : null}
+                                </View>
+                                {isSelected ? (
+                                    <MaterialCommunityIcons name="check" size={20} color={theme.colors.primary} />
+                                ) : null}
+                            </TouchableOpacity>
+                        );
+                    })
+                )}
+            </SheetModal>
+        </View>
+    );
+};
+
+// Tappable date field that opens the platform's native date picker
+export const DateField: React.FC<{
+    label?: string;
+    value: string; // YYYY-MM-DD
+    onChange: (iso: string) => void;
+    disabled?: boolean;
+    maximumDate?: Date;
+}> = ({ label, value, onChange, disabled, maximumDate }) => {
+    const { theme } = useTheme();
+    const [open, setOpen] = useState(false);
+
+    const parsed = (() => {
+        const [y, m, d] = value.split('-').map(Number);
+        const date = new Date(y, (m || 1) - 1, d || 1);
+        return isNaN(date.getTime()) ? new Date() : date;
+    })();
+
+    return (
+        <View style={{ marginBottom: spacing.md }}>
+            {label ? <FieldLabel>{label}</FieldLabel> : null}
+            <TouchableOpacity
+                onPress={() => {
+                    if (disabled) return;
+                    lightHaptic();
+                    setOpen(true);
+                }}
+                activeOpacity={0.7}
+                style={[
+                    styles.pickerField,
+                    {
+                        backgroundColor: theme.colors.inputBg,
+                        borderColor: theme.colors.inputBorder,
+                        opacity: disabled ? 0.6 : 1,
+                    },
+                ]}
+            >
+                <Text style={{ color: theme.colors.text, fontSize: 16 }}>{isoDateToDisplay(value)}</Text>
+                <MaterialCommunityIcons name="calendar-outline" size={20} color={theme.colors.textTertiary} />
+            </TouchableOpacity>
+            {open ? (
+                <DateTimePicker
+                    value={parsed}
+                    mode="date"
+                    display="default"
+                    maximumDate={maximumDate}
+                    onChange={(event, date) => {
+                        setOpen(false);
+                        if (event.type === 'set' && date) {
+                            const iso = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+                            onChange(iso);
+                        }
+                    }}
+                />
+            ) : null}
+        </View>
+    );
 };
 
 const styles = StyleSheet.create({
@@ -255,5 +428,21 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         borderRadius: 999,
         borderWidth: 1,
+    },
+    pickerField: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        borderWidth: 1,
+        borderRadius: radius.md,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+    },
+    optionRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 14,
+        paddingHorizontal: spacing.sm,
+        borderBottomWidth: StyleSheet.hairlineWidth,
     },
 });

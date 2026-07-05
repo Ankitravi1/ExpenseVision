@@ -1,11 +1,12 @@
 import React from 'react';
-import { Account, Budget, Category, Transaction, Page, User } from '../types';
+import { Account, Budget, Category, Transaction, Page, User, RecurringRule } from '../types';
 
 export interface AppContextValue {
   accounts: Account[];
   categories: Category[];
   transactions: Transaction[];
   budgets: Budget[];
+  recurring: RecurringRule[];
   currency: string;
   setCurrency: (currency: string) => void;
   theme: 'light' | 'dark';
@@ -21,6 +22,9 @@ export interface AppContextValue {
   deleteCategory: (id: string) => Promise<void>;
   setBudget: (budget: Budget) => Promise<void>;
   deleteBudget: (id: string) => Promise<void>;
+  addRecurring: (rule: Partial<RecurringRule>) => Promise<void>;
+  updateRecurring: (id: string, rule: Partial<RecurringRule>) => Promise<void>;
+  deleteRecurring: (id: string) => Promise<void>;
   clearAllTransactions: () => void;
   setActivePage: (page: Page) => void;
   refreshData: () => Promise<void>;

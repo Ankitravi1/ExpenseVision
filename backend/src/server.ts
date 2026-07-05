@@ -8,6 +8,8 @@ import categoriesRouter from './routes/categories.js';
 import budgetsRouter from './routes/budgets.js';
 import authRouter from './routes/auth.js';
 import pushRouter from './routes/push.js';
+import recurringRouter, { materializeRecurringRules } from './routes/recurring.js';
+import { budgetsWithSpent } from './services/budgets.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { authenticateToken } from './middleware/auth.js';
 import { apiLimiter } from './middleware/rateLimit.js';
@@ -64,59 +66,41 @@ app.use('/api/accounts', apiLimiter, authenticateToken, accountsRouter);
 app.use('/api/categories', apiLimiter, authenticateToken, categoriesRouter);
 app.use('/api/budgets', apiLimiter, authenticateToken, budgetsRouter);
 app.use('/api/push', apiLimiter, authenticateToken, pushRouter);
+app.use('/api/recurring', apiLimiter, authenticateToken, recurringRouter);
 
 // Initial data endpoint
 app.get('/api/initial-data', apiLimiter, authenticateToken, async (req, res, next) => {
     try {
         const userId = (req as any).userId;
 
-        const [accounts, categories, transactions, budgets] = await Promise.all([
+        // Create any due recurring transactions (rent, EMI, salary, ...) before
+        // reading, so they show up the moment a client opens the app
+        await materializeRecurringRules(prisma, userId).catch(err =>
+            console.error('Recurring materialization failed:', err)
+        );
+
+        const [accounts, categories, transactions, budgets, recurring] = await Promise.all([
             prisma.account.findMany({ where: { userId } }),
             prisma.category.findMany({ where: { userId } }),
             prisma.transaction.findMany({
                 where: { userId },
                 orderBy: { date: 'desc' }
             }),
-            prisma.budget.findMany({ where: { userId } })
+            budgetsWithSpent(prisma, userId),
+            prisma.recurringRule.findMany({ where: { userId }, orderBy: { nextRun: 'asc' } })
         ]);
-
-        // Calculate spent for each budget
-        const budgetsWithSpent = await Promise.all(
-            budgets.map(async (budget) => {
-                const spent = await prisma.transaction.aggregate({
-                    where: {
-                        userId,
-                        categoryId: budget.categoryId,
-                        type: 'expense',
-                        ...(budget.month ? { date: { gte: `${budget.month}-01`, lt: nextMonthStart(budget.month) } } : {})
-                    },
-                    _sum: { amount: true }
-                });
-
-                return {
-                    ...budget,
-                    spent: spent._sum.amount || 0
-                };
-            })
-        );
 
         res.json({
             accounts,
             categories,
             transactions,
-            budgets: budgetsWithSpent
+            budgets,
+            recurring
         });
     } catch (error) {
         next(error);
     }
 });
-
-// First day of the month after "YYYY-MM" (for exclusive date range filters)
-function nextMonthStart(month: string): string {
-    const [y, m] = month.split('-').map(Number);
-    const next = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
-    return `${next}-01`;
-}
 
 // Error handling
 app.use(errorHandler);

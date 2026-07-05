@@ -2,6 +2,7 @@ import React, { useContext } from 'react';
 import { AppContext } from '../App';
 import { Transaction } from '../types';
 import { Icon } from './Icon';
+import { formatTransactionDate } from '../utils/date';
 
 interface ExportButtonProps {
     className?: string;
@@ -16,7 +17,7 @@ export const ExportButton: React.FC<ExportButtonProps> = ({ className = '' }) =>
 
     const exportToCSV = () => {
         // Prepare CSV data
-        const headers = ['Date', 'Description', 'Amount', 'Type', 'Category', 'Account', 'Transfer To'];
+        const headers = ['Date', 'Time', 'Description', 'Amount', 'Type', 'Category', 'Account', 'Transfer To'];
 
         const rows = transactions.map(transaction => {
             const category = categories.find(c => c.id === transaction.categoryId);
@@ -26,7 +27,8 @@ export const ExportButton: React.FC<ExportButtonProps> = ({ className = '' }) =>
                 : null;
 
             return [
-                transaction.date,
+                formatTransactionDate(transaction.date),
+                transaction.date.split('T')[1]?.slice(0, 5) || '',
                 `"${transaction.description.replace(/"/g, '""')}"`, // Escape quotes
                 transaction.amount.toFixed(2),
                 transaction.type,

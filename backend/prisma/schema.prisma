@@ -41,6 +41,7 @@ model User {
   categories      Category[]
   transactions    Transaction[]
   budgets         Budget[]
+  recurringRules  RecurringRule[]
   refreshTokens   RefreshToken[]
   pushSubscriptions PushSubscription[]
 }
@@ -80,6 +81,8 @@ model Account {
   user                  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   transactions          Transaction[] @relation("AccountTransactions")
   transferTransactions  Transaction[] @relation("TransferToAccount")
+  recurringRules        RecurringRule[] @relation("RecurringAccount")
+  recurringTransferRules RecurringRule[] @relation("RecurringTransferToAccount")
 }
 
 model Category {
@@ -91,9 +94,10 @@ model Category {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  transactions Transaction[]
-  budgets      Budget[]
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions   Transaction[]
+  budgets        Budget[]
+  recurringRules RecurringRule[]
 }
 
 model Transaction {
@@ -106,6 +110,7 @@ model Transaction {
   type                 String   // 'income' | 'expense' | 'transfer'
   date                 String   // Stored as ISO date string (YYYY-MM-DD)
   description          String
+  notes                String?  // Free-form notes/tags (comma-separated tags allowed)
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
@@ -119,16 +124,44 @@ model Transaction {
 }
 
 model Budget {
-  id         String   @id @default(cuid())
-  userId     String
-  categoryId String
-  amount     Float
-  month      String?  // YYYY-MM format
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id             String   @id @default(cuid())
+  userId         String
+  categoryId     String
+  amount         Float
+  month          String?  // YYYY-MM format; null = repeats every month
+  rollover       Boolean  @default(false) // carry last month's leftover/overspend into this month
+  alertThreshold Float    @default(100)   // percent of budget at which to send an alert
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
   @@unique([userId, categoryId, month])
+}
+
+model RecurringRule {
+  id                  String   @id @default(cuid())
+  userId              String
+  description         String
+  notes               String?
+  amount              Float
+  type                String   // 'income' | 'expense' | 'transfer'
+  accountId           String
+  transferToAccountId String?
+  categoryId          String?
+  frequency           String   // 'daily' | 'weekly' | 'monthly' | 'yearly'
+  dayAnchor           Int      // day-of-month anchor for monthly/yearly (clamped to month length)
+  nextRun             String   // YYYY-MM-DD of the next occurrence to create
+  endDate             String?  // YYYY-MM-DD (inclusive); null = forever
+  active              Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account           Account   @relation("RecurringAccount", fields: [accountId], references: [id], onDelete: Cascade)
+  transferToAccount Account?  @relation("RecurringTransferToAccount", fields: [transferToAccountId], references: [id], onDelete: Cascade)
+  category          Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@index([userId, active, nextRun])
 }

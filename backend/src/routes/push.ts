@@ -56,6 +56,27 @@ router.post('/subscribe', authenticateToken, async (req, res) => {
     }
 });
 
+// DELETE /api/push/subscribe
+router.delete('/subscribe', authenticateToken, async (req, res) => {
+    try {
+        const { endpoint } = req.body;
+        const userId = (req as any).userId;
+
+        if (!endpoint) {
+            return res.status(400).json({ error: 'Subscription endpoint is required' });
+        }
+
+        await prisma.pushSubscription.deleteMany({
+            where: { endpoint, userId }
+        });
+
+        res.status(204).send();
+    } catch (error) {
+        console.error('Unsubscribe error:', error);
+        res.status(500).json({ error: 'Failed to unsubscribe' });
+    }
+});
+
 // Helper to send notification (can be imported elsewhere)
 export const sendNotification = async (userId: string, payload: any) => {
     if (!isPushEnabled) return;

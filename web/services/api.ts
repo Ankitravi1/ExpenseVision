@@ -86,6 +86,17 @@ export const api = {
         if (!res.ok) throw new Error('Failed to create transaction');
         return res.json();
     },
+    parseTransactionText: async (data: any) => {
+        const res = await api.fetch('/transactions/parse-text', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({}));
+            throw new Error(error.error || 'Failed to parse transaction text');
+        }
+        return res.json();
+    },
     updateTransaction: async (id: string, data: any) => {
         const res = await api.fetch(`/transactions/${id}`, {
             method: 'PUT',
@@ -210,7 +221,55 @@ export const api = {
         return res.json();
     },
 
+    // Recurring Transactions
+    getRecurring: async () => {
+        const res = await api.fetch('/recurring');
+        if (!res.ok) throw new Error('Failed to fetch recurring rules');
+        return res.json();
+    },
+    createRecurring: async (data: any) => {
+        const res = await api.fetch('/recurring', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({}));
+            throw new Error(error.error || 'Failed to create recurring rule');
+        }
+        return res.json();
+    },
+    updateRecurring: async (id: string, data: any) => {
+        const res = await api.fetch(`/recurring/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        });
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({}));
+            throw new Error(error.error || 'Failed to update recurring rule');
+        }
+        return res.json();
+    },
+    deleteRecurring: async (id: string) => {
+        const res = await api.fetch(`/recurring/${id}`, {
+            method: 'DELETE',
+        });
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({}));
+            throw new Error(error.error || 'Failed to delete recurring rule');
+        }
+        if (res.status === 204) return null;
+        return res.json();
+    },
+
     // Push Notifications
+    getVapidKey: async () => {
+        const res = await api.fetch('/push/vapid-key');
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({}));
+            throw new Error(error.error || 'Failed to load push notification key');
+        }
+        return res.json();
+    },
     subscribeToPush: async (subscription: PushSubscription) => {
         const res = await api.fetch('/push/subscribe', {
             method: 'POST',
@@ -218,5 +277,13 @@ export const api = {
         });
         if (!res.ok) throw new Error('Failed to subscribe to push notifications');
         return res.json();
+    },
+    unsubscribeFromPush: async (endpoint: string) => {
+        const res = await api.fetch('/push/subscribe', {
+            method: 'DELETE',
+            body: JSON.stringify({ endpoint }),
+        });
+        if (!res.ok && res.status !== 204) throw new Error('Failed to unsubscribe from push notifications');
+        return null;
     },
 };

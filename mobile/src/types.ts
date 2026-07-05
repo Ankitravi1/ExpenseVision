@@ -4,11 +4,29 @@ export interface Transaction {
     id: string;
     date: string; // YYYY-MM-DD
     description: string;
+    notes?: string | null;
     amount: number;
     type: TransactionType;
     categoryId: string | null;
     accountId: string;
     transferToAccountId?: string | null;
+}
+
+export type RecurringFrequency = 'daily' | 'weekly' | 'monthly' | 'yearly';
+
+export interface RecurringRule {
+    id: string;
+    description: string;
+    notes?: string | null;
+    amount: number;
+    type: TransactionType;
+    accountId: string;
+    transferToAccountId?: string | null;
+    categoryId?: string | null;
+    frequency: RecurringFrequency;
+    nextRun: string; // YYYY-MM-DD
+    endDate?: string | null;
+    active: boolean;
 }
 
 export interface Category {
@@ -33,7 +51,11 @@ export interface Budget {
     categoryId: string;
     amount: number;
     month?: string | null;
+    rollover?: boolean;
+    alertThreshold?: number; // percent (default 100)
     spent: number;
+    carryover?: number; // last month's leftover when rollover is on
+    effectiveAmount?: number; // amount + carryover, min 0
 }
 
 export interface User {

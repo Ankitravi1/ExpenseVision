@@ -1,16 +1,35 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, RefreshControl, TextInput } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, RefreshControl, TextInput, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Swipeable } from 'react-native-gesture-handler';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { EmptyState, ChipSelector } from '../../components/ui';
+import { EmptyState, ChipSelector, lightHaptic, warningHaptic } from '../../components/ui';
 import { CategoryIcon } from '../../components/CategoryIcon';
 import { TransactionForm } from '../../components/TransactionForm';
 import { formatCurrency } from '../../utils/currency';
+import { isoDateToDisplay } from '../../utils/date';
+import { shareTransactionsCsv } from '../../utils/exportCsv';
 import { spacing, radius } from '../../theme';
 import { Transaction } from '../../types';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+    UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+
+const monthLabel = (key: string) => {
+    const [y, m] = key.split('-').map(Number);
+    return new Date(y, m - 1, 1).toLocaleString('default', { month: 'long', year: 'numeric' });
+};
+
+const shiftMonth = (key: string, delta: number) => {
+    const [y, m] = key.split('-').map(Number);
+    return monthKey(new Date(y, m - 1 + delta, 1));
+};
 
 export default function TransactionsScreen() {
     const { transactions, categories, accounts, deleteTransaction, isLoading, refresh } = useData();
@@ -18,34 +37,52 @@ export default function TransactionsScreen() {
     const { theme } = useTheme();
     const [search, setSearch] = useState('');
     const [typeFilter, setTypeFilter] = useState('all');
+    const [month, setMonth] = useState<string | null>(null); // null = all time
     const [showForm, setShowForm] = useState(false);
     const [editing, setEditing] = useState<Transaction | null>(null);
+    const [exporting, setExporting] = useState(false);
     const currency = user?.currency || 'INR';
+    const currentMonth = monthKey(new Date());
 
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
         return transactions.filter(t => {
             if (typeFilter !== 'all' && t.type !== typeFilter) return false;
+            if (month && !t.date.startsWith(month)) return false;
             if (!q) return true;
             const cat = categories.find(c => c.id === t.categoryId);
             const acc = accounts.find(a => a.id === t.accountId);
             return (
                 t.description.toLowerCase().includes(q) ||
+                (t.notes?.toLowerCase().includes(q) ?? false) ||
                 (cat?.name.toLowerCase().includes(q) ?? false) ||
                 (acc?.name.toLowerCase().includes(q) ?? false)
             );
         });
-    }, [transactions, categories, accounts, search, typeFilter]);
+    }, [transactions, categories, accounts, search, typeFilter, month]);
+
+    const doDelete = (t: Transaction) => {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        deleteTransaction(t.id).catch(err => Alert.alert('Error', err.message));
+    };
 
     const confirmDelete = (t: Transaction) => {
+        warningHaptic();
         Alert.alert('Delete transaction', `Delete "${t.description}"? Account balances will be adjusted.`, [
             { text: 'Cancel', style: 'cancel' },
-            {
-                text: 'Delete',
-                style: 'destructive',
-                onPress: () => deleteTransaction(t.id).catch(err => Alert.alert('Error', err.message)),
-            },
+            { text: 'Delete', style: 'destructive', onPress: () => doDelete(t) },
         ]);
+    };
+
+    const handleExport = async () => {
+        setExporting(true);
+        try {
+            await shareTransactionsCsv();
+        } catch (err: any) {
+            Alert.alert('Export failed', err.message || 'Could not export transactions');
+        } finally {
+            setExporting(false);
+        }
     };
 
     const renderItem = ({ item: t }: { item: Transaction }) => {
@@ -53,30 +90,50 @@ export default function TransactionsScreen() {
         const acc = accounts.find(a => a.id === t.accountId);
         const isIncome = t.type === 'income';
         return (
-            <TouchableOpacity
-                onPress={() => {
-                    setEditing(t);
-                    setShowForm(true);
-                }}
-                onLongPress={() => confirmDelete(t)}
-                style={[styles.txRow, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder }]}
+            <Swipeable
+                onSwipeableWillOpen={() => lightHaptic()}
+                renderRightActions={() => (
+                    <TouchableOpacity
+                        onPress={() => confirmDelete(t)}
+                        style={[styles.deleteAction, { backgroundColor: theme.colors.danger }]}
+                    >
+                        <MaterialCommunityIcons name="trash-can-outline" size={22} color="#fff" />
+                        <Text style={{ color: '#fff', fontSize: 11, fontWeight: '600' }}>Delete</Text>
+                    </TouchableOpacity>
+                )}
+                overshootRight={false}
             >
-                <CategoryIcon name={t.type === 'transfer' ? 'CreditCard' : cat?.icon} size={16} />
-                <View style={{ flex: 1, marginLeft: spacing.sm }}>
-                    <Text style={{ color: theme.colors.text, fontWeight: '600' }} numberOfLines={1}>{t.description}</Text>
-                    <Text style={{ color: theme.colors.textTertiary, fontSize: 12 }}>
-                        {t.date.split('T')[0]} · {acc?.name || '—'}{cat ? ` · ${cat.name}` : ''}
-                    </Text>
-                </View>
-                <Text
-                    style={{
-                        fontWeight: '700',
-                        color: isIncome ? theme.colors.success : t.type === 'expense' ? theme.colors.danger : theme.colors.textSecondary,
+                <TouchableOpacity
+                    onPress={() => {
+                        setEditing(t);
+                        setShowForm(true);
                     }}
+                    onLongPress={() => confirmDelete(t)}
+                    activeOpacity={0.7}
+                    style={[styles.txRow, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder }]}
                 >
-                    {isIncome ? '+' : t.type === 'expense' ? '-' : ''}{formatCurrency(t.amount, currency)}
-                </Text>
-            </TouchableOpacity>
+                    <CategoryIcon name={t.type === 'transfer' ? 'CreditCard' : cat?.icon} size={16} />
+                    <View style={{ flex: 1, marginLeft: spacing.sm }}>
+                        <Text style={{ color: theme.colors.text, fontWeight: '600' }} numberOfLines={1}>{t.description}</Text>
+                        <Text style={{ color: theme.colors.textTertiary, fontSize: 12 }}>
+                            {isoDateToDisplay(t.date)} · {acc?.name || '—'}{cat ? ` · ${cat.name}` : ''}
+                        </Text>
+                        {t.notes ? (
+                            <Text style={{ color: theme.colors.textTertiary, fontSize: 11, fontStyle: 'italic' }} numberOfLines={1}>
+                                {t.notes}
+                            </Text>
+                        ) : null}
+                    </View>
+                    <Text
+                        style={{
+                            fontWeight: '700',
+                            color: isIncome ? theme.colors.success : t.type === 'expense' ? theme.colors.danger : theme.colors.textSecondary,
+                        }}
+                    >
+                        {isIncome ? '+' : t.type === 'expense' ? '-' : ''}{formatCurrency(t.amount, currency)}
+                    </Text>
+                </TouchableOpacity>
+            </Swipeable>
         );
     };
 
@@ -84,15 +141,25 @@ export default function TransactionsScreen() {
         <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top']}>
             <View style={styles.header}>
                 <Text style={[styles.title, { color: theme.colors.text }]}>Transactions</Text>
-                <TouchableOpacity
-                    onPress={() => {
-                        setEditing(null);
-                        setShowForm(true);
-                    }}
-                    style={[styles.addButton, { backgroundColor: theme.colors.primary }]}
-                >
-                    <MaterialCommunityIcons name="plus" size={24} color="#fff" />
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                    <TouchableOpacity
+                        onPress={handleExport}
+                        disabled={exporting || transactions.length === 0}
+                        style={[styles.iconButton, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder, borderWidth: 1, opacity: exporting || transactions.length === 0 ? 0.5 : 1 }]}
+                    >
+                        <MaterialCommunityIcons name="export-variant" size={20} color={theme.colors.textSecondary} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        onPress={() => {
+                            lightHaptic();
+                            setEditing(null);
+                            setShowForm(true);
+                        }}
+                        style={[styles.iconButton, { backgroundColor: theme.colors.primary }]}
+                    >
+                        <MaterialCommunityIcons name="plus" size={24} color="#fff" />
+                    </TouchableOpacity>
+                </View>
             </View>
 
             <View style={{ paddingHorizontal: spacing.md }}>
@@ -110,6 +177,38 @@ export default function TransactionsScreen() {
                             <MaterialCommunityIcons name="close-circle" size={18} color={theme.colors.textTertiary} />
                         </TouchableOpacity>
                     ) : null}
+                </View>
+                <View style={styles.monthRow}>
+                    <TouchableOpacity
+                        onPress={() => {
+                            lightHaptic();
+                            setMonth(prev => shiftMonth(prev || currentMonth, -1));
+                        }}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                        <MaterialCommunityIcons name="chevron-left" size={22} color={theme.colors.textSecondary} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        onPress={() => {
+                            lightHaptic();
+                            setMonth(prev => (prev ? null : currentMonth));
+                        }}
+                    >
+                        <Text style={{ color: month ? theme.colors.primary : theme.colors.textSecondary, fontWeight: '600', fontSize: 13 }}>
+                            {month ? monthLabel(month) : 'All time · tap for this month'}
+                        </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        onPress={() => {
+                            if (!month || month >= currentMonth) return;
+                            lightHaptic();
+                            setMonth(shiftMonth(month, 1));
+                        }}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        style={{ opacity: month && month < currentMonth ? 1 : 0.3 }}
+                    >
+                        <MaterialCommunityIcons name="chevron-right" size={22} color={theme.colors.textSecondary} />
+                    </TouchableOpacity>
                 </View>
                 <ChipSelector
                     options={[
@@ -132,8 +231,8 @@ export default function TransactionsScreen() {
                 ListEmptyComponent={
                     <EmptyState
                         icon="swap-horizontal"
-                        title={search || typeFilter !== 'all' ? 'No matching transactions' : 'No transactions yet'}
-                        subtitle={search || typeFilter !== 'all' ? 'Try changing the search or filter' : 'Tap + to add your first transaction. Tap a transaction to edit it, long-press to delete.'}
+                        title={search || typeFilter !== 'all' || month ? 'No matching transactions' : 'No transactions yet'}
+                        subtitle={search || typeFilter !== 'all' || month ? 'Try changing the search or filters' : 'Tap + to add your first transaction. Tap to edit, swipe left to delete.'}
                     />
                 }
             />
@@ -162,7 +261,7 @@ const styles = StyleSheet.create({
         fontSize: 26,
         fontWeight: '800',
     },
-    addButton: {
+    iconButton: {
         width: 44,
         height: 44,
         borderRadius: radius.md,
@@ -183,11 +282,26 @@ const styles = StyleSheet.create({
         paddingHorizontal: 8,
         fontSize: 15,
     },
+    monthRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: spacing.xs,
+        marginBottom: spacing.sm,
+    },
     txRow: {
         flexDirection: 'row',
         alignItems: 'center',
         padding: spacing.md,
         borderRadius: radius.md,
         borderWidth: 1,
+    },
+    deleteAction: {
+        width: 72,
+        borderRadius: radius.md,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginLeft: spacing.sm,
+        gap: 2,
     },
 });

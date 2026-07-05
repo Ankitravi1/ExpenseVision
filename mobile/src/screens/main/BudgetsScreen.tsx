@@ -54,9 +54,11 @@ export default function BudgetsScreen() {
                 refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refresh} tintColor={theme.colors.primary} />}
                 renderItem={({ item: b }) => {
                     const cat = categories.find(c => c.id === b.categoryId);
-                    const ratio = b.amount > 0 ? Math.min(1, b.spent / b.amount) : 0;
-                    const over = b.spent > b.amount;
-                    const barColor = over ? theme.colors.danger : ratio > 0.8 ? theme.colors.warning : theme.colors.success;
+                    const limit = b.effectiveAmount ?? b.amount;
+                    const ratio = limit > 0 ? Math.min(1, b.spent / limit) : 1;
+                    const over = b.spent > limit;
+                    const warnRatio = (b.alertThreshold ?? 100) / 100;
+                    const barColor = over ? theme.colors.danger : ratio >= Math.min(warnRatio, 0.8) ? theme.colors.warning : theme.colors.success;
                     return (
                         <TouchableOpacity
                             onPress={() => {
@@ -74,15 +76,22 @@ export default function BudgetsScreen() {
                                     </Text>
                                 </View>
                                 <Text style={{ color: over ? theme.colors.danger : theme.colors.textSecondary, fontSize: 13 }}>
-                                    {formatCurrency(b.spent, currency)} / {formatCurrency(b.amount, currency)}
+                                    {formatCurrency(b.spent, currency)} / {formatCurrency(limit, currency)}
                                 </Text>
                             </View>
                             <View style={[styles.track, { backgroundColor: theme.colors.separator }]}>
                                 <View style={[styles.fill, { width: `${ratio * 100}%`, backgroundColor: barColor }]} />
                             </View>
+                            {b.rollover && (b.carryover ?? 0) !== 0 && (
+                                <Text style={{ color: theme.colors.textTertiary, fontSize: 12, marginTop: 4 }}>
+                                    {(b.carryover ?? 0) > 0
+                                        ? `Includes ${formatCurrency(b.carryover ?? 0, currency)} rolled over from last month`
+                                        : `Reduced by ${formatCurrency(Math.abs(b.carryover ?? 0), currency)} overspent last month`}
+                                </Text>
+                            )}
                             {over && (
                                 <Text style={{ color: theme.colors.danger, fontSize: 12, marginTop: 4 }}>
-                                    Over budget by {formatCurrency(b.spent - b.amount, currency)}
+                                    Over budget by {formatCurrency(b.spent - limit, currency)}
                                 </Text>
                             )}
                         </TouchableOpacity>

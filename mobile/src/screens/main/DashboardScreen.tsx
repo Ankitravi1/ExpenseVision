@@ -9,6 +9,7 @@ import { Card, EmptyState } from '../../components/ui';
 import { CategoryIcon } from '../../components/CategoryIcon';
 import { TransactionForm } from '../../components/TransactionForm';
 import { formatCurrency } from '../../utils/currency';
+import { isoDateToDisplay } from '../../utils/date';
 import { spacing, radius } from '../../theme';
 
 const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -154,7 +155,7 @@ export default function DashboardScreen() {
                                             {t.description}
                                         </Text>
                                         <Text style={{ color: theme.colors.textTertiary, fontSize: 12 }}>
-                                            {t.date.split('T')[0]}{cat ? ` · ${cat.name}` : ''}
+                                            {isoDateToDisplay(t.date)}{cat ? ` · ${cat.name}` : ''}
                                         </Text>
                                     </View>
                                     <Text

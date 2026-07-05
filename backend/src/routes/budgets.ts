@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { budgetsWithSpent } from '../services/budgets.js';
 
 const router = Router();
 
@@ -7,7 +8,9 @@ const router = Router();
 const budgetSchema = z.object({
     categoryId: z.string(),
     amount: z.number().positive(),
-    month: z.string().optional()
+    month: z.string().nullish(),
+    rollover: z.boolean().optional(),
+    alertThreshold: z.number().min(1).max(500).optional()
 });
 
 // GET /api/budgets - List all budgets with calculated spent amounts
@@ -15,46 +18,7 @@ router.get('/', async (req, res, next) => {
     try {
         const prisma = (req as any).prisma;
         const userId = (req as any).userId;
-
-        const budgets = await prisma.budget.findMany({
-            where: { userId },
-            orderBy: { createdAt: 'desc' }
-        });
-
-        // Calculate spent for each budget
-        const budgetsWithSpent = await Promise.all(
-            budgets.map(async (budget: any) => {
-                const whereClause: any = {
-                    userId,
-                    categoryId: budget.categoryId,
-                    type: 'expense'
-                };
-
-                // If budget has a specific month, filter transactions by that month
-                if (budget.month) {
-                    const [year, month] = budget.month.split('-');
-                    const startDate = `${year}-${month}-01`;
-                    const endDate = new Date(parseInt(year), parseInt(month), 0).toISOString().split('T')[0];
-
-                    whereClause.date = {
-                        gte: startDate,
-                        lte: endDate
-                    };
-                }
-
-                const spent = await prisma.transaction.aggregate({
-                    where: whereClause,
-                    _sum: { amount: true }
-                });
-
-                return {
-                    ...budget,
-                    spent: spent._sum.amount || 0
-                };
-            })
-        );
-
-        res.json(budgetsWithSpent);
+        res.json(await budgetsWithSpent(prisma, userId));
     } catch (error) {
         next(error);
     }
@@ -68,8 +32,6 @@ router.post('/', async (req, res, next) => {
 
         const data = budgetSchema.parse(req.body);
 
-        // Upsert budget
-        // Check if budget exists
         const existingBudget = await prisma.budget.findFirst({
             where: {
                 userId,
@@ -78,49 +40,31 @@ router.post('/', async (req, res, next) => {
             }
         });
 
+        const fields = {
+            amount: data.amount,
+            ...(data.rollover !== undefined ? { rollover: data.rollover } : {}),
+            ...(data.alertThreshold !== undefined ? { alertThreshold: data.alertThreshold } : {})
+        };
+
         let budget;
         if (existingBudget) {
             budget = await prisma.budget.update({
                 where: { id: existingBudget.id },
-                data: { amount: data.amount }
+                data: fields
             });
         } else {
             budget = await prisma.budget.create({
                 data: {
-                    ...data,
+                    categoryId: data.categoryId,
+                    month: data.month || null,
                     userId,
-                    month: data.month || null
+                    ...fields
                 }
             });
         }
 
-        // Calculate spent
-        const whereClause: any = {
-            userId,
-            categoryId: budget.categoryId,
-            type: 'expense'
-        };
-
-        if (budget.month) {
-            const [year, month] = budget.month.split('-');
-            const startDate = `${year}-${month}-01`;
-            const endDate = new Date(parseInt(year), parseInt(month), 0).toISOString().split('T')[0];
-
-            whereClause.date = {
-                gte: startDate,
-                lte: endDate
-            };
-        }
-
-        const spent = await prisma.transaction.aggregate({
-            where: whereClause,
-            _sum: { amount: true }
-        });
-
-        res.status(201).json({
-            ...budget,
-            spent: spent._sum.amount || 0
-        });
+        const [view] = await budgetsWithSpent(prisma, userId, [budget]);
+        res.status(201).json(view);
     } catch (error) {
         if (error instanceof z.ZodError) {
             res.status(400).json({ error: 'Validation error', details: error.errors });

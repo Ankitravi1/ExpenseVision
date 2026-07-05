@@ -6,6 +6,7 @@ import { Icon } from '../components/Icon';
 import { Transaction } from '../types';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { formatCurrency } from '../utils/currency';
+import { formatTransactionDate } from '../utils/date';
 
 const StatCard: React.FC<{ title: string; amount: number; change: number; type: 'income' | 'expense' | 'net'; currency: string }> = ({ title, amount, change, type, currency }) => {
   const isPositiveChange = change >= 0;
@@ -112,7 +113,7 @@ const TransactionRow: React.FC<{ transaction: Transaction }> = ({ transaction })
         <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mt-0.5">
           <span>{account?.name}</span>
           <span className="mx-1">•</span>
-          <span>{new Date(transaction.date).toLocaleDateString()}</span>
+          <span>{formatTransactionDate(transaction.date)}</span>
         </div>
       </div>
       <p className={`font-semibold whitespace-nowrap ${amountClass}`}>
@@ -159,48 +160,32 @@ export const Dashboard: React.FC = () => {
     setCurrentDate(getNowInTimezone(user?.timezone));
   }, [user?.timezone]);
 
+  const now = getNowInTimezone(user?.timezone);
+  const isAtCurrentMonth =
+    currentDate.getFullYear() === now.getFullYear() && currentDate.getMonth() === now.getMonth();
+
   const changeMonth = (offset: number) => {
     setCurrentDate(prevDate => {
-      const newDate = new Date(prevDate);
-      newDate.setMonth(newDate.getMonth() + offset);
-      return newDate;
+      // Anchor to the 1st so month arithmetic never overflows (e.g. 31st -> next month)
+      const newDate = new Date(prevDate.getFullYear(), prevDate.getMonth() + offset, 1);
+      // Never navigate into future months beyond the current one
+      const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      return newDate > currentMonthStart ? currentMonthStart : newDate;
     });
   };
 
   const netWorth = useMemo(() => accounts.reduce((sum, acc) => sum + acc.balance, 0), [accounts]);
 
   const { totalIncome, totalExpenses, netFlow, incomeChange, expenseChange, netFlowChange, recentTransactions, expenseByCategory } = useMemo(() => {
-    const currentMonth = currentDate.getMonth();
-    const currentYear = currentDate.getFullYear();
+    const currentMonthKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
 
     const lastMonthDate = new Date(currentDate);
     lastMonthDate.setMonth(lastMonthDate.getMonth() - 1);
-    const lastMonth = lastMonthDate.getMonth();
-    const lastMonthYear = lastMonthDate.getFullYear();
+    const lastMonthKey = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth() + 1).padStart(2, '0')}`;
 
-    const currentTransactions = transactions.filter(t => {
-      const tDate = new Date(t.date);
-      let tDateInUserTZ = tDate;
-      if (user?.timezone) {
-        try {
-          const str = tDate.toLocaleString('en-US', { timeZone: user.timezone });
-          tDateInUserTZ = new Date(str);
-        } catch (e) { }
-      }
-      return tDateInUserTZ.getMonth() === currentMonth && tDateInUserTZ.getFullYear() === currentYear;
-    });
+    const currentTransactions = transactions.filter(t => t.date.startsWith(currentMonthKey));
 
-    const lastMonthTransactions = transactions.filter(t => {
-      const tDate = new Date(t.date);
-      let tDateInUserTZ = tDate;
-      if (user?.timezone) {
-        try {
-          const str = tDate.toLocaleString('en-US', { timeZone: user.timezone });
-          tDateInUserTZ = new Date(str);
-        } catch (e) { }
-      }
-      return tDateInUserTZ.getMonth() === lastMonth && tDateInUserTZ.getFullYear() === lastMonthYear;
-    });
+    const lastMonthTransactions = transactions.filter(t => t.date.startsWith(lastMonthKey));
 
     const calculateTotal = (txs: Transaction[], type: 'income' | 'expense') =>
       txs.filter(t => t.type === type).reduce((sum, t) => sum + t.amount, 0);
@@ -284,7 +269,8 @@ export const Dashboard: React.FC = () => {
           </h2>
           <button
             onClick={() => changeMonth(1)}
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors"
+            disabled={isAtCurrentMonth}
+            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent dark:disabled:hover:bg-transparent"
             aria-label="Next month"
           >
             <Icon name="ChevronRight" size={20} />

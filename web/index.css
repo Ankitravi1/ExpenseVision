@@ -125,6 +125,15 @@
   box-sizing: border-box;
 }
 
+/*
+ * Global scale: the app was designed around `body { zoom: 0.8 }`.
+ * Tailwind is rem-based, so shrinking the root font size (16px * 0.8 = 12.8px)
+ * reproduces the same visual size without the non-standard zoom property.
+ */
+html {
+  font-size: 12.8px;
+}
+
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
@@ -132,7 +141,6 @@ body {
   -moz-osx-font-smoothing: grayscale;
   background-color: var(--bg-secondary);
   color: var(--text-primary);
-  zoom: 0.8;
 }
 
 /* Custom Scrollbar */

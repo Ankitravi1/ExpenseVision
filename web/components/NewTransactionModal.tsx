@@ -1,9 +1,12 @@
 
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useContext, useEffect, useRef } from 'react';
 import { AppContext } from '../App';
 import { Icon } from './Icon';
 import { TransactionType } from '../types';
 import { getCurrencySymbol, formatCurrency } from '../utils/currency';
+import { api } from '../services/api';
+import { getAiSettings } from '../services/aiSettings';
+import { displayDateToIso, isoDateToDisplay, todayIsoDate } from '../utils/date';
 
 import { Transaction } from '../types';
 
@@ -20,12 +23,16 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
     const [type, setType] = useState<TransactionType>('expense');
     const [amount, setAmount] = useState('');
     const [description, setDescription] = useState('');
-    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+    const [date, setDate] = useState(isoDateToDisplay(todayIsoDate()));
     const [time, setTime] = useState(new Date().toTimeString().slice(0, 5));
     const [accountId, setAccountId] = useState(''); // From Account (Expense/Transfer) or To Account (Income)
     const [transferToAccountId, setTransferToAccountId] = useState(''); // Only for Transfer
     const [categoryId, setCategoryId] = useState('');
     const [isMounted, setIsMounted] = useState(false);
+    const [voiceText, setVoiceText] = useState('');
+    const [isParsingVoiceText, setIsParsingVoiceText] = useState(false);
+    const [voiceParseError, setVoiceParseError] = useState('');
+    const nativeDateInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         setIsMounted(true);
@@ -45,9 +52,9 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
             setType(transaction.type);
             setAmount(transaction.amount.toString());
             setDescription(transaction.description);
-            const dateObj = new Date(transaction.date);
-            setDate(dateObj.toISOString().split('T')[0]);
-            setTime(dateObj.toTimeString().slice(0, 5));
+            const [datePart, timePart] = transaction.date.split('T');
+            setDate(isoDateToDisplay(datePart));
+            setTime(timePart?.slice(0, 5) || new Date().toTimeString().slice(0, 5));
             setAccountId(transaction.accountId);
             setCategoryId(transaction.categoryId || '');
             setTransferToAccountId(transaction.transferToAccountId || '');
@@ -56,8 +63,10 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
             setType('expense');
             setAmount('');
             setDescription('');
+            setVoiceText('');
+            setVoiceParseError('');
             const now = new Date();
-            setDate(now.toISOString().split('T')[0]);
+            setDate(isoDateToDisplay(todayIsoDate()));
             setTime(now.toTimeString().slice(0, 5));
             setCategoryId('');
             setTransferToAccountId('');
@@ -80,6 +89,48 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
     const { accounts, categories, addTransaction, updateTransaction, currency } = context;
 
     const filteredCategories = categories.filter(c => c.type === type);
+
+    const handleParseVoiceText = async () => {
+        const aiSettings = getAiSettings();
+        if (!aiSettings.enabled) {
+            setVoiceParseError('Enable AI transaction parsing in Settings first.');
+            return;
+        }
+        if (!aiSettings.apiKey.trim()) {
+            setVoiceParseError('Add an AI API key in Settings first.');
+            return;
+        }
+        if (!voiceText.trim()) {
+            setVoiceParseError('Type or dictate a transaction note first. The example text is only a placeholder.');
+            return;
+        }
+
+        setIsParsingVoiceText(true);
+        setVoiceParseError('');
+        try {
+            const draft = await api.parseTransactionText({
+                text: voiceText,
+                preferredType: type,
+                aiConfig: aiSettings
+            });
+            setType(draft.type);
+            setAmount(draft.amount ? String(draft.amount) : '');
+            setDescription(draft.description || voiceText);
+            setDate(isoDateToDisplay(draft.date || todayIsoDate()));
+            if (draft.time) setTime(draft.time);
+            if (draft.accountId) setAccountId(draft.accountId);
+            setCategoryId(draft.categoryId || '');
+            setTransferToAccountId(draft.transferToAccountId || '');
+
+            if (draft.missingFields?.length) {
+                setVoiceParseError(`Review missing fields: ${draft.missingFields.join(', ')}.`);
+            }
+        } catch (error) {
+            setVoiceParseError(error instanceof Error ? error.message : 'Failed to parse transaction note.');
+        } finally {
+            setIsParsingVoiceText(false);
+        }
+    };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -104,7 +155,13 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
             return;
         }
 
-        const dateTimeString = `${date}T${time}`;
+        const isoDate = displayDateToIso(date);
+        if (!isoDate) {
+            alert("Please enter date as DD-MM-YYYY.");
+            return;
+        }
+
+        const dateTimeString = `${isoDate}T${time}`;
 
         const transactionData = {
             date: dateTimeString,
@@ -128,7 +185,7 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
             setAmount('');
             setDescription('');
             const now = new Date();
-            setDate(now.toISOString().split('T')[0]);
+            setDate(isoDateToDisplay(todayIsoDate()));
             setTime(now.toTimeString().slice(0, 5));
             setType('expense');
         }
@@ -137,6 +194,16 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
 
     const inputStyles = "mt-1 block w-full bg-gray-100 border-transparent rounded-lg p-3 focus:ring-2 focus:ring-primary focus:bg-white text-base dark:bg-gray-700 dark:text-gray-100 dark:focus:bg-gray-600";
     const labelStyles = "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1";
+    const nativeDateValue = displayDateToIso(date) || todayIsoDate();
+    const openCalendarPicker = () => {
+        const picker = nativeDateInputRef.current;
+        if (!picker) return;
+        if (typeof picker.showPicker === 'function') {
+            picker.showPicker();
+        } else {
+            picker.click();
+        }
+    };
 
     return (
         <>
@@ -157,7 +224,7 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
                     </button>
                 </div>
                 <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
-                    <div className="p-6 space-y-6 flex-1 overflow-y-auto">
+                    <fieldset disabled={isParsingVoiceText} className="p-6 space-y-6 flex-1 overflow-y-auto disabled:opacity-70">
 
                         {/* Type Toggle */}
                         <div className="grid grid-cols-3 gap-1 bg-gray-100 dark:bg-gray-900 p-1.5 rounded-xl border border-dashed border-primary/30">
@@ -166,6 +233,7 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
                                     key={t}
                                     type="button"
                                     onClick={() => setType(t)}
+                                    disabled={isParsingVoiceText}
                                     className={`px-3 py-2 text-sm font-semibold rounded-lg capitalize transition-all ${type === t
                                         ? 'bg-white dark:bg-gray-700 shadow-sm text-primary dark:text-primary-light'
                                         : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
@@ -175,6 +243,38 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
                                 </button>
                             ))}
                         </div>
+
+                        {!transaction && (
+                            <div className="rounded-lg border border-primary/20 bg-primary-light/40 p-4 dark:bg-primary/10 dark:border-primary/30">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <Icon name="Mic2" size={18} className="text-primary" />
+                                    <label htmlFor="voiceText" className="text-sm font-semibold text-gray-darkest dark:text-gray-50">Quick Entry</label>
+                                </div>
+                                <textarea
+                                    id="voiceText"
+                                    value={voiceText}
+                                    onChange={e => {
+                                        setVoiceText(e.target.value);
+                                        setVoiceParseError('');
+                                    }}
+                                    placeholder="Example: spent 20 on food from SBI savings"
+                                    rows={3}
+                                    className="block w-full resize-none bg-white border-transparent rounded-lg p-3 focus:ring-2 focus:ring-primary text-base dark:bg-gray-700 dark:text-gray-100"
+                                />
+                                {voiceParseError && (
+                                    <p className="mt-2 text-sm text-amber-700 dark:text-amber-300">{voiceParseError}</p>
+                                )}
+                                <button
+                                    type="button"
+                                    onClick={handleParseVoiceText}
+                                    disabled={isParsingVoiceText || !voiceText.trim()}
+                                    className="mt-3 w-full bg-white text-primary border border-primary/30 font-semibold px-4 py-2.5 rounded-lg shadow-sm hover:bg-primary hover:text-white disabled:opacity-60 disabled:hover:bg-white disabled:hover:text-primary transition-colors flex justify-center items-center dark:bg-gray-800"
+                                >
+                                    <Icon name="Sparkles" size={18} className="mr-2" />
+                                    {isParsingVoiceText ? 'Parsing...' : 'Parse with AI'}
+                                </button>
+                            </div>
+                        )}
 
                         <div>
                             <label htmlFor="amount" className={labelStyles}>Amount</label>
@@ -200,7 +300,33 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
                         <div className="flex space-x-4 border border-dashed border-primary/30 p-2 rounded-lg">
                             <div className="flex-1">
                                 <label htmlFor="date" className={labelStyles}>Date</label>
-                                <input type="date" id="date" value={date} onChange={e => setDate(e.target.value)} className={inputStyles} />
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        id="date"
+                                        value={date}
+                                        onChange={e => setDate(e.target.value)}
+                                        placeholder="DD-MM-YYYY"
+                                        inputMode="numeric"
+                                        className={`${inputStyles} pr-11`}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={openCalendarPicker}
+                                        className="absolute right-2 top-2.5 p-2 rounded-lg text-gray-500 hover:text-primary hover:bg-white dark:hover:bg-gray-600"
+                                        title="Pick date from calendar"
+                                    >
+                                        <Icon name="Calendar" size={18} />
+                                    </button>
+                                    <input
+                                        ref={nativeDateInputRef}
+                                        type="date"
+                                        value={nativeDateValue}
+                                        onChange={e => setDate(isoDateToDisplay(e.target.value))}
+                                        className="sr-only"
+                                        tabIndex={-1}
+                                    />
+                                </div>
                             </div>
                             <div className="w-1/3">
                                 <label htmlFor="time" className={labelStyles}>Time</label>
@@ -245,7 +371,7 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
                                 </div>
                             </>
                         )}
-                    </div>
+                    </fieldset>
                     <div className="px-6 py-4 border-t border-gray-100 dark:border-gray-700 mt-auto bg-gray-50 dark:bg-gray-800/50">
                         <button type="submit" className="bg-primary text-white font-semibold px-4 py-3 rounded-lg shadow-sm hover:bg-primary-hover transition-colors w-full text-base flex justify-center items-center">
                             <Icon name={transaction ? "Save" : "Plus"} size={20} className="mr-2" />

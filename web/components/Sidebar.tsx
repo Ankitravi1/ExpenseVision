@@ -54,6 +54,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activePage, setActivePage, isC
   const navItems: { icon: IconName; label: Page }[] = [
     { icon: 'LayoutDashboard', label: 'Dashboard' },
     { icon: 'ArrowLeftRight', label: 'Transactions' },
+    { icon: 'Repeat', label: 'Recurring' },
     { icon: 'Target', label: 'Budgets' },
     { icon: 'Wallet', label: 'Accounts' },
     { icon: 'Tags', label: 'Categories' },
@@ -77,8 +78,23 @@ export const Sidebar: React.FC<SidebarProps> = ({ activePage, setActivePage, isC
   }
 
   return (
-    <aside className={`flex flex-col fixed left-0 top-0 transition-all duration-300 ${isCollapsed ? 'w-16' : 'w-52'} z-50`} style={{ background: 'var(--gradient-sidebar)', boxShadow: 'var(--shadow-sidebar)', height: '100vh', zoom: 1.25 }}>
-      <div style={{ zoom: 0.64 }} className="flex flex-col h-full">
+    <aside
+      className="flex flex-col fixed left-0 top-0 transition-all duration-300 z-50"
+      style={{
+        background: 'var(--gradient-sidebar)',
+        boxShadow: 'var(--shadow-sidebar)',
+        height: '100vh',
+        // Physical widths preserved from the old zoom-based layout
+        // (body zoom 0.8 * aside zoom 1.25 = 1.0 of the declared px width).
+        width: isCollapsed ? 64 : 208,
+      }}
+    >
+      {/* Replaces the old inner `zoom: 0.64` (net 0.8x of the page scale):
+          lay out at 125% size, then scale down by 0.8. */}
+      <div
+        style={{ width: '125%', height: '125%', transform: 'scale(0.8)', transformOrigin: 'top left' }}
+        className="flex flex-col"
+      >
         <div className="px-6 py-6 flex items-center justify-between">
           {!isCollapsed && <h1 className="text-2xl font-bold text-white tracking-tight">ExpenseVision</h1>}
           {isCollapsed &&

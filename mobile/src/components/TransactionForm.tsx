@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Alert, Text } from 'react-native';
-import { SheetModal, Input, Button, ChipSelector, FieldLabel } from './ui';
+import { Alert, StyleSheet, Text, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { SheetModal, Input, Button, ChipSelector, FieldLabel, OptionSheet, DateField, successHaptic } from './ui';
 import { useData } from '../context/DataContext';
+import { useTheme } from '../context/ThemeContext';
 import { Transaction, TransactionType } from '../types';
-
-const todayStr = () => new Date().toISOString().split('T')[0];
+import { api } from '../services/api';
+import { getAiSettings } from '../services/aiSettings';
+import { radius, spacing } from '../theme';
+import { displayDateToIso, isoDateToDisplay, todayIsoDate } from '../utils/date';
 
 interface Props {
     visible: boolean;
@@ -14,14 +18,19 @@ interface Props {
 
 export const TransactionForm: React.FC<Props> = ({ visible, onClose, editing }) => {
     const { accounts, categories, addTransaction, updateTransaction } = useData();
+    const { theme } = useTheme();
     const [type, setType] = useState<TransactionType>('expense');
     const [amount, setAmount] = useState('');
     const [description, setDescription] = useState('');
-    const [date, setDate] = useState(todayStr());
+    const [notes, setNotes] = useState('');
+    const [date, setDate] = useState(todayIsoDate());
     const [accountId, setAccountId] = useState<string | null>(null);
     const [transferToAccountId, setTransferToAccountId] = useState<string | null>(null);
     const [categoryId, setCategoryId] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
+    const [quickEntry, setQuickEntry] = useState('');
+    const [parsing, setParsing] = useState(false);
+    const [parseMessage, setParseMessage] = useState('');
 
     useEffect(() => {
         if (visible) {
@@ -29,6 +38,7 @@ export const TransactionForm: React.FC<Props> = ({ visible, onClose, editing }) 
                 setType(editing.type);
                 setAmount(String(editing.amount));
                 setDescription(editing.description);
+                setNotes(editing.notes || '');
                 setDate(editing.date.split('T')[0]);
                 setAccountId(editing.accountId);
                 setTransferToAccountId(editing.transferToAccountId || null);
@@ -37,7 +47,10 @@ export const TransactionForm: React.FC<Props> = ({ visible, onClose, editing }) 
                 setType('expense');
                 setAmount('');
                 setDescription('');
-                setDate(todayStr());
+                setNotes('');
+                setQuickEntry('');
+                setParseMessage('');
+                setDate(todayIsoDate());
                 setAccountId(accounts[0]?.id || null);
                 setTransferToAccountId(null);
                 setCategoryId(null);
@@ -47,12 +60,43 @@ export const TransactionForm: React.FC<Props> = ({ visible, onClose, editing }) 
 
     const typeCategories = categories.filter(c => c.type === type);
 
+    const handleParseQuickEntry = async () => {
+        const aiSettings = await getAiSettings();
+        if (!aiSettings.enabled) return Alert.alert('AI disabled', 'Enable AI transaction parsing in Settings first.');
+        if (!aiSettings.apiKey.trim()) return Alert.alert('Missing API key', 'Add your AI API key in Settings first.');
+        if (!quickEntry.trim()) return Alert.alert('Missing note', 'Type or dictate a transaction note first.');
+
+        setParsing(true);
+        setParseMessage('');
+        try {
+            const draft = await api.parseTransactionText({ text: quickEntry, preferredType: type, aiConfig: aiSettings });
+            setType(draft.type);
+            setAmount(draft.amount ? String(draft.amount) : '');
+            setDescription(draft.description || quickEntry);
+            setDate((draft.date || todayIsoDate()).split('T')[0]);
+            setAccountId(draft.accountId || accounts[0]?.id || null);
+            setCategoryId(draft.categoryId || null);
+            setTransferToAccountId(draft.transferToAccountId || null);
+
+            if (draft.missingFields?.length) {
+                setParseMessage(`Review missing fields: ${draft.missingFields.join(', ')}.`);
+            } else {
+                setParseMessage('Draft filled. Review and save.');
+            }
+        } catch (err: any) {
+            Alert.alert('Could not parse note', err.message || 'Failed to parse transaction note.');
+        } finally {
+            setParsing(false);
+        }
+    };
+
     const handleSave = async () => {
         const value = parseFloat(amount);
         if (!value || value <= 0) return Alert.alert('Invalid amount', 'Enter an amount greater than zero.');
         if (!description.trim()) return Alert.alert('Missing description', 'Enter a description.');
         if (!accountId) return Alert.alert('Missing account', 'Select an account.');
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return Alert.alert('Invalid date', 'Use YYYY-MM-DD format.');
+        const isoDate = displayDateToIso(date);
+        if (!isoDate) return Alert.alert('Invalid date', 'Pick a valid date.');
         if (type === 'transfer' && !transferToAccountId) return Alert.alert('Missing account', 'Select a destination account.');
         if (type === 'transfer' && transferToAccountId === accountId) return Alert.alert('Invalid transfer', 'Source and destination must differ.');
 
@@ -62,7 +106,8 @@ export const TransactionForm: React.FC<Props> = ({ visible, onClose, editing }) 
                 type,
                 amount: value,
                 description: description.trim(),
-                date,
+                notes: notes.trim() || null,
+                date: isoDate,
                 accountId,
                 categoryId: type === 'transfer' ? null : categoryId,
                 transferToAccountId: type === 'transfer' ? transferToAccountId : null,
@@ -72,6 +117,7 @@ export const TransactionForm: React.FC<Props> = ({ visible, onClose, editing }) 
             } else {
                 await addTransaction(payload as Omit<Transaction, 'id'>);
             }
+            successHaptic();
             onClose();
         } catch (err: any) {
             Alert.alert('Error', err.message || 'Failed to save transaction');
@@ -90,48 +136,100 @@ export const TransactionForm: React.FC<Props> = ({ visible, onClose, editing }) 
                     { value: 'transfer', label: 'Transfer' },
                 ]}
                 value={type}
+                disabled={parsing}
                 onChange={v => {
                     setType(v as TransactionType);
                     setCategoryId(null);
                 }}
             />
 
-            <Input label="Amount" value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="0.00" />
-            <Input label="Description" value={description} onChangeText={setDescription} placeholder="e.g. Groceries" />
-            <Input label="Date (YYYY-MM-DD)" value={date} onChangeText={setDate} placeholder={todayStr()} autoCapitalize="none" />
+            {!editing ? (
+                <View style={[styles.quickEntry, { backgroundColor: theme.colors.primaryLight, borderColor: theme.colors.cardBorder }]}>
+                    <View style={styles.quickEntryHeader}>
+                        <MaterialCommunityIcons name="microphone-outline" size={18} color={theme.colors.primary} />
+                        <Text style={[styles.quickEntryTitle, { color: theme.colors.text }]}>Quick Entry</Text>
+                    </View>
+                    <Input
+                        value={quickEntry}
+                        onChangeText={value => {
+                            setQuickEntry(value);
+                            setParseMessage('');
+                        }}
+                        placeholder="Spent 20 on food from SBI savings"
+                        multiline
+                        editable={!parsing}
+                        numberOfLines={3}
+                        textAlignVertical="top"
+                        style={{ minHeight: 82 }}
+                    />
+                    {parseMessage ? <Text style={[styles.parseMessage, { color: theme.colors.warning }]}>{parseMessage}</Text> : null}
+                    <Button
+                        title={parsing ? 'Parsing...' : 'Parse with AI'}
+                        onPress={handleParseQuickEntry}
+                        loading={parsing}
+                        variant="secondary"
+                    />
+                </View>
+            ) : null}
 
-            <FieldLabel>{type === 'transfer' ? 'From account' : 'Account'}</FieldLabel>
-            <ChipSelector
-                options={accounts.map(a => ({ value: a.id, label: a.name }))}
+            <Input label="Amount" value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="0.00" editable={!parsing} />
+            <Input label="Description" value={description} onChangeText={setDescription} placeholder="e.g. Groceries" editable={!parsing} />
+            <DateField label="Date" value={date} onChange={setDate} disabled={parsing} />
+
+            <OptionSheet
+                label={type === 'transfer' ? 'From account' : 'Account'}
+                options={accounts.map(a => ({ value: a.id, label: a.name, sublabel: a.type }))}
                 value={accountId}
+                disabled={parsing}
                 onChange={setAccountId}
             />
 
             {type === 'transfer' ? (
-                <>
-                    <FieldLabel>To account</FieldLabel>
-                    <ChipSelector
-                        options={accounts.filter(a => a.id !== accountId).map(a => ({ value: a.id, label: a.name }))}
-                        value={transferToAccountId}
-                        onChange={setTransferToAccountId}
-                    />
-                </>
+                <OptionSheet
+                    label="To account"
+                    options={accounts.filter(a => a.id !== accountId).map(a => ({ value: a.id, label: a.name, sublabel: a.type }))}
+                    value={transferToAccountId}
+                    disabled={parsing}
+                    onChange={setTransferToAccountId}
+                />
+            ) : typeCategories.length === 0 ? (
+                <Text style={{ marginBottom: 16, opacity: 0.6 }}>No {type} categories yet.</Text>
             ) : (
-                <>
-                    <FieldLabel>Category</FieldLabel>
-                    {typeCategories.length === 0 ? (
-                        <Text style={{ marginBottom: 16, opacity: 0.6 }}>No {type} categories yet.</Text>
-                    ) : (
-                        <ChipSelector
-                            options={typeCategories.map(c => ({ value: c.id, label: c.name }))}
-                            value={categoryId}
-                            onChange={setCategoryId}
-                        />
-                    )}
-                </>
+                <OptionSheet
+                    label="Category"
+                    options={typeCategories.map(c => ({ value: c.id, label: c.name, icon: c.icon }))}
+                    value={categoryId}
+                    disabled={parsing}
+                    onChange={setCategoryId}
+                />
             )}
 
-            <Button title={editing ? 'Save Changes' : 'Add Transaction'} onPress={handleSave} loading={saving} />
+            <Input label="Notes / tags (optional)" value={notes} onChangeText={setNotes} placeholder="e.g. upi, office" editable={!parsing} />
+
+            <Button title={editing ? 'Save Changes' : 'Add Transaction'} onPress={handleSave} loading={saving} disabled={parsing} />
         </SheetModal>
     );
 };
+
+const styles = StyleSheet.create({
+    quickEntry: {
+        borderWidth: 1,
+        borderRadius: radius.md,
+        padding: spacing.md,
+        marginBottom: spacing.md,
+    },
+    quickEntryHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.sm,
+        marginBottom: spacing.sm,
+    },
+    quickEntryTitle: {
+        fontSize: 14,
+        fontWeight: '700',
+    },
+    parseMessage: {
+        fontSize: 12,
+        marginBottom: spacing.sm,
+    },
+});

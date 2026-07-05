@@ -30,7 +30,7 @@ GOOGLE_CALLBACK_URL=http://your-domain.com/api/auth/google/callback
 # Frontend URL (for CORS)
 FRONTEND_URL=http://your-domain.com
 
-# VAPID Keys for Push Notifications (Generate using web-push)
+# VAPID Keys for Push Notifications (generate with `node backend/generate-keys.cjs`)
 VAPID_PUBLIC_KEY=your_vapid_public_key
 VAPID_PRIVATE_KEY=your_vapid_private_key
 ```
@@ -46,8 +46,6 @@ VITE_API_URL=http://your-domain.com/api
 # Google OAuth Client ID (Must match the one in backend)
 VITE_GOOGLE_CLIENT_ID=your_google_client_id
 
-# VAPID Public Key (Must match the one in backend)
-VITE_VAPID_PUBLIC_KEY=your_vapid_public_key
 ```
 
 ## 2. Building the Frontend

@@ -1,6 +1,6 @@
 
 
-export type Page = 'Dashboard' | 'Transactions' | 'Budgets' | 'Accounts' | 'Categories' | 'Reports' | 'Profile' | 'Settings';
+export type Page = 'Dashboard' | 'Transactions' | 'Recurring' | 'Budgets' | 'Accounts' | 'Categories' | 'Reports' | 'Profile' | 'Settings';
 
 
 export type TransactionType = 'income' | 'expense' | 'transfer';
@@ -17,6 +17,7 @@ export interface Transaction {
   categoryId: string;
   accountId: string;
   transferToAccountId?: string;
+  notes?: string | null;
 }
 
 export interface Category {
@@ -41,6 +42,30 @@ export interface Budget {
   categoryId: string;
   amount: number;
   spent: number;
+  month?: string | null; // YYYY-MM, or null for a recurring (month-less) budget
+  rollover?: boolean;
+  alertThreshold?: number; // percent, default 100
+  carryover?: number; // 0 unless rollover is enabled
+  effectiveAmount?: number; // amount + carryover, clamped >= 0
+}
+
+export type RecurringFrequency = 'daily' | 'weekly' | 'monthly' | 'yearly';
+
+export interface RecurringRule {
+  id: string;
+  description: string;
+  amount: number;
+  type: TransactionType;
+  accountId: string;
+  transferToAccountId?: string | null;
+  categoryId?: string | null;
+  frequency: RecurringFrequency;
+  startDate: string; // YYYY-MM-DD
+  endDate?: string | null; // YYYY-MM-DD
+  nextRun: string; // YYYY-MM-DD
+  dayAnchor?: number | null;
+  active: boolean;
+  notes?: string | null;
 }
 
 export interface User {
