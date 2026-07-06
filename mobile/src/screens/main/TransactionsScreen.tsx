@@ -1,8 +1,9 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, RefreshControl, TextInput, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Swipeable } from 'react-native-gesture-handler';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -11,7 +12,6 @@ import { CategoryIcon } from '../../components/CategoryIcon';
 import { TransactionForm } from '../../components/TransactionForm';
 import { formatCurrency } from '../../utils/currency';
 import { isoDateToDisplay } from '../../utils/date';
-import { shareTransactionsCsv } from '../../utils/exportCsv';
 import { spacing, radius } from '../../theme';
 import { Transaction } from '../../types';
 
@@ -35,14 +35,24 @@ export default function TransactionsScreen() {
     const { transactions, categories, accounts, deleteTransaction, isLoading, refresh } = useData();
     const { user } = useAuth();
     const { theme } = useTheme();
+    const navigation = useNavigation();
+    const route = useRoute();
     const [search, setSearch] = useState('');
     const [typeFilter, setTypeFilter] = useState('all');
-    const [month, setMonth] = useState<string | null>(null); // null = all time
+    const currentMonth = monthKey(new Date());
+    const [month, setMonth] = useState<string | null>(currentMonth); // default to current month
     const [showForm, setShowForm] = useState(false);
     const [editing, setEditing] = useState<Transaction | null>(null);
-    const [exporting, setExporting] = useState(false);
     const currency = user?.currency || 'INR';
-    const currentMonth = monthKey(new Date());
+
+    // Open form when navigated with openForm param (from FAB press)
+    useEffect(() => {
+        if ((route.params as any)?.openForm) {
+            setEditing(null);
+            setShowForm(true);
+            navigation.setParams({ openForm: undefined } as any);
+        }
+    }, [route.params, navigation]);
 
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
@@ -72,17 +82,6 @@ export default function TransactionsScreen() {
             { text: 'Cancel', style: 'cancel' },
             { text: 'Delete', style: 'destructive', onPress: () => doDelete(t) },
         ]);
-    };
-
-    const handleExport = async () => {
-        setExporting(true);
-        try {
-            await shareTransactionsCsv();
-        } catch (err: any) {
-            Alert.alert('Export failed', err.message || 'Could not export transactions');
-        } finally {
-            setExporting(false);
-        }
     };
 
     const renderItem = ({ item: t }: { item: Transaction }) => {
@@ -141,25 +140,6 @@ export default function TransactionsScreen() {
         <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top']}>
             <View style={styles.header}>
                 <Text style={[styles.title, { color: theme.colors.text }]}>Transactions</Text>
-                <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-                    <TouchableOpacity
-                        onPress={handleExport}
-                        disabled={exporting || transactions.length === 0}
-                        style={[styles.iconButton, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder, borderWidth: 1, opacity: exporting || transactions.length === 0 ? 0.5 : 1 }]}
-                    >
-                        <MaterialCommunityIcons name="export-variant" size={20} color={theme.colors.textSecondary} />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        onPress={() => {
-                            lightHaptic();
-                            setEditing(null);
-                            setShowForm(true);
-                        }}
-                        style={[styles.iconButton, { backgroundColor: theme.colors.primary }]}
-                    >
-                        <MaterialCommunityIcons name="plus" size={24} color="#fff" />
-                    </TouchableOpacity>
-                </View>
             </View>
 
             <View style={{ paddingHorizontal: spacing.md }}>
@@ -232,7 +212,7 @@ export default function TransactionsScreen() {
                     <EmptyState
                         icon="swap-horizontal"
                         title={search || typeFilter !== 'all' || month ? 'No matching transactions' : 'No transactions yet'}
-                        subtitle={search || typeFilter !== 'all' || month ? 'Try changing the search or filters' : 'Tap + to add your first transaction. Tap to edit, swipe left to delete.'}
+                        subtitle={search || typeFilter !== 'all' || month ? 'Try changing the search or filters' : 'Tap the + button at the bottom to add your first transaction. Tap to edit, swipe left to delete.'}
                     />
                 }
             />

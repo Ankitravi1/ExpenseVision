@@ -1,8 +1,9 @@
 import React from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, View, Text, TouchableOpacity, StyleSheet, Switch } from 'react-native';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createDrawerNavigator } from '@react-navigation/drawer';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import LoginScreen from '../screens/auth/LoginScreen';
@@ -17,41 +18,168 @@ import ReportsScreen from '../screens/main/ReportsScreen';
 import SettingsScreen from '../screens/main/SettingsScreen';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useData } from '../context/DataContext';
+import { CustomTabBar } from '../components/CustomTabBar';
+import { spacing, radius } from '../theme';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
+const Drawer = createDrawerNavigator();
 
 const TAB_ICONS: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> = {
     Dashboard: 'view-dashboard-outline',
     Transactions: 'swap-horizontal',
     Budgets: 'target',
     Accounts: 'wallet-outline',
-    Settings: 'cog-outline',
 };
 
 function MainTabs() {
     const { theme } = useTheme();
     return (
         <Tab.Navigator
-            screenOptions={({ route }) => ({
+            screenOptions={{
                 headerShown: false,
-                tabBarIcon: ({ color, size }) => (
-                    <MaterialCommunityIcons name={TAB_ICONS[route.name] || 'circle'} size={size} color={color} />
-                ),
                 tabBarActiveTintColor: theme.colors.primary,
                 tabBarInactiveTintColor: theme.colors.textTertiary,
-                tabBarStyle: {
-                    backgroundColor: theme.colors.tabBar,
-                    borderTopColor: theme.colors.cardBorder,
-                },
-            })}
+            }}
+            tabBar={(props) => <CustomTabBar {...props} />}
         >
             <Tab.Screen name="Dashboard" component={DashboardScreen} />
             <Tab.Screen name="Transactions" component={TransactionsScreen} />
             <Tab.Screen name="Budgets" component={BudgetsScreen} />
             <Tab.Screen name="Accounts" component={AccountsScreen} />
-            <Tab.Screen name="Settings" component={SettingsScreen} />
         </Tab.Navigator>
+    );
+}
+
+function DrawerContentComponent({ navigation }: any) {
+    const { theme, mode, toggleTheme } = useTheme();
+    const { user, logout } = useAuth();
+    const { categories, recurring, transactions, clearAllTransactions } = useData();
+    const [showClearConfirm, setShowClearConfirm] = React.useState(false);
+
+    const DrawerItem: React.FC<{
+        icon: keyof typeof MaterialCommunityIcons.glyphMap;
+        label: string;
+        onPress: () => void;
+        badge?: string;
+        danger?: boolean;
+    }> = ({ icon, label, onPress, badge, danger }) => (
+        <TouchableOpacity
+            onPress={onPress}
+            style={[styles.drawerItem, { backgroundColor: danger ? theme.colors.dangerBg : 'transparent' }]}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+            <MaterialCommunityIcons name={icon} size={24} color={danger ? theme.colors.danger : theme.colors.textSecondary} />
+            <Text style={[styles.drawerLabel, { color: danger ? theme.colors.danger : theme.colors.text }]}>{label}</Text>
+            {badge ? (
+                <View style={[styles.badge, { backgroundColor: danger ? theme.colors.danger : theme.colors.primary }]}>
+                    <Text style={styles.badgeText}>{badge}</Text>
+                </View>
+            ) : null}
+        </TouchableOpacity>
+    );
+
+    const goToTab = (screen: string, params?: Record<string, unknown>) => {
+        navigation.navigate('Main', { screen, params });
+        navigation.closeDrawer();
+    };
+
+    const goToDrawerScreen = (screen: string) => {
+        navigation.navigate(screen);
+        navigation.closeDrawer();
+    };
+
+    return (
+        <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+            <View style={styles.drawerHeader}>
+                <View style={[styles.avatar, { backgroundColor: theme.colors.primary }]}>
+                    <Text style={styles.avatarText}>{(user?.name || 'U').trim().charAt(0).toUpperCase()}</Text>
+                </View>
+                <View style={styles.headerInfo}>
+                    <Text style={[styles.headerName, { color: theme.colors.text }]}>{user?.name}</Text>
+                    <Text style={[styles.headerEmail, { color: theme.colors.textTertiary }]}>{user?.email}</Text>
+                </View>
+            </View>
+
+            <View style={styles.section}>
+                <DrawerItem icon="plus-circle" label="Add transaction" onPress={() => goToTab('Transactions', { openForm: true })} />
+                <DrawerItem icon="view-dashboard-outline" label="Dashboard" onPress={() => goToTab('Dashboard')} />
+                <DrawerItem icon="swap-horizontal" label="Transactions" badge={`${transactions.length}`} onPress={() => goToTab('Transactions')} />
+                <DrawerItem icon="target" label="Budgets" onPress={() => goToTab('Budgets')} />
+                <DrawerItem icon="wallet-outline" label="Accounts" onPress={() => goToTab('Accounts')} />
+            </View>
+
+            <View style={styles.section}>
+                <View style={styles.sectionDivider} />
+                <DrawerItem icon="chart-pie" label="Reports" onPress={() => goToDrawerScreen('Reports')} />
+                <DrawerItem icon="tag-multiple" label="Categories" badge={`${categories.length}`} onPress={() => goToDrawerScreen('Settings')} />
+                <DrawerItem icon="repeat" label="Recurring" badge={`${recurring.length}`} onPress={() => goToDrawerScreen('Settings')} />
+                <DrawerItem icon="cog-outline" label="Settings" onPress={() => goToDrawerScreen('Settings')} />
+            </View>
+
+            <View style={styles.section}>
+                <View style={styles.sectionDivider} />
+                <View style={styles.drawerToggleRow}>
+                    <MaterialCommunityIcons name="theme-light-dark" size={24} color={theme.colors.textSecondary} />
+                    <Text style={[styles.drawerLabel, { color: theme.colors.text, flex: 1 }]}>Dark mode</Text>
+                    <Switch value={mode === 'dark'} onValueChange={toggleTheme} trackColor={{ true: theme.colors.primary }} />
+                </View>
+            </View>
+
+            <View style={styles.section}>
+                <DrawerItem icon="delete-sweep" label="Clear all transactions" badge={`${transactions.length}`} danger onPress={() => setShowClearConfirm(true)} />
+                <DrawerItem icon="logout" label="Log out" danger onPress={logout} />
+            </View>
+
+            {showClearConfirm ? (
+                <View style={styles.confirmOverlay}>
+                    <View style={[styles.confirmBox, { backgroundColor: theme.colors.card }]}>
+                        <Text style={[styles.confirmTitle, { color: theme.colors.text }]}>Clear all transactions?</Text>
+                        <Text style={[styles.confirmText, { color: theme.colors.textSecondary }]}>
+                            This deletes all {transactions.length} transactions and resets account balances. This cannot be undone.
+                        </Text>
+                        <View style={styles.confirmActions}>
+                            <TouchableOpacity onPress={() => setShowClearConfirm(false)} style={[styles.confirmBtn, { backgroundColor: theme.colors.cardBorder }]}>
+                                <Text style={[styles.confirmBtnText, { color: theme.colors.text }]}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={() => {
+                                    clearAllTransactions().catch(() => {});
+                                    setShowClearConfirm(false);
+                                }}
+                                style={[styles.confirmBtn, { backgroundColor: theme.colors.danger }]}
+                            >
+                                <Text style={styles.confirmBtnText}>Delete everything</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            ) : null}
+
+            <Text style={{ color: theme.colors.textTertiary, textAlign: 'center', marginTop: spacing.lg, fontSize: 12, paddingBottom: spacing.xl }}>
+                ExpenseVision · synced with your web account
+            </Text>
+        </View>
+    );
+}
+
+function MainDrawer() {
+    const { theme } = useTheme();
+    return (
+        <Drawer.Navigator
+            screenOptions={{
+                headerShown: false,
+                drawerStyle: { backgroundColor: theme.colors.background, width: 280 },
+                drawerType: 'slide',
+                drawerPosition: 'left',
+            }}
+            drawerContent={(props) => <DrawerContentComponent {...props} />}
+        >
+            <Drawer.Screen name="Main" component={MainTabs} />
+            <Drawer.Screen name="Reports" component={ReportsScreen} />
+            <Drawer.Screen name="Settings" component={SettingsScreen} />
+        </Drawer.Navigator>
     );
 }
 
@@ -83,12 +211,129 @@ export default function AppNavigator() {
                 ) : needsProfileCompletion ? (
                     <Stack.Screen name="CompleteProfile" component={CompleteProfileScreen} />
                 ) : (
-                    <>
-                        <Stack.Screen name="Main" component={MainTabs} />
-                        <Stack.Screen name="Reports" component={ReportsScreen} />
-                    </>
+                    <Stack.Screen name="MainDrawer" component={MainDrawer} />
                 )}
             </Stack.Navigator>
         </NavigationContainer>
     );
 }
+
+const styles = StyleSheet.create({
+    drawerHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: spacing.lg,
+        paddingTop: spacing.xl,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: '#334155',
+        gap: spacing.md,
+    },
+    avatar: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    avatarText: {
+        color: '#fff',
+        fontSize: 22,
+        fontWeight: '800',
+    },
+    headerInfo: {
+        flex: 1,
+    },
+    headerName: {
+        fontSize: 16,
+        fontWeight: '700',
+    },
+    headerEmail: {
+        fontSize: 13,
+        marginTop: 2,
+    },
+    section: {
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+    },
+    sectionDivider: {
+        height: StyleSheet.hairlineWidth,
+        backgroundColor: '#334155',
+        marginVertical: spacing.sm,
+    },
+    drawerItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 14,
+        paddingHorizontal: spacing.sm,
+        borderRadius: radius.md,
+        gap: spacing.md,
+    },
+    drawerLabel: {
+        fontSize: 15,
+        fontWeight: '500',
+        flex: 1,
+    },
+    badge: {
+        minWidth: 20,
+        height: 20,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 6,
+    },
+    badgeText: {
+        color: '#fff',
+        fontSize: 11,
+        fontWeight: '700',
+    },
+    drawerToggleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 14,
+        paddingHorizontal: spacing.sm,
+        gap: spacing.md,
+    },
+    confirmOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: spacing.md,
+        zIndex: 100,
+    },
+    confirmBox: {
+        width: '100%',
+        maxWidth: 360,
+        borderRadius: radius.lg,
+        padding: spacing.lg,
+        gap: spacing.md,
+    },
+    confirmTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+    },
+    confirmText: {
+        fontSize: 14,
+        lineHeight: 20,
+    },
+    confirmActions: {
+        flexDirection: 'row',
+        gap: spacing.md,
+        marginTop: spacing.sm,
+    },
+    confirmBtn: {
+        flex: 1,
+        paddingVertical: 14,
+        borderRadius: radius.md,
+        alignItems: 'center',
+    },
+    confirmBtnText: {
+        color: '#fff',
+        fontSize: 15,
+        fontWeight: '600',
+    },
+});

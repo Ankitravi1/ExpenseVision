@@ -1,7 +1,9 @@
 {
-  // Run all three in their own SEPARATE VS Code integrated terminal tabs:
-  //   Ctrl+Shift+P  →  "Tasks: Run Task"  →  "Start ExpenseVision (all)"
-  // Or without mobile: "Start ExpenseVision (web + backend)".
+  // Run services in their own SEPARATE VS Code integrated terminal tabs:
+  //   Ctrl+Shift+P  →  "Tasks: Run Task"  →  choose one:
+  //   - "Start ExpenseVision (phone LAN)" for a physical phone on same Wi-Fi
+  //   - "Start ExpenseVision (emulator)" for Android Studio emulator
+  //   - "Start ExpenseVision (web + backend)" without mobile
   //
   // Each task uses a dedicated panel and NO shared group, so they open as
   // separate terminal TABS (not split panes). Switch between them with the
@@ -37,7 +39,21 @@
       "problemMatcher": []
     },
     {
-      "label": "mobile",
+      "label": "mobile: phone Wi-Fi/LAN",
+      "type": "shell",
+      "command": "npx expo start --lan",
+      "options": { "cwd": "${workspaceFolder}/mobile" },
+      "isBackground": true,
+      "presentation": {
+        "panel": "dedicated",
+        "reveal": "always",
+        "focus": false,
+        "showReuseMessage": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "mobile: emulator",
       "type": "shell",
       "command": "npx expo start --android",
       "options": { "cwd": "${workspaceFolder}/mobile" },
@@ -57,8 +73,14 @@
       "problemMatcher": []
     },
     {
-      "label": "Start ExpenseVision (all)",
-      "dependsOn": ["backend", "web", "mobile"],
+      "label": "Start ExpenseVision (phone LAN)",
+      "dependsOn": ["backend", "web", "mobile: phone Wi-Fi/LAN"],
+      "dependsOrder": "parallel",
+      "problemMatcher": []
+    },
+    {
+      "label": "Start ExpenseVision (emulator)",
+      "dependsOn": ["backend", "web", "mobile: emulator"],
       "dependsOrder": "parallel",
       "problemMatcher": []
     }

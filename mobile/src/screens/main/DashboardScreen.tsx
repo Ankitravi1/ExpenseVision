@@ -23,6 +23,10 @@ export default function DashboardScreen() {
     const [showForm, setShowForm] = useState(false);
     const currency = user?.currency || 'INR';
 
+    const openDrawer = () => {
+        (navigation as any).openDrawer?.();
+    };
+
     const { netWorth, monthIncome, monthExpense, recent, sixMonths } = useMemo(() => {
         const netWorth = accounts.reduce((sum, a) => sum + a.balance, 0);
         const nowKey = monthKey(new Date());
@@ -65,22 +69,23 @@ export default function DashboardScreen() {
                 refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refresh} tintColor={theme.colors.primary} />}
             >
                 <View style={styles.headerRow}>
-                    <View>
+                    <TouchableOpacity
+                        onPress={openDrawer}
+                        style={styles.drawerToggle}
+                        hitSlop={{ top: 12, bottom: 12, left: 8, right: 12 }}
+                    >
+                        <MaterialCommunityIcons name="menu" size={26} color={theme.colors.text} />
+                    </TouchableOpacity>
+                    <View style={styles.headerCenter}>
                         <Text style={[styles.greeting, { color: theme.colors.textSecondary }]}>Hi {user?.name?.split(' ')[0] || 'there'} 👋</Text>
                         <Text style={[styles.title, { color: theme.colors.text }]}>Dashboard</Text>
                     </View>
-                    <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                    <View style={styles.headerRight}>
                         <TouchableOpacity
                             onPress={() => (navigation as any).navigate('Reports')}
-                            style={[styles.addButton, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder, borderWidth: 1 }]}
+                            style={[styles.iconButton, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder, borderWidth: 1 }]}
                         >
                             <MaterialCommunityIcons name="chart-pie" size={22} color={theme.colors.textSecondary} />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            onPress={() => setShowForm(true)}
-                            style={[styles.addButton, { backgroundColor: theme.colors.primary }]}
-                        >
-                            <MaterialCommunityIcons name="plus" size={24} color="#fff" />
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -200,6 +205,17 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: spacing.md,
     },
+    headerCenter: {
+        flex: 1,
+        paddingHorizontal: spacing.md,
+    },
+    headerRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    drawerToggle: {
+        padding: spacing.xs,
+    },
     greeting: {
         fontSize: 14,
     },
@@ -207,7 +223,7 @@ const styles = StyleSheet.create({
         fontSize: 26,
         fontWeight: '800',
     },
-    addButton: {
+    iconButton: {
         width: 44,
         height: 44,
         borderRadius: radius.md,

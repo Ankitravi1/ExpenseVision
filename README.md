@@ -77,21 +77,21 @@ The raw OpenAPI spec is served at `http://localhost:5000/api/docs.json`.
 
 ### Prerequisites
 - Node.js (v18+)
-- Android Studio + an emulator (only for the mobile app)
+- Expo Go on your phone for physical-device testing
+- Android Studio + an emulator only if you want emulator testing
 
 No database server is needed — the backend uses a local SQLite file (`backend/prisma/dev.db`).
 
 ### Installation & Running
 
-**In VS Code (recommended)** — run everything as separate integrated terminal tabs:
-`Ctrl+Shift+P` → **Tasks: Run Task** → **Start ExpenseVision (all)** (or *web + backend*). Each service gets its own dedicated terminal tab. See `.vscode/tasks.json`.
+**In VS Code (recommended)** — run services as separate integrated terminal tabs:
+`Ctrl+Shift+P` → **Tasks: Run Task** → choose one:
 
-**Or via the script** — opens each service in its own separate terminal window (Windows Terminal tabs when available):
+- **Start ExpenseVision (phone LAN)**: backend + web + Expo for a physical phone on the same Wi-Fi (`--lan`)
+- **Start ExpenseVision (emulator)**: backend + web + Expo Android emulator (`--android`)
+- **Start ExpenseVision (web + backend)**: backend + web only
 
-```powershell
-.\start-expensevision.ps1            # backend + web
-.\start-expensevision.ps1 -WithMobile   # also Expo Android (emulator required)
-```
+Each service gets its own dedicated terminal tab. To switch between them, use the terminal dropdown at the top-right of the VS Code terminal panel, or click the terminal tab names (`backend`, `web`, `mobile: phone Wi-Fi/LAN`, `mobile: emulator`). Stop a service with `Ctrl+C` inside that terminal.
 
 1.  **Backend** (http://localhost:5000 · API docs at http://localhost:5000/api/docs)
     ```bash
@@ -114,9 +114,77 @@ No database server is needed — the backend uses a local SQLite file (`backend/
     ```bash
     cd mobile
     npm install
-    npx expo start --android
     ```
-    The app auto-detects the backend: Android emulator via `10.0.2.2`, physical devices via your PC's LAN IP (phone and PC must be on the same Wi-Fi, backend running).
+
+    **Option A — Android emulator:**
+    1. Open Android Studio → Device Manager → start your emulator and wait for the Android home screen.
+    2. Start the backend: `cd backend && npm run dev`.
+    3. Start Expo:
+       ```bash
+       cd mobile
+       npx expo start --android
+       ```
+    4. If the app cannot reach the backend, run:
+       ```bash
+       adb reverse tcp:5000 tcp:5000
+       adb reverse tcp:8081 tcp:8081
+       ```
+       Then press `r` in the Expo terminal to reload.
+
+    **Option B — physical phone on same Wi-Fi / LAN (recommended):**
+    `--lan` means "use my local network" — your phone and laptop must be on the same Wi-Fi/router. It does **not** mean USB cable.
+    1. Connect phone to the **same Wi-Fi** as your PC.
+    2. Install **Expo Go** from Play Store / App Store
+    3. Start the backend: `cd backend && npm run dev`
+    4. Run:
+       ```bash
+       cd mobile
+       npx expo start --lan
+       ```
+       If Expo asks about port `8081` being busy, stop the old Expo terminal first or accept the new port.
+    5. Scan the QR code in the terminal with Expo Go
+    6. App loads on your phone, pointing at your PC's backend automatically
+
+    **Option C — physical Android phone with USB cable:**
+    Use this when Wi-Fi/LAN is blocked or unreliable.
+    1. Enable **Developer options** and **USB debugging** on the phone.
+    2. Connect the phone by USB and allow the debugging prompt on the phone.
+    3. Check that ADB sees it:
+       ```bash
+       adb devices
+       ```
+       It should show your phone as `device`.
+    4. Start the backend: `cd backend && npm run dev`
+    5. Create USB port bridges:
+       ```bash
+       adb reverse tcp:5000 tcp:5000
+       adb reverse tcp:8081 tcp:8081
+       ```
+    6. Start Expo and open Android:
+       ```bash
+       cd mobile
+       npx expo start --localhost
+       ```
+       Then press `a` in the Expo terminal if the app does not open automatically.
+
+    The app auto-detects the backend: Android emulator via `10.0.2.2`, physical devices on Wi-Fi/LAN via your PC's LAN IP, and USB devices via ADB reverse.
+
+    **Expo SDK 54 version note:**
+    This project targets Expo SDK 54 / Expo Go 54.x. Keep these native packages aligned with Expo's bundled versions:
+    ```bash
+    cd mobile
+    npx expo install react-native-reanimated@~4.1.1 react-native-worklets@0.5.1
+    ```
+    If Expo shows a red screen mentioning `NativeWorklets` or `installTurboModule`, stop Metro and restart it with a clean cache:
+    ```bash
+    npx expo start --lan --clear
+    ```
+
+### Database commands
+
+- `npx prisma migrate dev` applies pending Prisma schema migrations to SQLite and regenerates the Prisma client.
+- `npx prisma studio` opens the visual database browser for the local SQLite data.
+- If `migrate dev` fails with `EPERM ... query_engine-windows.dll.node`, stop the running backend/Node process and run the command again. On Windows that DLL can be locked while the server is running.
 
 ### Optional features (off by default, enable via `backend/.env`)
 - **Google sign-in**: set `GOOGLE_CLIENT_ID` (backend) and `VITE_GOOGLE_CLIENT_ID` (web).
