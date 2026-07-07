@@ -19,3 +19,6 @@ const getDevHost = (): string => {
 };
 
 export const API_URL = `http://${getDevHost()}:5000/api`;
+
+// Same OAuth client ID as backend GOOGLE_CLIENT_ID / web VITE_GOOGLE_CLIENT_ID
+export const GOOGLE_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ?? '';

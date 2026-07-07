@@ -111,7 +111,7 @@ async function main() {
                 amount: 75.50,
                 type: 'expense',
                 date: getDate(0),
-                description: 'Trader Joe\'s'
+                note: 'Trader Joe\'s'
             }
         }),
         prisma.transaction.create({
@@ -122,7 +122,7 @@ async function main() {
                 amount: 2500.00,
                 type: 'income',
                 date: getDate(0),
-                description: 'Monthly Paycheck'
+                note: 'Monthly Paycheck'
             }
         }),
         prisma.transaction.create({
@@ -133,7 +133,7 @@ async function main() {
                 amount: 112.30,
                 type: 'expense',
                 date: getDate(1),
-                description: 'Dinner with friends'
+                note: 'Dinner with friends'
             }
         }),
         prisma.transaction.create({
@@ -144,7 +144,7 @@ async function main() {
                 amount: 55.00,
                 type: 'expense',
                 date: getDate(3),
-                description: 'Monthly Transit Pass'
+                note: 'Monthly Transit Pass'
             }
         }),
         prisma.transaction.create({
@@ -155,7 +155,7 @@ async function main() {
                 amount: 32.00,
                 type: 'expense',
                 date: getDate(3),
-                description: 'Movie Tickets'
+                note: 'Movie Tickets'
             }
         }),
         prisma.transaction.create({
@@ -166,7 +166,7 @@ async function main() {
                 amount: 89.90,
                 type: 'expense',
                 date: getDate(5),
-                description: 'Electric Bill'
+                note: 'Electric Bill'
             }
         }),
         prisma.transaction.create({
@@ -177,7 +177,7 @@ async function main() {
                 amount: 145.00,
                 type: 'expense',
                 date: getDate(10),
-                description: 'Amazon Purchase'
+                note: 'Amazon Purchase'
             }
         }),
         prisma.transaction.create({
@@ -188,7 +188,7 @@ async function main() {
                 amount: 750.00,
                 type: 'income',
                 date: getDate(12),
-                description: 'Freelance Project'
+                note: 'Freelance Project'
             }
         }),
         prisma.transaction.create({
@@ -199,7 +199,7 @@ async function main() {
                 amount: 1500.00,
                 type: 'expense',
                 date: getDate(15),
-                description: 'Monthly Rent'
+                note: 'Monthly Rent'
             }
         }),
         prisma.transaction.create({
@@ -210,7 +210,7 @@ async function main() {
                 amount: 25.60,
                 type: 'expense',
                 date: getDate(20),
-                description: 'Pharmacy'
+                note: 'Pharmacy'
             }
         }),
         prisma.transaction.create({
@@ -221,7 +221,7 @@ async function main() {
                 amount: 120.00,
                 type: 'income',
                 date: getDate(25),
-                description: 'Investment Dividend'
+                note: 'Investment Dividend'
             }
         })
     ]);

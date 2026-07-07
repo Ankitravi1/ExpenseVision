@@ -21,8 +21,7 @@ export const TransactionForm: React.FC<Props> = ({ visible, onClose, editing }) 
     const { theme } = useTheme();
     const [type, setType] = useState<TransactionType>('expense');
     const [amount, setAmount] = useState('');
-    const [description, setDescription] = useState('');
-    const [notes, setNotes] = useState('');
+    const [note, setNote] = useState('');
     const [date, setDate] = useState(todayIsoDate());
     const [accountId, setAccountId] = useState<string | null>(null);
     const [transferToAccountId, setTransferToAccountId] = useState<string | null>(null);
@@ -31,14 +30,18 @@ export const TransactionForm: React.FC<Props> = ({ visible, onClose, editing }) 
     const [quickEntry, setQuickEntry] = useState('');
     const [parsing, setParsing] = useState(false);
     const [parseMessage, setParseMessage] = useState('');
+    const [aiSettings, setAiSettings] = useState<{ enabled: boolean; apiKey: string } | null>(null);
+
+    useEffect(() => {
+        getAiSettings().then(setAiSettings).catch(console.error);
+    }, []);
 
     useEffect(() => {
         if (visible) {
             if (editing) {
                 setType(editing.type);
                 setAmount(String(editing.amount));
-                setDescription(editing.description);
-                setNotes(editing.notes || '');
+                setNote(editing.note);
                 setDate(editing.date.split('T')[0]);
                 setAccountId(editing.accountId);
                 setTransferToAccountId(editing.transferToAccountId || null);
@@ -46,8 +49,7 @@ export const TransactionForm: React.FC<Props> = ({ visible, onClose, editing }) 
             } else {
                 setType('expense');
                 setAmount('');
-                setDescription('');
-                setNotes('');
+                setNote('');
                 setQuickEntry('');
                 setParseMessage('');
                 setDate(todayIsoDate());
@@ -57,6 +59,17 @@ export const TransactionForm: React.FC<Props> = ({ visible, onClose, editing }) 
             }
         }
     }, [visible, editing, accounts]);
+
+    useEffect(() => {
+        if (!visible || editing) return;
+        if (type === 'transfer') {
+            setAccountId(null);
+            setTransferToAccountId(null);
+            setCategoryId(null);
+        } else if (!accountId && accounts[0]) {
+            setAccountId(accounts[0].id);
+        }
+    }, [type, visible, editing, accounts, accountId]);
 
     const typeCategories = categories.filter(c => c.type === type);
 
@@ -69,10 +82,10 @@ export const TransactionForm: React.FC<Props> = ({ visible, onClose, editing }) 
         setParsing(true);
         setParseMessage('');
         try {
-            const draft = await api.parseTransactionText({ text: quickEntry, preferredType: type, aiConfig: aiSettings });
+            const draft = await api.parseTransactionText({ text: quickEntry, preferredType: type });
             setType(draft.type);
             setAmount(draft.amount ? String(draft.amount) : '');
-            setDescription(draft.description || quickEntry);
+            setNote(draft.note || quickEntry);
             setDate((draft.date || todayIsoDate()).split('T')[0]);
             setAccountId(draft.accountId || accounts[0]?.id || null);
             setCategoryId(draft.categoryId || null);
@@ -93,7 +106,7 @@ export const TransactionForm: React.FC<Props> = ({ visible, onClose, editing }) 
     const handleSave = async () => {
         const value = parseFloat(amount);
         if (!value || value <= 0) return Alert.alert('Invalid amount', 'Enter an amount greater than zero.');
-        if (!description.trim()) return Alert.alert('Missing description', 'Enter a description.');
+        if (!note.trim()) return Alert.alert('Missing note', 'Enter a note.');
         if (!accountId) return Alert.alert('Missing account', 'Select an account.');
         const isoDate = displayDateToIso(date);
         if (!isoDate) return Alert.alert('Invalid date', 'Pick a valid date.');
@@ -105,8 +118,7 @@ export const TransactionForm: React.FC<Props> = ({ visible, onClose, editing }) 
             const payload = {
                 type,
                 amount: value,
-                description: description.trim(),
-                notes: notes.trim() || null,
+                note: note.trim(),
                 date: isoDate,
                 accountId,
                 categoryId: type === 'transfer' ? null : categoryId,
@@ -140,10 +152,14 @@ export const TransactionForm: React.FC<Props> = ({ visible, onClose, editing }) 
                 onChange={v => {
                     setType(v as TransactionType);
                     setCategoryId(null);
+                    if (v === 'transfer') {
+                        setAccountId(null);
+                        setTransferToAccountId(null);
+                    }
                 }}
             />
 
-            {!editing ? (
+            {!editing && aiSettings?.enabled ? (
                 <View style={[styles.quickEntry, { backgroundColor: theme.colors.primaryLight, borderColor: theme.colors.cardBorder }]}>
                     <View style={styles.quickEntryHeader}>
                         <MaterialCommunityIcons name="microphone-outline" size={18} color={theme.colors.primary} />
@@ -173,8 +189,7 @@ export const TransactionForm: React.FC<Props> = ({ visible, onClose, editing }) 
             ) : null}
 
             <Input label="Amount" value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="0.00" editable={!parsing} />
-            <Input label="Description" value={description} onChangeText={setDescription} placeholder="e.g. Groceries" editable={!parsing} />
-            <DateField label="Date" value={date} onChange={setDate} disabled={parsing} />
+            <Input label="Description / note" value={note} onChangeText={setNote} placeholder="e.g. Groceries" editable={!parsing} />
 
             <OptionSheet
                 label={type === 'transfer' ? 'From account' : 'Account'}
@@ -203,8 +218,6 @@ export const TransactionForm: React.FC<Props> = ({ visible, onClose, editing }) 
                     onChange={setCategoryId}
                 />
             )}
-
-            <Input label="Notes / tags (optional)" value={notes} onChangeText={setNotes} placeholder="e.g. upi, office" editable={!parsing} />
 
             <Button title={editing ? 'Save Changes' : 'Add Transaction'} onPress={handleSave} loading={saving} disabled={parsing} />
         </SheetModal>

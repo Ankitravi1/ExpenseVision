@@ -16,6 +16,8 @@ import AccountsScreen from '../screens/main/AccountsScreen';
 import BudgetsScreen from '../screens/main/BudgetsScreen';
 import ReportsScreen from '../screens/main/ReportsScreen';
 import SettingsScreen from '../screens/main/SettingsScreen';
+import CategoriesScreen from '../screens/main/CategoriesScreen';
+import RecurringScreen from '../screens/main/RecurringScreen';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
@@ -55,8 +57,7 @@ function MainTabs() {
 function DrawerContentComponent({ navigation }: any) {
     const { theme, mode, toggleTheme } = useTheme();
     const { user, logout } = useAuth();
-    const { categories, recurring, transactions, clearAllTransactions } = useData();
-    const [showClearConfirm, setShowClearConfirm] = React.useState(false);
+    const { categories, recurring, transactions } = useData();
 
     const DrawerItem: React.FC<{
         icon: keyof typeof MaterialCommunityIcons.glyphMap;
@@ -113,8 +114,8 @@ function DrawerContentComponent({ navigation }: any) {
             <View style={styles.section}>
                 <View style={styles.sectionDivider} />
                 <DrawerItem icon="chart-pie" label="Reports" onPress={() => goToDrawerScreen('Reports')} />
-                <DrawerItem icon="tag-multiple" label="Categories" badge={`${categories.length}`} onPress={() => goToDrawerScreen('Settings')} />
-                <DrawerItem icon="repeat" label="Recurring" badge={`${recurring.length}`} onPress={() => goToDrawerScreen('Settings')} />
+                <DrawerItem icon="tag-multiple" label="Categories" badge={`${categories.length}`} onPress={() => goToDrawerScreen('Categories')} />
+                <DrawerItem icon="repeat" label="Recurring" badge={`${recurring.length}`} onPress={() => goToDrawerScreen('Recurring')} />
                 <DrawerItem icon="cog-outline" label="Settings" onPress={() => goToDrawerScreen('Settings')} />
             </View>
 
@@ -128,34 +129,8 @@ function DrawerContentComponent({ navigation }: any) {
             </View>
 
             <View style={styles.section}>
-                <DrawerItem icon="delete-sweep" label="Clear all transactions" badge={`${transactions.length}`} danger onPress={() => setShowClearConfirm(true)} />
                 <DrawerItem icon="logout" label="Log out" danger onPress={logout} />
             </View>
-
-            {showClearConfirm ? (
-                <View style={styles.confirmOverlay}>
-                    <View style={[styles.confirmBox, { backgroundColor: theme.colors.card }]}>
-                        <Text style={[styles.confirmTitle, { color: theme.colors.text }]}>Clear all transactions?</Text>
-                        <Text style={[styles.confirmText, { color: theme.colors.textSecondary }]}>
-                            This deletes all {transactions.length} transactions and resets account balances. This cannot be undone.
-                        </Text>
-                        <View style={styles.confirmActions}>
-                            <TouchableOpacity onPress={() => setShowClearConfirm(false)} style={[styles.confirmBtn, { backgroundColor: theme.colors.cardBorder }]}>
-                                <Text style={[styles.confirmBtnText, { color: theme.colors.text }]}>Cancel</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                onPress={() => {
-                                    clearAllTransactions().catch(() => {});
-                                    setShowClearConfirm(false);
-                                }}
-                                style={[styles.confirmBtn, { backgroundColor: theme.colors.danger }]}
-                            >
-                                <Text style={styles.confirmBtnText}>Delete everything</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                </View>
-            ) : null}
 
             <Text style={{ color: theme.colors.textTertiary, textAlign: 'center', marginTop: spacing.lg, fontSize: 12, paddingBottom: spacing.xl }}>
                 ExpenseVision · synced with your web account
@@ -178,6 +153,8 @@ function MainDrawer() {
         >
             <Drawer.Screen name="Main" component={MainTabs} />
             <Drawer.Screen name="Reports" component={ReportsScreen} />
+            <Drawer.Screen name="Categories" component={CategoriesScreen} />
+            <Drawer.Screen name="Recurring" component={RecurringScreen} />
             <Drawer.Screen name="Settings" component={SettingsScreen} />
         </Drawer.Navigator>
     );
@@ -292,48 +269,5 @@ const styles = StyleSheet.create({
         paddingVertical: 14,
         paddingHorizontal: spacing.sm,
         gap: spacing.md,
-    },
-    confirmOverlay: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: spacing.md,
-        zIndex: 100,
-    },
-    confirmBox: {
-        width: '100%',
-        maxWidth: 360,
-        borderRadius: radius.lg,
-        padding: spacing.lg,
-        gap: spacing.md,
-    },
-    confirmTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-    },
-    confirmText: {
-        fontSize: 14,
-        lineHeight: 20,
-    },
-    confirmActions: {
-        flexDirection: 'row',
-        gap: spacing.md,
-        marginTop: spacing.sm,
-    },
-    confirmBtn: {
-        flex: 1,
-        paddingVertical: 14,
-        borderRadius: radius.md,
-        alignItems: 'center',
-    },
-    confirmBtnText: {
-        color: '#fff',
-        fontSize: 15,
-        fontWeight: '600',
     },
 });

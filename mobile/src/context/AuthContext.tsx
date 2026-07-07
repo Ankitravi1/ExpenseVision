@@ -11,6 +11,7 @@ interface AuthContextValue {
     login: (email: string, password: string) => Promise<{ require2FA?: boolean; userId?: string }>;
     login2FA: (userId: string, code: string) => Promise<void>;
     signup: (name: string, email: string, password: string) => Promise<void>;
+    googleAuth: (googleToken: string) => Promise<void>;
     completeProfile: (currency: string, timezone?: string) => Promise<void>;
     updateProfile: (data: { name?: string; currency?: string; timezone?: string; theme?: string }) => Promise<void>;
     logout: () => Promise<void>;
@@ -76,6 +77,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await applySession(res);
     }, []);
 
+    const googleAuth = useCallback(async (googleToken: string) => {
+        const res = await api.googleAuth(googleToken);
+        await applySession(res);
+    }, []);
+
     const completeProfile = useCallback(async (currency: string, timezone?: string) => {
         const tz = timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
         const res = await api.completeProfile({ currency, timezone: tz });
@@ -99,6 +105,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 login,
                 login2FA,
                 signup,
+                googleAuth,
                 completeProfile,
                 updateProfile,
                 logout,

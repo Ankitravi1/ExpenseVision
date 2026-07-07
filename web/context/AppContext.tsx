@@ -25,7 +25,7 @@ export interface AppContextValue {
   addRecurring: (rule: Partial<RecurringRule>) => Promise<void>;
   updateRecurring: (id: string, rule: Partial<RecurringRule>) => Promise<void>;
   deleteRecurring: (id: string) => Promise<void>;
-  clearAllTransactions: () => void;
+  clearAllTransactions: (confirmationPhrase: string) => Promise<void>;
   setActivePage: (page: Page) => void;
   refreshData: () => Promise<void>;
   user: User | null;

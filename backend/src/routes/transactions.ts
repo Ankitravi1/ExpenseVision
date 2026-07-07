@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { decrypt } from './aiSettings.js';
 
 const router = Router();
 
@@ -59,26 +60,19 @@ const transactionSchema = z.object({
     amount: z.number().positive(),
     type: z.enum(['income', 'expense', 'transfer']),
     date: z.string(),
-    description: z.string(),
-    notes: z.string().nullish()
+    note: z.string(),
 });
 
 const parseTextSchema = z.object({
     text: z.string().min(3),
     preferredType: z.enum(['income', 'expense', 'transfer']).optional(),
-    aiConfig: z.object({
-        enabled: z.boolean(),
-        provider: z.enum(['deepseek', 'openai', 'openrouter', 'custom']),
-        model: z.string().min(1),
-        apiKey: z.string().min(1),
-        baseUrl: z.string().optional()
-    })
 });
 
 const getAiEndpoint = (provider: string, baseUrl?: string) => {
     if (provider === 'deepseek') return 'https://api.deepseek.com/chat/completions';
     if (provider === 'openai') return 'https://api.openai.com/v1/chat/completions';
     if (provider === 'openrouter') return 'https://openrouter.ai/api/v1/chat/completions';
+    if (provider === 'gemini') return 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
     return `${baseUrl?.replace(/\/$/, '')}/chat/completions`;
 };
 
@@ -243,10 +237,17 @@ router.post('/parse-text', async (req, res, next) => {
     try {
         const prisma = (req as any).prisma;
         const userId = (req as any).userId;
-        const { text, preferredType, aiConfig } = parseTextSchema.parse(req.body);
+        const { text, preferredType } = parseTextSchema.parse(req.body);
 
-        if (!aiConfig.enabled) {
+        const aiConfig = await prisma.aiSettings.findUnique({ where: { userId } });
+
+        if (!aiConfig?.enabled) {
             return res.status(400).json({ error: 'AI transaction parsing is disabled' });
+        }
+        
+        const apiKey = decrypt(aiConfig.encryptedApiKey);
+        if (!apiKey) {
+            return res.status(400).json({ error: 'AI API key is missing' });
         }
 
         if (aiConfig.provider === 'custom' && !aiConfig.baseUrl) {
@@ -264,14 +265,14 @@ router.post('/parse-text', async (req, res, next) => {
         const scopedCategories = preferredType === 'income' ? incomeCategories : preferredType === 'expense' ? expenseCategories : [];
         const prompt = [
             'Parse the user text into one ExpenseVision transaction draft.',
-            'Return only JSON with: type, amount, description, date, time, accountId, categoryId, transferToAccountId, confidence, missingFields.',
+            'Return only JSON with: type, amount, note, date, time, accountId, categoryId, transferToAccountId, confidence, missingFields.',
             'type must be income, expense, or transfer. date must be YYYY-MM-DD. time must be HH:MM in 24-hour format. amount must be a number.',
             ...(preferredType ? [`The user selected the ${preferredType} tab. Output type must be exactly ${preferredType}.`] : []),
             'Use only ids from the provided accounts and categories. Never invent or create a new account or category.',
             'Prefer exact ids. If unsure, return the closest existing accountName/categoryName from the provided lists; do not create a new name.',
-            'Expense schema: type expense, amount, description, date, time, accountId, categoryId from expense categories, transferToAccountId null.',
-            'Income schema: type income, amount, description, date, time, accountId, categoryId from income categories, transferToAccountId null.',
-            'Transfer schema: type transfer, amount, description, date, time, accountId source account, transferToAccountId destination account, categoryId null.',
+            'Expense schema: type expense, amount, note, date, time, accountId, categoryId from expense categories, transferToAccountId null.',
+            'Income schema: type income, amount, note, date, time, accountId, categoryId from income categories, transferToAccountId null.',
+            'Transfer schema: type transfer, amount, note, date, time, accountId source account, transferToAccountId destination account, categoryId null.',
             'If the user does not mention a date, use the current date. If the user does not mention a time, use the current time.',
             `Current date is ${now.date}. Current time is ${now.time}.`,
             `Accounts: ${JSON.stringify(accounts)}`,
@@ -285,7 +286,7 @@ router.post('/parse-text', async (req, res, next) => {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${aiConfig.apiKey}`,
+                'Authorization': `Bearer ${apiKey}`,
                 ...(aiConfig.provider === 'openrouter' ? { 'HTTP-Referer': 'http://localhost:3000', 'X-Title': 'ExpenseVision' } : {})
             },
             body: JSON.stringify({
@@ -317,7 +318,7 @@ router.post('/parse-text', async (req, res, next) => {
         const category = type === 'transfer'
             ? undefined
             : findByIdOrName(typeCategories, parsed.categoryId || parsed.categoryName) ||
-                findBestByText(typeCategories, `${parsed.categoryName || ''} ${parsed.description || ''} ${text}`, categoryAliases) ||
+                findBestByText(typeCategories, `${parsed.categoryName || ''} ${parsed.note || ''} ${text}`, categoryAliases) ||
                 (typeCategories.length === 1 ? typeCategories[0] : undefined);
         const transferToAccount = type === 'transfer'
             ? findByIdOrName(accounts, parsed.transferToAccountId || parsed.transferToAccountName) || findBestByText(accounts, `${parsed.transferToAccountName || ''} ${text}`)
@@ -336,7 +337,7 @@ router.post('/parse-text', async (req, res, next) => {
         res.json({
             type,
             amount: Number(parsed.amount) || 0,
-            description: parsed.description || text,
+            note: parsed.note || text,
             date: parsedDate,
             time: parsedTime,
             accountId: account?.id || '',
@@ -621,6 +622,11 @@ router.delete('/all', async (req, res, next) => {
     try {
         const prisma = (req as any).prisma;
         const userId = (req as any).userId;
+        const { confirmationPhrase } = req.body || {};
+
+        if (confirmationPhrase !== 'DELETE') {
+            return res.status(400).json({ error: 'Type DELETE to confirm clearing all transactions' });
+        }
 
         await prisma.$transaction(async (tx: any) => {
             // Get all transactions
@@ -751,19 +757,18 @@ router.get('/export', async (req, res, next) => {
         });
 
         // Generate CSV
-        const headers = ['Date', 'Time', 'Description', 'Amount', 'Type', 'Category', 'Account', 'Transfer To', 'Notes'];
+        const headers = ['Date', 'Time', 'Note', 'Amount', 'Type', 'Category', 'Account', 'Transfer To'];
         const rows = transactions.map((t: any) => {
             const formatted = formatDateForCsv(t.date);
             return [
                 formatted.date,
                 formatted.time,
-                `"${t.description.replace(/"/g, '""')}"`,
-                t.amount.toFixed(2),
+                `"${t.note.replace(/"/g, '""')}"`,
+                t.amount,
                 t.type,
                 t.category?.name || '',
-                t.account?.name || '',
-                t.transferToAccount?.name || '',
-                `"${(t.notes || '').replace(/"/g, '""')}"`
+                t.account.name,
+                t.transferToAccount?.name || ''
             ];
         });
 

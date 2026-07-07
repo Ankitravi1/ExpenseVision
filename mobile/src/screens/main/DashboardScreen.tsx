@@ -167,7 +167,7 @@ export default function DashboardScreen() {
                                     <CategoryIcon name={t.type === 'transfer' ? 'CreditCard' : cat?.icon} size={16} />
                                     <View style={{ flex: 1, marginLeft: spacing.sm }}>
                                         <Text style={{ color: theme.colors.text, fontWeight: '600' }} numberOfLines={1}>
-                                            {t.description}
+                                            {t.note}
                                         </Text>
                                         <Text style={{ color: theme.colors.textTertiary, fontSize: 12 }}>
                                             {isoDateToDisplay(t.date)}{cat ? ` · ${cat.name}` : ''}

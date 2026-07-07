@@ -32,13 +32,7 @@ router.post('/', async (req, res, next) => {
 
         const data = budgetSchema.parse(req.body);
 
-        const existingBudget = await prisma.budget.findFirst({
-            where: {
-                userId,
-                categoryId: data.categoryId,
-                month: data.month || null
-            }
-        });
+        const month = data.month || "";
 
         const fields = {
             amount: data.amount,
@@ -46,22 +40,22 @@ router.post('/', async (req, res, next) => {
             ...(data.alertThreshold !== undefined ? { alertThreshold: data.alertThreshold } : {})
         };
 
-        let budget;
-        if (existingBudget) {
-            budget = await prisma.budget.update({
-                where: { id: existingBudget.id },
-                data: fields
-            });
-        } else {
-            budget = await prisma.budget.create({
-                data: {
-                    categoryId: data.categoryId,
-                    month: data.month || null,
+        const budget = await prisma.budget.upsert({
+            where: {
+                userId_categoryId_month: {
                     userId,
-                    ...fields
+                    categoryId: data.categoryId,
+                    month
                 }
-            });
-        }
+            },
+            create: {
+                categoryId: data.categoryId,
+                month,
+                userId,
+                ...fields
+            },
+            update: fields
+        });
 
         const [view] = await budgetsWithSpent(prisma, userId, [budget]);
         res.status(201).json(view);

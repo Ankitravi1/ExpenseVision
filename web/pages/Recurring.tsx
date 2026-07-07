@@ -9,8 +9,7 @@ import { todayIsoDate } from '../utils/date';
 
 type RuleForm = {
   id?: string;
-  description: string;
-  notes: string;
+  note: string;
   amount: string;
   type: TransactionType;
   accountId: string;
@@ -23,8 +22,7 @@ type RuleForm = {
 };
 
 const emptyForm = (accountId = ''): RuleForm => ({
-  description: '',
-  notes: '',
+  note: '',
   amount: '',
   type: 'expense',
   accountId,
@@ -74,8 +72,7 @@ export const Recurring: React.FC = () => {
   const editRule = (rule: RecurringRule) => {
     setForm({
       id: rule.id,
-      description: rule.description,
-      notes: rule.notes || '',
+      note: rule.note,
       amount: String(rule.amount),
       type: rule.type,
       accountId: rule.accountId,
@@ -92,8 +89,8 @@ export const Recurring: React.FC = () => {
     event.preventDefault();
 
     const amount = Number(form.amount);
-    if (!form.description.trim() || !amount || amount <= 0 || !form.accountId) {
-      alert('Please add a description, amount, and account.');
+    if (!form.note.trim() || !amount || amount <= 0 || !form.accountId) {
+      alert('Please add a note, amount, and account.');
       return;
     }
     if (form.type === 'transfer') {
@@ -107,8 +104,7 @@ export const Recurring: React.FC = () => {
     }
 
     const payload = {
-      description: form.description.trim(),
-      notes: form.notes.trim() || null,
+      note: form.note.trim(),
       amount,
       type: form.type,
       accountId: form.accountId,
@@ -166,10 +162,10 @@ export const Recurring: React.FC = () => {
             </div>
 
             <label className="block">
-              <span className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</span>
+              <span className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Note</span>
               <input
-                value={form.description}
-                onChange={event => setForm(prev => ({ ...prev, description: event.target.value }))}
+                value={form.note}
+                onChange={event => setForm(prev => ({ ...prev, note: event.target.value }))}
                 className="input"
                 placeholder="e.g. Home rent"
               />
@@ -248,7 +244,7 @@ export const Recurring: React.FC = () => {
                 </select>
               </label>
               <label className="block">
-                <span className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Next run</span>
+                <span className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{form.id ? 'Next occurrence' : 'First occurrence'}</span>
                 <input
                   type="date"
                   value={form.startDate}
@@ -258,15 +254,35 @@ export const Recurring: React.FC = () => {
               </label>
             </div>
 
-            <label className="block">
-              <span className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">End date</span>
-              <input
-                type="date"
-                value={form.endDate}
-                onChange={event => setForm(prev => ({ ...prev, endDate: event.target.value }))}
-                className="input"
-              />
-            </label>
+            <div className="flex items-center justify-between">
+              <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">Ends on a date</span>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="sr-only peer"
+                  checked={!!form.endDate}
+                  onChange={event => {
+                    if (event.target.checked) {
+                      setForm(prev => ({ ...prev, endDate: todayIsoDate() }));
+                    } else {
+                      setForm(prev => ({ ...prev, endDate: '' }));
+                    }
+                  }}
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/30 dark:peer-focus:ring-primary/80 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
+              </label>
+            </div>
+            {form.endDate !== '' && (
+              <label className="block mt-3">
+                <span className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">End date</span>
+                <input
+                  type="date"
+                  value={form.endDate}
+                  onChange={event => setForm(prev => ({ ...prev, endDate: event.target.value }))}
+                  className="input"
+                />
+              </label>
+            )}
 
             <label className="flex items-center gap-3">
               <input
@@ -276,16 +292,6 @@ export const Recurring: React.FC = () => {
                 className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
               />
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Active</span>
-            </label>
-
-            <label className="block">
-              <span className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Notes / tags</span>
-              <textarea
-                value={form.notes}
-                onChange={event => setForm(prev => ({ ...prev, notes: event.target.value }))}
-                className="input min-h-20"
-                placeholder="Optional notes"
-              />
             </label>
 
             <button type="submit" className="btn btn-primary w-full flex items-center justify-center gap-2">
@@ -320,7 +326,7 @@ export const Recurring: React.FC = () => {
                         {rule.active ? 'Active' : 'Paused'}
                       </span>
                     </div>
-                    <h3 className="text-lg font-bold text-gray-darkest dark:text-gray-50 truncate">{rule.description}</h3>
+                    <h3 className="text-lg font-bold text-gray-darkest dark:text-gray-50 truncate">{rule.note}</h3>
                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                       {frequencyLabels[rule.frequency]} • next on {rule.nextRun}
                       {rule.endDate ? ` • ends ${rule.endDate}` : ''}
@@ -330,7 +336,6 @@ export const Recurring: React.FC = () => {
                         ? `${accountName(rule.accountId)} to ${accountName(rule.transferToAccountId)}`
                         : `${accountName(rule.accountId)} • ${categoryName(rule.categoryId)}`}
                     </p>
-                    {rule.notes && <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">{rule.notes}</p>}
                   </div>
 
                   <div className="flex items-center justify-between gap-4 md:flex-col md:items-end">
@@ -375,7 +380,7 @@ export const Recurring: React.FC = () => {
           if (deleteTarget) deleteRecurring(deleteTarget.id);
         }}
         title="Delete Recurring Rule"
-        message={`Delete "${deleteTarget?.description || 'this recurring rule'}"? Future transactions will no longer be created from it.`}
+        message={`Delete "${deleteTarget?.note || 'this recurring rule'}"? Future transactions will no longer be created from it.`}
         confirmText="Delete"
         cancelText="Cancel"
         variant="danger"

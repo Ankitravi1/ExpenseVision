@@ -5,6 +5,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
+import { useNavigation } from '@react-navigation/native';
 import { EmptyState } from '../../components/ui';
 import { AccountForm } from '../../components/AccountForm';
 import { formatCurrency } from '../../utils/currency';
@@ -22,6 +23,7 @@ const TYPE_ICONS: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> =
 };
 
 export default function AccountsScreen() {
+    const navigation = useNavigation();
     const { accounts, deleteAccount, isLoading, refresh } = useData();
     const { user } = useAuth();
     const { theme } = useTheme();
@@ -46,7 +48,16 @@ export default function AccountsScreen() {
         <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top']}>
             <View style={styles.header}>
                 <View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <TouchableOpacity
+                        onPress={() => (navigation as any).openDrawer?.()}
+                        style={{ marginRight: 12, padding: 4 }}
+                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                    >
+                        <MaterialCommunityIcons name="menu" size={26} color={theme.colors.text} />
+                    </TouchableOpacity>
                     <Text style={[styles.title, { color: theme.colors.text }]}>Accounts</Text>
+                </View>
                     <Text style={{ color: theme.colors.textSecondary, fontSize: 13 }}>
                         Total: <Text style={{ fontWeight: '700', color: theme.colors.text }}>{formatCurrency(total, currency)}</Text>
                     </Text>

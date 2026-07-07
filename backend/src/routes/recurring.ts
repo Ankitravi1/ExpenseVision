@@ -4,8 +4,7 @@ import { z } from 'zod';
 const router = Router();
 
 const ruleSchema = z.object({
-    description: z.string().min(1),
-    notes: z.string().nullish(),
+    note: z.string().min(1),
     amount: z.number().positive(),
     type: z.enum(['income', 'expense', 'transfer']),
     accountId: z.string(),
@@ -77,8 +76,7 @@ export const materializeRecurringRules = async (prisma: any, userId: string): Pr
                         amount: rule.amount,
                         type: rule.type,
                         date: nextRun,
-                        description: rule.description,
-                        notes: rule.notes ? `${rule.notes}, recurring` : 'recurring'
+                        note: rule.note ? `${rule.note}, recurring` : 'recurring'
                     }
                 });
 
@@ -144,8 +142,7 @@ router.post('/', async (req, res, next) => {
         const rule = await prisma.recurringRule.create({
             data: {
                 userId,
-                description: data.description,
-                notes: data.notes ?? null,
+                note: data.note,
                 amount: data.amount,
                 type: data.type,
                 accountId: data.accountId,
@@ -184,8 +181,7 @@ router.put('/:id', async (req, res, next) => {
         const updated = await prisma.recurringRule.update({
             where: { id },
             data: {
-                ...(data.description !== undefined ? { description: data.description } : {}),
-                ...(data.notes !== undefined ? { notes: data.notes ?? null } : {}),
+                ...(data.note !== undefined ? { note: data.note } : {}),
                 ...(data.amount !== undefined ? { amount: data.amount } : {}),
                 ...(data.type !== undefined ? { type: data.type } : {}),
                 ...(data.accountId !== undefined ? { accountId: data.accountId } : {}),

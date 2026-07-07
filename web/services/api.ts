@@ -86,7 +86,7 @@ export const api = {
         if (!res.ok) throw new Error('Failed to create transaction');
         return res.json();
     },
-    parseTransactionText: async (data: any) => {
+    parseTransactionText: async (data: { text: string; preferredType?: string }) => {
         const res = await api.fetch('/transactions/parse-text', {
             method: 'POST',
             body: JSON.stringify(data),
@@ -121,9 +121,10 @@ export const api = {
         if (!res.ok) throw new Error('Failed to import transactions');
         return res.json();
     },
-    clearAllTransactions: async () => {
+    clearAllTransactions: async (confirmationPhrase: string) => {
         const res = await api.fetch('/transactions/all', {
             method: 'DELETE',
+            body: JSON.stringify({ confirmationPhrase }),
         });
         if (!res.ok) throw new Error('Failed to clear transactions');
         if (res.status === 204) return null;

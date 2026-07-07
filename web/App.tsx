@@ -217,9 +217,9 @@ const App: React.FC = () => {
     }
   }, [refreshFinancials, showToast]);
 
-  const clearAllTransactions = useCallback(async () => {
+  const clearAllTransactions = useCallback(async (confirmationPhrase: string) => {
     try {
-      await api.clearAllTransactions();
+      await api.clearAllTransactions(confirmationPhrase);
       setTransactions([]);
       await refreshFinancials();
       showToast('All transactions cleared successfully', 'success');

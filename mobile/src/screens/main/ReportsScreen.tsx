@@ -24,10 +24,10 @@ const shiftMonth = (key: string, delta: number) => {
 };
 
 export default function ReportsScreen() {
+    const navigation = useNavigation();
     const { transactions, categories, budgets } = useData();
     const { user } = useAuth();
     const { theme } = useTheme();
-    const navigation = useNavigation();
     const currency = user?.currency || 'INR';
     const currentMonth = monthKey(new Date());
     const [month, setMonth] = useState(currentMonth);
@@ -99,7 +99,16 @@ export default function ReportsScreen() {
                 <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                     <MaterialCommunityIcons name="arrow-left" size={24} color={theme.colors.text} />
                 </TouchableOpacity>
-                <Text style={[styles.title, { color: theme.colors.text }]}>Reports</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <TouchableOpacity
+                        onPress={() => (navigation as any).openDrawer?.()}
+                        style={{ marginRight: 12, padding: 4 }}
+                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                    >
+                        <MaterialCommunityIcons name="menu" size={26} color={theme.colors.text} />
+                    </TouchableOpacity>
+                    <Text style={[styles.title, { color: theme.colors.text }]}>Reports</Text>
+                </View>
                 <View style={{ width: 24 }} />
             </View>
 

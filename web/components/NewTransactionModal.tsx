@@ -22,7 +22,7 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
 
     const [type, setType] = useState<TransactionType>('expense');
     const [amount, setAmount] = useState('');
-    const [description, setDescription] = useState('');
+    const [note, setNote] = useState('');
     const [date, setDate] = useState(isoDateToDisplay(todayIsoDate()));
     const [time, setTime] = useState(new Date().toTimeString().slice(0, 5));
     const [accountId, setAccountId] = useState(''); // From Account (Expense/Transfer) or To Account (Income)
@@ -39,19 +39,16 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
     }, []);
 
     useEffect(() => {
-        if (context?.accounts && context.accounts.length > 0 && !accountId) {
+        if (type !== 'transfer' && context?.accounts && context.accounts.length > 0 && !accountId) {
             setAccountId(context.accounts[0].id);
         }
-        if (context?.accounts && context.accounts.length > 1 && !transferToAccountId) {
-            setTransferToAccountId(context.accounts[1].id);
-        }
-    }, [context?.accounts, accountId, transferToAccountId]);
+    }, [context?.accounts, accountId, type]);
 
     useEffect(() => {
         if (transaction) {
             setType(transaction.type);
             setAmount(transaction.amount.toString());
-            setDescription(transaction.description);
+            setNote(transaction.note);
             const [datePart, timePart] = transaction.date.split('T');
             setDate(isoDateToDisplay(datePart));
             setTime(timePart?.slice(0, 5) || new Date().toTimeString().slice(0, 5));
@@ -62,7 +59,7 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
             // Reset to defaults for new transaction
             setType('expense');
             setAmount('');
-            setDescription('');
+            setNote('');
             setVoiceText('');
             setVoiceParseError('');
             const now = new Date();
@@ -70,7 +67,7 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
             setTime(now.toTimeString().slice(0, 5));
             setCategoryId('');
             setTransferToAccountId('');
-            // Account ID defaults handled by other useEffect
+            setAccountId(type === 'transfer' ? '' : accountId);
         }
     }, [transaction, isOpen]); // Reset when opening
 
@@ -91,7 +88,7 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
     const filteredCategories = categories.filter(c => c.type === type);
 
     const handleParseVoiceText = async () => {
-        const aiSettings = getAiSettings();
+        const aiSettings = await getAiSettings();
         if (!aiSettings.enabled) {
             setVoiceParseError('Enable AI transaction parsing in Settings first.');
             return;
@@ -110,12 +107,11 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
         try {
             const draft = await api.parseTransactionText({
                 text: voiceText,
-                preferredType: type,
-                aiConfig: aiSettings
+                preferredType: type
             });
             setType(draft.type);
             setAmount(draft.amount ? String(draft.amount) : '');
-            setDescription(draft.description || voiceText);
+            setNote(draft.note || voiceText);
             setDate(isoDateToDisplay(draft.date || todayIsoDate()));
             if (draft.time) setTime(draft.time);
             if (draft.accountId) setAccountId(draft.accountId);
@@ -135,7 +131,7 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (!amount || !description || !accountId) {
+        if (!amount || !note || !accountId) {
             alert("Please fill required fields.");
             return;
         }
@@ -165,7 +161,7 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
 
         const transactionData = {
             date: dateTimeString,
-            description,
+            note,
             amount: parseFloat(amount),
             type,
             categoryId: (type === 'transfer' || !categoryId) ? undefined : categoryId,
@@ -183,7 +179,7 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
         // Reset form and close
         if (!transaction) {
             setAmount('');
-            setDescription('');
+            setNote('');
             const now = new Date();
             setDate(isoDateToDisplay(todayIsoDate()));
             setTime(now.toTimeString().slice(0, 5));
@@ -232,7 +228,14 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
                                 <button
                                     key={t}
                                     type="button"
-                                    onClick={() => setType(t)}
+                                    onClick={() => {
+                                        setType(t);
+                                        if (t === 'transfer' && !transaction) {
+                                            setAccountId('');
+                                            setTransferToAccountId('');
+                                            setCategoryId('');
+                                        }
+                                    }}
                                     disabled={isParsingVoiceText}
                                     className={`px-3 py-2 text-sm font-semibold rounded-lg capitalize transition-all ${type === t
                                         ? 'bg-white dark:bg-gray-700 shadow-sm text-primary dark:text-primary-light'
@@ -276,26 +279,28 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
                             </div>
                         )}
 
-                        <div>
-                            <label htmlFor="amount" className={labelStyles}>Amount</label>
-                            <div className="relative">
-                                <span className="absolute left-3 top-3.5 text-gray-500">{getCurrencySymbol(currency)}</span>
-                                <input
-                                    type="number"
-                                    id="amount"
-                                    value={amount}
-                                    onChange={e => setAmount(e.target.value)}
-                                    placeholder="0.00"
-                                    step="0.01"
-                                    className={`${inputStyles} pl-8 text-xl font-semibold`}
-                                />
+                        <fieldset disabled={isParsingVoiceText} className="space-y-4">
+                            <div>
+                                <label htmlFor="amount" className={labelStyles}>Amount</label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-3.5 text-gray-500">{getCurrencySymbol(currency)}</span>
+                                    <input
+                                        type="number"
+                                        id="amount"
+                                        value={amount}
+                                        onChange={e => setAmount(e.target.value)}
+                                        placeholder="0.00"
+                                        step="0.01"
+                                        className={`${inputStyles} pl-8 text-xl font-semibold`}
+                                    />
+                                </div>
                             </div>
-                        </div>
 
                         <div>
-                            <label htmlFor="description" className={labelStyles}>Description</label>
-                            <input type="text" id="description" value={description} onChange={e => setDescription(e.target.value)} placeholder={type === 'transfer' ? "e.g. Savings allocation" : "e.g. Coffee with friends"} className={inputStyles} />
+                            <label htmlFor="note" className={labelStyles}>Description / note</label>
+                            <input type="text" id="note" value={note} onChange={e => setNote(e.target.value)} placeholder={type === 'transfer' ? "e.g. Savings allocation" : "e.g. Coffee with friends"} className={inputStyles} />
                         </div>
+                        </fieldset>
 
                         <div className="flex space-x-4 border border-dashed border-primary/30 p-2 rounded-lg">
                             <div className="flex-1">
@@ -339,6 +344,7 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
                                 <div>
                                     <label htmlFor="fromAccount" className={labelStyles}>From Account</label>
                                     <select id="fromAccount" value={accountId} onChange={e => setAccountId(e.target.value)} className={inputStyles}>
+                                        <option value="">Select source account</option>
                                         {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name} ({formatCurrency(acc.balance, currency)})</option>)}
                                     </select>
                                 </div>
@@ -350,6 +356,7 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
                                 <div>
                                     <label htmlFor="toAccount" className={labelStyles}>To Account</label>
                                     <select id="toAccount" value={transferToAccountId} onChange={e => setTransferToAccountId(e.target.value)} className={inputStyles}>
+                                        <option value="">Select destination account</option>
                                         {accounts.filter(a => a.id !== accountId).map(acc => <option key={acc.id} value={acc.id}>{acc.name} ({formatCurrency(acc.balance, currency)})</option>)}
                                     </select>
                                 </div>
@@ -372,10 +379,13 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
                             </>
                         )}
                     </fieldset>
-                    <div className="px-6 py-4 border-t border-gray-100 dark:border-gray-700 mt-auto bg-gray-50 dark:bg-gray-800/50">
-                        <button type="submit" className="bg-primary text-white font-semibold px-4 py-3 rounded-lg shadow-sm hover:bg-primary-hover transition-colors w-full text-base flex justify-center items-center">
-                            <Icon name={transaction ? "Save" : "Plus"} size={20} className="mr-2" />
-                            {transaction ? 'Save Changes' : (type === 'transfer' ? 'Transfer Funds' : 'Add Transaction')}
+                    <div className="mt-8">
+                        <button
+                            type="submit"
+                            disabled={isParsingVoiceText}
+                            className="w-full bg-primary text-white font-semibold px-4 py-3 rounded-lg shadow-sm hover:bg-primary-dark transition-colors disabled:opacity-70 flex justify-center items-center"
+                        >
+                            {transaction ? 'Save Changes' : 'Add Transaction'}
                         </button>
                         {transaction && onDelete && (
                             <button

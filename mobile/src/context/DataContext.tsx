@@ -16,14 +16,14 @@ interface DataContextValue {
     addTransaction: (t: Omit<Transaction, 'id'>) => Promise<void>;
     updateTransaction: (id: string, t: Partial<Transaction>) => Promise<void>;
     deleteTransaction: (id: string) => Promise<void>;
-    clearAllTransactions: () => Promise<void>;
+    clearAllTransactions: (confirmationPhrase: string) => Promise<void>;
     addAccount: (a: Omit<Account, 'id'>) => Promise<void>;
     updateAccount: (id: string, a: Partial<Account>) => Promise<void>;
     deleteAccount: (id: string) => Promise<void>;
     addCategory: (c: Omit<Category, 'id'>) => Promise<void>;
     updateCategory: (id: string, c: Partial<Category>) => Promise<void>;
     deleteCategory: (id: string) => Promise<void>;
-    setBudget: (b: { categoryId: string; amount: number; month?: string; rollover?: boolean; alertThreshold?: number }) => Promise<void>;
+    setBudget: (b: { categoryId: string; amount: number; month?: string | null; rollover?: boolean; alertThreshold?: number }) => Promise<void>;
     deleteBudget: (id: string) => Promise<void>;
     addRecurring: (r: Parameters<typeof api.createRecurring>[0]) => Promise<void>;
     updateRecurring: (id: string, r: Partial<RecurringRule> & { startDate?: string }) => Promise<void>;
@@ -103,8 +103,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await refreshFinancials();
     }, [refreshFinancials]);
 
-    const clearAllTransactions = useCallback(async () => {
-        await api.deleteAllTransactions();
+    const clearAllTransactions = useCallback(async (confirmationPhrase: string) => {
+        await api.deleteAllTransactions(confirmationPhrase);
         setTransactions([]);
         await refreshFinancials();
     }, [refreshFinancials]);
@@ -156,7 +156,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setCategories(prev => prev.filter(x => x.id !== id));
     }, []);
 
-    const setBudget = useCallback(async (b: { categoryId: string; amount: number; month?: string; rollover?: boolean; alertThreshold?: number }) => {
+    const setBudget = useCallback(async (b: { categoryId: string; amount: number; month?: string | null; rollover?: boolean; alertThreshold?: number }) => {
         const saved = await api.setBudget(b);
         setBudgets(prev => {
             const existing = prev.find(x => x.id === saved.id || x.categoryId === saved.categoryId);

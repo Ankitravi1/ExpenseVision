@@ -16,8 +16,10 @@ export const Settings: React.FC = () => {
     const [budgetAlerts, setBudgetAlerts] = useState(false);
     const [emailReports, setEmailReports] = useState(false);
     const [clearConfirm, setClearConfirm] = useState(false);
+    const [clearPhrase, setClearPhrase] = useState('');
     const [aiSettings, setAiSettings] = useState<AiSettings>(defaultAiSettings);
     const [aiSaved, setAiSaved] = useState(false);
+    const [aiError, setAiError] = useState('');
 
     useEffect(() => {
         // Check if push is supported and subscribed
@@ -29,7 +31,9 @@ export const Settings: React.FC = () => {
                 });
             });
         }
-        setAiSettings(getAiSettings());
+        getAiSettings()
+            .then(setAiSettings)
+            .catch(err => setAiError(err.message || 'Failed to load AI settings'));
     }, []);
 
     const handleThemeChange = (newTheme: 'light' | 'dark') => {
@@ -82,8 +86,9 @@ export const Settings: React.FC = () => {
         }
     };
 
-    const handleClearAllTransactions = () => {
-        clearAllTransactions();
+    const handleClearAllTransactions = async () => {
+        await clearAllTransactions('DELETE');
+        setClearPhrase('');
         setClearConfirm(false);
     };
 
@@ -124,10 +129,15 @@ export const Settings: React.FC = () => {
         }));
     };
 
-    const handleSaveAiSettings = () => {
-        saveAiSettings(aiSettings);
-        setAiSaved(true);
-        window.setTimeout(() => setAiSaved(false), 2500);
+    const handleSaveAiSettings = async () => {
+        setAiError('');
+        try {
+            setAiSettings(await saveAiSettings(aiSettings));
+            setAiSaved(true);
+            window.setTimeout(() => setAiSaved(false), 2500);
+        } catch (err: any) {
+            setAiError(err.message || 'Failed to save AI settings');
+        }
     };
 
     return (
@@ -267,6 +277,10 @@ export const Settings: React.FC = () => {
                             <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 dark:peer-focus:ring-primary/40 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
                         </label>
                     </div>
+
+                    {aiError && (
+                        <p className="text-sm text-danger">{aiError}</p>
+                    )}
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
@@ -431,10 +445,11 @@ export const Settings: React.FC = () => {
                 onClose={() => setClearConfirm(false)}
                 onConfirm={handleClearAllTransactions}
                 title="Clear All Transactions"
-                message={`Are you absolutely sure you want to delete all ${transactions.length} transactions? This action cannot be undone and will permanently remove all your transaction history.`}
+                message={`Are you absolutely sure you want to delete all ${transactions.length} transactions and reset account balances?`}
                 confirmText="Yes, Clear All"
                 cancelText="Cancel"
                 variant="danger"
+                requirePhrase="DELETE"
             />
         </div>
     );

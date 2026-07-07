@@ -9,6 +9,7 @@ interface ConfirmDialogProps {
   confirmText?: string;
   cancelText?: string;
   variant?: 'danger' | 'warning' | 'primary';
+  requirePhrase?: string;
 }
 
 export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
@@ -19,8 +20,17 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   message,
   confirmText = 'Confirm',
   cancelText = 'Cancel',
-  variant = 'danger'
+  variant = 'danger',
+  requirePhrase
 }) => {
+  const [inputValue, setInputValue] = React.useState('');
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setInputValue('');
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const handleConfirm = () => {
@@ -54,6 +64,20 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           <p className="text-sm text-gray-600 dark:text-gray-400">
             {message}
           </p>
+          {requirePhrase && (
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Type <strong>{requirePhrase}</strong> to confirm
+              </label>
+              <input
+                type="text"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                placeholder={requirePhrase}
+                className="w-full bg-gray-100 dark:bg-gray-700 border-transparent rounded-lg p-3 text-sm focus:ring-2 focus:ring-danger text-gray-900 dark:text-white"
+              />
+            </div>
+          )}
         </div>
 
         <div className="flex gap-3 justify-end">
@@ -65,7 +89,8 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           </button>
           <button
             onClick={handleConfirm}
-            className={`btn ${getButtonClass()}`}
+            disabled={requirePhrase ? inputValue !== requirePhrase : false}
+            className={`btn ${getButtonClass()} disabled:opacity-50 disabled:cursor-not-allowed`}
           >
             {confirmText}
           </button>

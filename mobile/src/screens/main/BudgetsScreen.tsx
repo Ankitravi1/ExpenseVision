@@ -5,6 +5,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
+import { useNavigation } from '@react-navigation/native';
 import { EmptyState } from '../../components/ui';
 import { CategoryIcon } from '../../components/CategoryIcon';
 import { BudgetForm } from '../../components/BudgetForm';
@@ -13,6 +14,7 @@ import { spacing, radius } from '../../theme';
 import { Budget } from '../../types';
 
 export default function BudgetsScreen() {
+    const navigation = useNavigation();
     const { budgets, categories, deleteBudget, isLoading, refresh } = useData();
     const { user } = useAuth();
     const { theme } = useTheme();
@@ -35,7 +37,16 @@ export default function BudgetsScreen() {
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top']}>
             <View style={styles.header}>
-                <Text style={[styles.title, { color: theme.colors.text }]}>Budgets</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <TouchableOpacity
+                        onPress={() => (navigation as any).openDrawer?.()}
+                        style={{ marginRight: 12, padding: 4 }}
+                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                    >
+                        <MaterialCommunityIcons name="menu" size={26} color={theme.colors.text} />
+                    </TouchableOpacity>
+                    <Text style={[styles.title, { color: theme.colors.text }]}>Budgets</Text>
+                </View>
                 <TouchableOpacity
                     onPress={() => {
                         setEditing(null);

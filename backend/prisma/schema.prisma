@@ -44,6 +44,7 @@ model User {
   recurringRules  RecurringRule[]
   refreshTokens   RefreshToken[]
   pushSubscriptions PushSubscription[]
+  aiSettings      AiSettings?
 }
 
 model PushSubscription {
@@ -109,8 +110,7 @@ model Transaction {
   amount               Float
   type                 String   // 'income' | 'expense' | 'transfer'
   date                 String   // Stored as ISO date string (YYYY-MM-DD)
-  description          String
-  notes                String?  // Free-form notes/tags (comma-separated tags allowed)
+  note                 String
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
@@ -128,7 +128,7 @@ model Budget {
   userId         String
   categoryId     String
   amount         Float
-  month          String?  // YYYY-MM format; null = repeats every month
+  month          String   @default("")  // YYYY-MM format; "" = repeats every month
   rollover       Boolean  @default(false) // carry last month's leftover/overspend into this month
   alertThreshold Float    @default(100)   // percent of budget at which to send an alert
   createdAt      DateTime @default(now())
@@ -143,8 +143,7 @@ model Budget {
 model RecurringRule {
   id                  String   @id @default(cuid())
   userId              String
-  description         String
-  notes               String?
+  note                String
   amount              Float
   type                String   // 'income' | 'expense' | 'transfer'
   accountId           String
@@ -164,4 +163,18 @@ model RecurringRule {
   category          Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
   @@index([userId, active, nextRun])
+}
+
+model AiSettings {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  enabled         Boolean  @default(false)
+  provider        String   @default("deepseek")
+  model           String   @default("deepseek-v4-flash")
+  baseUrl         String?
+  encryptedApiKey String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

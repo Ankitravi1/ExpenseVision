@@ -13,7 +13,7 @@ interface Props {
 }
 
 export const BudgetForm: React.FC<Props> = ({ visible, onClose, editing }) => {
-    const { categories, setBudget } = useData();
+    const { categories, setBudget, budgets } = useData();
     const { theme } = useTheme();
     const [categoryId, setCategoryId] = useState<string | null>(null);
     const [amount, setAmount] = useState('');
@@ -21,7 +21,8 @@ export const BudgetForm: React.FC<Props> = ({ visible, onClose, editing }) => {
     const [threshold, setThreshold] = useState('100');
     const [saving, setSaving] = useState(false);
 
-    const expenseCategories = categories.filter(c => c.type === 'expense');
+    const budgetedCategoryIds = new Set(budgets.map(b => b.categoryId));
+    const expenseCategories = categories.filter(c => c.type === 'expense' && (editing || !budgetedCategoryIds.has(c.id)));
 
     useEffect(() => {
         if (visible) {
@@ -43,7 +44,13 @@ export const BudgetForm: React.FC<Props> = ({ visible, onClose, editing }) => {
 
         setSaving(true);
         try {
-            await setBudget({ categoryId, amount: value, rollover, alertThreshold: thresholdValue });
+            await setBudget({
+                categoryId,
+                amount: value,
+                month: editing?.month ?? null,
+                rollover,
+                alertThreshold: thresholdValue,
+            });
             successHaptic();
             onClose();
         } catch (err: any) {
@@ -63,6 +70,7 @@ export const BudgetForm: React.FC<Props> = ({ visible, onClose, editing }) => {
                     options={expenseCategories.map(c => ({ value: c.id, label: c.name, icon: c.icon }))}
                     value={categoryId}
                     onChange={setCategoryId}
+                    disabled={!!editing}
                 />
             )}
             <Input label="Monthly limit" value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="0.00" />

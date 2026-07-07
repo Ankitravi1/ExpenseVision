@@ -76,7 +76,7 @@ const TransactionRow: React.FC<{ transaction: Transaction }> = ({ transaction })
   const isTransfer = transaction.type === 'transfer';
 
   let iconName = 'Tags';
-  let displayDescription = transaction.description;
+  let displayNote = transaction.note;
   let amountClass = '';
   let amountPrefix = '';
   let iconBgClass = '';
@@ -96,7 +96,7 @@ const TransactionRow: React.FC<{ transaction: Transaction }> = ({ transaction })
     iconColorClass = 'text-emerald-600 dark:text-emerald-400';
   } else if (isTransfer) {
     iconName = 'ArrowLeftRight';
-    displayDescription = `Transfer to ${destAccount?.name || 'Account'}`;
+    displayNote = `Transfer to ${destAccount?.name || 'Account'}`;
     amountClass = 'text-blue-600 dark:text-blue-400';
     amountPrefix = '';
     iconBgClass = 'bg-blue-100 dark:bg-blue-900/30';
@@ -109,7 +109,7 @@ const TransactionRow: React.FC<{ transaction: Transaction }> = ({ transaction })
         <Icon name={iconName} className={iconColorClass} size={18} />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="font-medium text-gray-900 dark:text-gray-100 truncate">{displayDescription}</p>
+        <p className="font-medium text-gray-900 dark:text-gray-100 truncate">{displayNote}</p>
         <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mt-0.5">
           <span>{account?.name}</span>
           <span className="mx-1">•</span>

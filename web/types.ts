@@ -11,13 +11,13 @@ export type AccountType = 'Checking' | 'Savings' | 'Cash' | 'Credit Card' | 'Ass
 export interface Transaction {
   id: string;
   date: string;
-  description: string;
+  note: string;
   amount: number;
   type: TransactionType;
   categoryId: string;
   accountId: string;
   transferToAccountId?: string;
-  notes?: string | null;
+
 }
 
 export interface Category {
@@ -53,7 +53,7 @@ export type RecurringFrequency = 'daily' | 'weekly' | 'monthly' | 'yearly';
 
 export interface RecurringRule {
   id: string;
-  description: string;
+  note: string;
   amount: number;
   type: TransactionType;
   accountId: string;
@@ -65,7 +65,7 @@ export interface RecurringRule {
   nextRun: string; // YYYY-MM-DD
   dayAnchor?: number | null;
   active: boolean;
-  notes?: string | null;
+
 }
 
 export interface User {

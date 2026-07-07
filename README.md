@@ -39,32 +39,7 @@ The raw OpenAPI spec is served at `http://localhost:5000/api/docs.json`.
 
 ## 🗺️ Roadmap
 
-### v0.1 — Web Foundation ✅
-- [x] Core CRUD (accounts, categories, transactions, budgets)
-- [x] Bulk CSV Import/Export
-- [x] Timezone support
-- [x] Web Push Notifications (budget alerts)
-
-### v0.2 — Mobile & Transaction Entry ✅
-- [x] Android mobile app (React Native + Expo) at full feature parity with web
-- [x] Native date picker, bottom-sheet pickers, haptics, swipe-to-delete
-- [x] Optional AI-assisted voice/text-to-transaction parsing (user-provided API key)
-
-### v0.3 — Recurring, Budgets & Insights ✅ (Current)
-- [x] Recurring transactions (rent, EMI, salary, subscriptions) with auto-materialization
-- [x] Budget roll-over + per-budget alert thresholds
-- [x] Reports insights (month-over-month change, spending pace vs budget)
-- [x] Transaction notes/tags (foundation for future import reconciliation)
-- [x] Swagger / OpenAPI documentation with bearer auth
-
-### v0.4 — Intelligence (Premium)
-- [ ] AI-based smart import (PDF / image statement parsing)
-- [ ] Real-time sync (refresh on focus / websockets)
-- [ ] Mobile push notifications (expo-notifications) for budget alerts
-
-### v0.5 — Payments & Integrations
-- [ ] UPI Payment Integration (Intent Flow)
-- [ ] Bank Account Aggregator Integration
+See [plan.md](./plan.md) for the current roadmap and next work.
 
 ## 🛠 Tech Stack
 

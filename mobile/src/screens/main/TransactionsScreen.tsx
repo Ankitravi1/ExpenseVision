@@ -32,10 +32,10 @@ const shiftMonth = (key: string, delta: number) => {
 };
 
 export default function TransactionsScreen() {
+    const navigation = useNavigation();
     const { transactions, categories, accounts, deleteTransaction, isLoading, refresh } = useData();
     const { user } = useAuth();
     const { theme } = useTheme();
-    const navigation = useNavigation();
     const route = useRoute();
     const [search, setSearch] = useState('');
     const [typeFilter, setTypeFilter] = useState('all');
@@ -63,8 +63,7 @@ export default function TransactionsScreen() {
             const cat = categories.find(c => c.id === t.categoryId);
             const acc = accounts.find(a => a.id === t.accountId);
             return (
-                t.description.toLowerCase().includes(q) ||
-                (t.notes?.toLowerCase().includes(q) ?? false) ||
+                t.note.toLowerCase().includes(q) ||
                 (cat?.name.toLowerCase().includes(q) ?? false) ||
                 (acc?.name.toLowerCase().includes(q) ?? false)
             );
@@ -78,7 +77,7 @@ export default function TransactionsScreen() {
 
     const confirmDelete = (t: Transaction) => {
         warningHaptic();
-        Alert.alert('Delete transaction', `Delete "${t.description}"? Account balances will be adjusted.`, [
+        Alert.alert('Delete transaction', `Delete "${t.note}"? Account balances will be adjusted.`, [
             { text: 'Cancel', style: 'cancel' },
             { text: 'Delete', style: 'destructive', onPress: () => doDelete(t) },
         ]);
@@ -113,15 +112,10 @@ export default function TransactionsScreen() {
                 >
                     <CategoryIcon name={t.type === 'transfer' ? 'CreditCard' : cat?.icon} size={16} />
                     <View style={{ flex: 1, marginLeft: spacing.sm }}>
-                        <Text style={{ color: theme.colors.text, fontWeight: '600' }} numberOfLines={1}>{t.description}</Text>
+                        <Text style={{ color: theme.colors.text, fontWeight: '600' }} numberOfLines={1}>{t.note}</Text>
                         <Text style={{ color: theme.colors.textTertiary, fontSize: 12 }}>
                             {isoDateToDisplay(t.date)} · {acc?.name || '—'}{cat ? ` · ${cat.name}` : ''}
                         </Text>
-                        {t.notes ? (
-                            <Text style={{ color: theme.colors.textTertiary, fontSize: 11, fontStyle: 'italic' }} numberOfLines={1}>
-                                {t.notes}
-                            </Text>
-                        ) : null}
                     </View>
                     <Text
                         style={{
@@ -139,7 +133,16 @@ export default function TransactionsScreen() {
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top']}>
             <View style={styles.header}>
-                <Text style={[styles.title, { color: theme.colors.text }]}>Transactions</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <TouchableOpacity
+                        onPress={() => (navigation as any).openDrawer?.()}
+                        style={{ marginRight: 12, padding: 4 }}
+                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                    >
+                        <MaterialCommunityIcons name="menu" size={26} color={theme.colors.text} />
+                    </TouchableOpacity>
+                    <Text style={[styles.title, { color: theme.colors.text }]}>Transactions</Text>
+                </View>
             </View>
 
             <View style={{ paddingHorizontal: spacing.md }}>

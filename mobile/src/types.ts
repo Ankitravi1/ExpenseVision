@@ -3,8 +3,7 @@ export type TransactionType = 'income' | 'expense' | 'transfer';
 export interface Transaction {
     id: string;
     date: string; // YYYY-MM-DD
-    description: string;
-    notes?: string | null;
+    note: string;
     amount: number;
     type: TransactionType;
     categoryId: string | null;
@@ -16,8 +15,7 @@ export type RecurringFrequency = 'daily' | 'weekly' | 'monthly' | 'yearly';
 
 export interface RecurringRule {
     id: string;
-    description: string;
-    notes?: string | null;
+    note: string;
     amount: number;
     type: TransactionType;
     accountId: string;

@@ -23,7 +23,7 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
     const { accounts, categories, refreshData } = context;
 
     const downloadTemplate = () => {
-        const headers = ['Date', 'Time', 'Description', 'Amount', 'Type', 'Category', 'Account', 'Transfer To'];
+        const headers = ['Date', 'Time', 'Note', 'Amount', 'Type', 'Category', 'Account', 'Transfer To'];
         const csvContent = headers.join(',') + '\n' +
             '01-01-2025,12:00,Groceries,50.00,expense,Groceries,Checking Account,\n' +
             '02-01-2025,09:00,Salary,2000.00,income,Salary,Checking Account,\n' +
@@ -67,7 +67,7 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
             const dateIdx = getIndex('date');
             const timeIdx = getIndex('time');
             const amountIdx = getIndex('amount');
-            const descIdx = getIndex('description');
+            const noteIdx = getIndex('note');
             const accIdx = getIndex('account');
             const catIdx = getIndex('category');
             const transferIdx = getIndex('transfer to');
@@ -125,7 +125,7 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
                 const rawDate = cols[dateIdx];
                 const rawTime = cols[timeIdx];
                 const amount = parseFloat(cols[amountIdx]);
-                const description = cols[descIdx] || '';
+                const note = cols[noteIdx] || '';
                 const accountName = cols[accIdx];
                 const categoryName = cols[catIdx];
                 const transferToName = cols[transferIdx];
@@ -178,7 +178,7 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
                     type,
                     date: `${formattedDate}T${time}`,
                     amount,
-                    description,
+                    note,
                     accountId: account.id,
                     categoryId,
                     transferToAccountId
@@ -285,7 +285,7 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
                                             <thead className="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
                                                 <tr>
                                                     <th className="px-4 py-2">Date</th>
-                                                    <th className="px-4 py-2">Description</th>
+                                                    <th className="px-4 py-2">Note</th>
                                                     <th className="px-4 py-2">Amount</th>
                                                     <th className="px-4 py-2">Account</th>
                                                 </tr>
@@ -294,7 +294,7 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
                                                 {previewData.slice(0, 5).map((row, i) => (
                                                     <tr key={i} className="text-gray-700 dark:text-gray-300">
                                                         <td className="px-4 py-2">{formatTransactionDate(row.date)}</td>
-                                                        <td className="px-4 py-2">{row.description}</td>
+                                                        <td className="px-4 py-2">{row.note}</td>
                                                         <td className="px-4 py-2">{row.amount}</td>
                                                         <td className="px-4 py-2">{accounts.find(a => a.id === row.accountId)?.name}</td>
                                                     </tr>

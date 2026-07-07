@@ -149,7 +149,7 @@ export const SetBudgetModal: React.FC<SetBudgetModalProps> = ({ isOpen, onClose,
                                     value={amount}
                                     onChange={e => setAmount(e.target.value)}
                                     placeholder="0.00"
-                                    step="0.01"
+                                    step="any"
                                     className={`${inputStyles} pl-8`}
                                     required
                                 />

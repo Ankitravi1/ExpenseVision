@@ -5,6 +5,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { useTheme } from '../../context/ThemeContext';
+import { useNavigation } from '@react-navigation/native';
 import { Card, SheetModal, ChipSelector, FieldLabel, Input, Button, OptionSheet, warningHaptic } from '../../components/ui';
 import { CategoryIcon } from '../../components/CategoryIcon';
 import { CategoryForm } from '../../components/CategoryForm';
@@ -21,26 +22,25 @@ const COMMON_TIMEZONES = [
     'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
     'America/Sao_Paulo', 'Australia/Sydney', 'Pacific/Auckland', 'UTC',
 ];
+import * as DocumentPicker from 'expo-document-picker';
 import { AiProvider, AiSettings, defaultAiSettings, getAiSettings, providerModels, saveAiSettings } from '../../services/aiSettings';
 
 export default function SettingsScreen() {
+    const navigation = useNavigation();
     const { user, logout, updateProfile } = useAuth();
-    const { categories, recurring, deleteCategory, deleteRecurring, clearAllTransactions, transactions } = useData();
+    const { categories, recurring, deleteCategory, deleteRecurring, clearAllTransactions, transactions, refresh } = useData();
     const { theme, mode, toggleTheme } = useTheme();
     const [showCurrency, setShowCurrency] = useState(false);
-    const [showCategories, setShowCategories] = useState(false);
-    const [showCategoryForm, setShowCategoryForm] = useState(false);
-    const [showAiSettings, setShowAiSettings] = useState(false);
-    const [showRecurring, setShowRecurring] = useState(false);
-    const [showRecurringForm, setShowRecurringForm] = useState(false);
-    const [editingRule, setEditingRule] = useState<RecurringRule | null>(null);
     const [exporting, setExporting] = useState(false);
-    const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+    const [importing, setImporting] = useState(false);
     const [showEditName, setShowEditName] = useState(false);
+    const [showAiSettings, setShowAiSettings] = useState(false);
     const [name, setName] = useState(user?.name || '');
     const [savingName, setSavingName] = useState(false);
     const [aiSettings, setAiSettings] = useState<AiSettings>(defaultAiSettings);
     const [savingAiSettings, setSavingAiSettings] = useState(false);
+    const [showClearAll, setShowClearAll] = useState(false);
+    const [clearPhrase, setClearPhrase] = useState('');
 
     useEffect(() => {
         getAiSettings().then(setAiSettings).catch(() => setAiSettings(defaultAiSettings));
@@ -108,48 +108,69 @@ export default function SettingsScreen() {
         }
     };
 
-    const confirmClearAll = () => {
-        warningHaptic();
-        Alert.alert(
-            'Clear all transactions',
-            `This deletes all ${transactions.length} transactions and resets account balances. This cannot be undone.`,
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Delete everything',
-                    style: 'destructive',
-                    onPress: () => clearAllTransactions().catch(err => Alert.alert('Error', err.message)),
+    const handleImport = async () => {
+        try {
+            const res = await DocumentPicker.getDocumentAsync({
+                type: ['text/csv', 'application/csv', 'text/comma-separated-values'],
+                copyToCacheDirectory: true,
+            });
+            
+            if (res.canceled || !res.assets || res.assets.length === 0) return;
+            
+            setImporting(true);
+            const fileUri = res.assets[0].uri;
+            
+            const formData = new FormData();
+            formData.append('file', {
+                uri: fileUri,
+                name: res.assets[0].name || 'import.csv',
+                type: res.assets[0].mimeType || 'text/csv'
+            } as any);
+
+            const token = await require('../../services/storage').getToken();
+            const response = await fetch(`${require('../../config').API_URL}/api/transactions/import`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
                 },
-            ]
-        );
+                body: formData
+            });
+
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'Import failed');
+
+            Alert.alert('Success', `Imported ${result.count} transactions successfully.`);
+            refresh();
+        } catch (err: any) {
+            Alert.alert('Import failed', err.message || 'Could not import transactions');
+        } finally {
+            setImporting(false);
+        }
     };
 
-    const confirmDeleteRule = (r: RecurringRule) => {
-        Alert.alert('Delete recurring', `Delete "${r.description}"? Already-created transactions stay.`, [
-            { text: 'Cancel', style: 'cancel' },
-            {
-                text: 'Delete',
-                style: 'destructive',
-                onPress: () => deleteRecurring(r.id).catch(err => Alert.alert('Error', err.message)),
-            },
-        ]);
+    const confirmClearAll = () => {
+        warningHaptic();
+        setShowClearAll(true);
+        setClearPhrase('');
+    };
+
+    const handleClearAll = async () => {
+        if (clearPhrase !== 'DELETE') {
+            Alert.alert('Error', 'You must type DELETE to confirm.');
+            return;
+        }
+        try {
+            await clearAllTransactions(clearPhrase);
+            setShowClearAll(false);
+        } catch (err: any) {
+            Alert.alert('Error', err.message);
+        }
     };
 
     const confirmLogout = () => {
         Alert.alert('Log out', 'Are you sure you want to log out?', [
             { text: 'Cancel', style: 'cancel' },
             { text: 'Log out', style: 'destructive', onPress: logout },
-        ]);
-    };
-
-    const confirmDeleteCategory = (c: Category) => {
-        Alert.alert('Delete category', `Delete "${c.name}"? Categories in use cannot be deleted.`, [
-            { text: 'Cancel', style: 'cancel' },
-            {
-                text: 'Delete',
-                style: 'destructive',
-                onPress: () => deleteCategory(c.id).catch(err => Alert.alert('Cannot delete', err.message)),
-            },
         ]);
     };
 
@@ -173,7 +194,16 @@ export default function SettingsScreen() {
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top']}>
             <ScrollView contentContainerStyle={{ padding: spacing.md }}>
-                <Text style={[styles.title, { color: theme.colors.text }]}>Settings</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <TouchableOpacity
+                        onPress={() => (navigation as any).openDrawer?.()}
+                        style={{ marginRight: 12, padding: 4 }}
+                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                    >
+                        <MaterialCommunityIcons name="menu" size={26} color={theme.colors.text} />
+                    </TouchableOpacity>
+                    <Text style={[styles.title, { color: theme.colors.text }]}>Settings</Text>
+                </View>
 
                 {/* Profile */}
                 <Card style={{ marginBottom: spacing.md, alignItems: 'center', paddingVertical: spacing.lg }}>
@@ -187,8 +217,6 @@ export default function SettingsScreen() {
                 <Card style={{ marginBottom: spacing.md, paddingVertical: 0 }}>
                     <Row icon="account-edit" label="Edit name" onPress={() => { setName(user?.name || ''); setShowEditName(true); }} />
                     <Row icon="currency-usd" label="Currency" value={user?.currency || 'INR'} onPress={() => setShowCurrency(true)} />
-                    <Row icon="tag-multiple" label="Manage categories" value={`${categories.length}`} onPress={() => setShowCategories(true)} />
-                    <Row icon="repeat" label="Recurring transactions" value={`${recurring.length}`} onPress={() => setShowRecurring(true)} />
                     <Row icon="creation" label="AI transaction parsing" value={aiSettings.enabled ? aiSettings.model : 'Off'} onPress={() => setShowAiSettings(true)} />
                     <Row
                         icon="theme-light-dark"
@@ -211,6 +239,7 @@ export default function SettingsScreen() {
                             onChange={handleTimezoneChange}
                         />
                     </View>
+                    <Row icon="file-import-outline" label={importing ? 'Importing…' : 'Import transactions (CSV)'} onPress={importing ? undefined : handleImport} />
                     <Row icon="export-variant" label={exporting ? 'Exporting…' : 'Export transactions (CSV)'} onPress={exporting ? undefined : handleExport} />
                     <Row icon="delete-sweep" label="Clear all transactions" onPress={confirmClearAll} danger />
                 </Card>
@@ -261,6 +290,7 @@ export default function SettingsScreen() {
                     options={[
                         { value: 'deepseek', label: 'DeepSeek' },
                         { value: 'openai', label: 'OpenAI' },
+                        { value: 'gemini', label: 'Google Gemini' },
                         { value: 'openrouter', label: 'OpenRouter' },
                         { value: 'custom', label: 'Custom' },
                     ]}
@@ -305,106 +335,24 @@ export default function SettingsScreen() {
                 <Button title="Save AI Settings" onPress={handleSaveAiSettings} loading={savingAiSettings} />
             </SheetModal>
 
-            {/* Categories manager */}
-            <SheetModal visible={showCategories} onClose={() => setShowCategories(false)} title="Categories">
-                <Button
-                    title="+ New Category"
-                    variant="secondary"
-                    onPress={() => {
-                        setEditingCategory(null);
-                        setShowCategoryForm(true);
-                    }}
-                    style={{ marginBottom: spacing.md }}
-                />
-                {categories.map(c => (
-                    <TouchableOpacity
-                        key={c.id}
-                        onPress={() => {
-                            setEditingCategory(c);
-                            setShowCategoryForm(true);
-                        }}
-                        onLongPress={() => confirmDeleteCategory(c)}
-                        style={[styles.categoryRow, { borderBottomColor: theme.colors.separator }]}
-                    >
-                        <CategoryIcon name={c.icon} size={14} />
-                        <Text style={{ color: theme.colors.text, flex: 1, marginLeft: spacing.sm, fontWeight: '500' }}>{c.name}</Text>
-                        <Text style={{ color: c.type === 'income' ? theme.colors.success : theme.colors.danger, fontSize: 12 }}>
-                            {c.type}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
-                <Text style={{ color: theme.colors.textTertiary, fontSize: 12, marginTop: spacing.sm, textAlign: 'center' }}>
-                    Tap to edit · long-press to delete
+
+            {/* Clear All */}
+            <SheetModal visible={showClearAll} onClose={() => setShowClearAll(false)} title="Clear all transactions">
+                <Text style={{ color: theme.colors.textTertiary, marginBottom: spacing.md, fontSize: 14 }}>
+                    This deletes all {transactions.length} transactions and resets account balances. This cannot be undone. Type DELETE to confirm.
                 </Text>
-            </SheetModal>
-
-            <CategoryForm
-                visible={showCategoryForm}
-                onClose={() => {
-                    setShowCategoryForm(false);
-                    setEditingCategory(null);
-                }}
-                editing={editingCategory}
-            />
-
-            {/* Recurring rules manager */}
-            <SheetModal visible={showRecurring} onClose={() => setShowRecurring(false)} title="Recurring transactions">
-                <Button
-                    title="+ New Recurring"
-                    variant="secondary"
-                    onPress={() => {
-                        setEditingRule(null);
-                        setShowRecurringForm(true);
-                    }}
-                    style={{ marginBottom: spacing.md }}
+                <Input
+                    value={clearPhrase}
+                    onChangeText={setClearPhrase}
+                    placeholder="Type DELETE"
+                    autoCapitalize="none"
                 />
-                {recurring.length === 0 ? (
-                    <Text style={{ color: theme.colors.textTertiary, textAlign: 'center', paddingVertical: spacing.md }}>
-                        Set up rent, EMI, salary and other repeating transactions — they'll be added automatically when due.
-                    </Text>
-                ) : (
-                    recurring.map(r => (
-                        <TouchableOpacity
-                            key={r.id}
-                            onPress={() => {
-                                setEditingRule(r);
-                                setShowRecurringForm(true);
-                            }}
-                            onLongPress={() => confirmDeleteRule(r)}
-                            style={[styles.categoryRow, { borderBottomColor: theme.colors.separator, opacity: r.active ? 1 : 0.5 }]}
-                        >
-                            <View style={{ flex: 1 }}>
-                                <Text style={{ color: theme.colors.text, fontWeight: '600' }}>{r.description}</Text>
-                                <Text style={{ color: theme.colors.textTertiary, fontSize: 12 }}>
-                                    {r.frequency} · next {isoDateToDisplay(r.nextRun)}{r.active ? '' : ' · paused'}
-                                </Text>
-                            </View>
-                            <Text
-                                style={{
-                                    fontWeight: '700',
-                                    color: r.type === 'income' ? theme.colors.success : r.type === 'expense' ? theme.colors.danger : theme.colors.textSecondary,
-                                }}
-                            >
-                                {r.type === 'income' ? '+' : r.type === 'expense' ? '-' : ''}{formatCurrency(r.amount, user?.currency || 'INR')}
-                            </Text>
-                        </TouchableOpacity>
-                    ))
-                )}
-                {recurring.length > 0 ? (
-                    <Text style={{ color: theme.colors.textTertiary, fontSize: 12, marginTop: spacing.sm, textAlign: 'center' }}>
-                        Tap to edit · long-press to delete
-                    </Text>
-                ) : null}
+                <Button 
+                    title="Delete everything" 
+                    onPress={handleClearAll} 
+                    style={{ backgroundColor: theme.colors.danger, borderColor: theme.colors.danger }} 
+                />
             </SheetModal>
-
-            <RecurringForm
-                visible={showRecurringForm}
-                onClose={() => {
-                    setShowRecurringForm(false);
-                    setEditingRule(null);
-                }}
-                editing={editingRule}
-            />
         </SafeAreaView>
     );
 }

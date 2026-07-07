@@ -17,7 +17,7 @@ export const RecurringForm: React.FC<Props> = ({ visible, onClose, editing }) =>
     const { accounts, categories, addRecurring, updateRecurring } = useData();
     const { theme } = useTheme();
     const [type, setType] = useState<TransactionType>('expense');
-    const [description, setDescription] = useState('');
+    const [note, setNote] = useState('');
     const [amount, setAmount] = useState('');
     const [accountId, setAccountId] = useState<string | null>(null);
     const [transferToAccountId, setTransferToAccountId] = useState<string | null>(null);
@@ -26,7 +26,6 @@ export const RecurringForm: React.FC<Props> = ({ visible, onClose, editing }) =>
     const [startDate, setStartDate] = useState(todayIsoDate());
     const [hasEndDate, setHasEndDate] = useState(false);
     const [endDate, setEndDate] = useState(todayIsoDate());
-    const [notes, setNotes] = useState('');
     const [active, setActive] = useState(true);
     const [saving, setSaving] = useState(false);
 
@@ -34,7 +33,7 @@ export const RecurringForm: React.FC<Props> = ({ visible, onClose, editing }) =>
         if (visible) {
             if (editing) {
                 setType(editing.type);
-                setDescription(editing.description);
+                setNote(editing.note);
                 setAmount(String(editing.amount));
                 setAccountId(editing.accountId);
                 setTransferToAccountId(editing.transferToAccountId || null);
@@ -43,11 +42,10 @@ export const RecurringForm: React.FC<Props> = ({ visible, onClose, editing }) =>
                 setStartDate(editing.nextRun);
                 setHasEndDate(Boolean(editing.endDate));
                 setEndDate(editing.endDate || todayIsoDate());
-                setNotes(editing.notes || '');
                 setActive(editing.active);
             } else {
                 setType('expense');
-                setDescription('');
+                setNote('');
                 setAmount('');
                 setAccountId(accounts[0]?.id || null);
                 setTransferToAccountId(null);
@@ -56,18 +54,28 @@ export const RecurringForm: React.FC<Props> = ({ visible, onClose, editing }) =>
                 setStartDate(todayIsoDate());
                 setHasEndDate(false);
                 setEndDate(todayIsoDate());
-                setNotes('');
                 setActive(true);
             }
         }
     }, [visible, editing, accounts]);
+
+    useEffect(() => {
+        if (!visible || editing) return;
+        if (type === 'transfer') {
+            setAccountId(null);
+            setTransferToAccountId(null);
+            setCategoryId(null);
+        } else if (!accountId && accounts[0]) {
+            setAccountId(accounts[0].id);
+        }
+    }, [type, visible, editing, accounts, accountId]);
 
     const typeCategories = categories.filter(c => c.type === type);
 
     const handleSave = async () => {
         const value = parseFloat(amount);
         if (!value || value <= 0) return Alert.alert('Invalid amount', 'Enter an amount greater than zero.');
-        if (!description.trim()) return Alert.alert('Missing description', 'Enter a description (e.g. Rent, EMI, Salary).');
+        if (!note.trim()) return Alert.alert('Missing note', 'Enter a note (e.g. Rent, EMI, Salary).');
         if (!accountId) return Alert.alert('Missing account', 'Select an account.');
         if (type === 'transfer' && !transferToAccountId) return Alert.alert('Missing account', 'Select a destination account.');
         if (type === 'transfer' && transferToAccountId === accountId) return Alert.alert('Invalid transfer', 'Source and destination must differ.');
@@ -76,7 +84,7 @@ export const RecurringForm: React.FC<Props> = ({ visible, onClose, editing }) =>
         setSaving(true);
         try {
             const payload = {
-                description: description.trim(),
+                note: note.trim(),
                 amount: value,
                 type,
                 accountId,
@@ -85,7 +93,6 @@ export const RecurringForm: React.FC<Props> = ({ visible, onClose, editing }) =>
                 frequency,
                 startDate,
                 endDate: hasEndDate ? endDate : null,
-                notes: notes.trim() || null,
                 active,
             };
             if (editing) {
@@ -115,10 +122,14 @@ export const RecurringForm: React.FC<Props> = ({ visible, onClose, editing }) =>
                 onChange={v => {
                     setType(v as TransactionType);
                     setCategoryId(null);
+                    if (v === 'transfer') {
+                        setAccountId(null);
+                        setTransferToAccountId(null);
+                    }
                 }}
             />
 
-            <Input label="Description" value={description} onChangeText={setDescription} placeholder="e.g. Rent, EMI, Salary" />
+            <Input label="Description / note" value={note} onChangeText={setNote} placeholder="e.g. Rent, EMI, Salary" />
             <Input label="Amount" value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="0.00" />
 
             <FieldLabel>Repeats</FieldLabel>
@@ -165,8 +176,6 @@ export const RecurringForm: React.FC<Props> = ({ visible, onClose, editing }) =>
                     onChange={setCategoryId}
                 />
             )}
-
-            <Input label="Notes (optional)" value={notes} onChangeText={setNotes} placeholder="e.g. flat 402" />
 
             {editing ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md }}>

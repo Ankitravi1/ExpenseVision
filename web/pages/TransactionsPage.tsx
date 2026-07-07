@@ -20,14 +20,14 @@ const TransactionRow: React.FC<{ transaction: Transaction; onEdit: () => void }>
 
     let amountColor = isExpense ? 'text-danger' : 'text-success';
     let prefix = isExpense ? '-' : '+';
-    let description = transaction.description;
+    let note = transaction.note;
     let categoryName = category?.name;
     let icon = category?.icon || 'Tags';
 
     if (isTransfer) {
         amountColor = 'text-gray-700 dark:text-gray-300';
         prefix = '';
-        description = `Transfer to ${destAccount?.name || 'Account'}`;
+        note = `Transfer to ${destAccount?.name || 'Account'}`;
         categoryName = 'Transfer';
         icon = 'ArrowLeftRight';
     }
@@ -45,7 +45,7 @@ const TransactionRow: React.FC<{ transaction: Transaction; onEdit: () => void }>
                         <Icon name={icon} className="text-primary dark:text-indigo-300" size={18} />
                     </div>
                     <div>
-                        <div className="text-sm font-medium text-gray-900 dark:text-gray-100">{description}</div>
+                        <div className="text-sm font-medium text-gray-900 dark:text-gray-100">{note}</div>
                         <div className="text-sm text-gray-500 dark:text-gray-400">{categoryName}</div>
                     </div>
                 </div>
@@ -226,7 +226,7 @@ export const TransactionsPage: React.FC = () => {
                         <thead className="bg-gray-50 dark:bg-gray-700/50">
                             <tr>
                                 <SortableHeader columnKey="date" title="Date" className="text-left" />
-                                <SortableHeader columnKey="description" title="Description" className="text-left" />
+                                <SortableHeader columnKey="note" title="Note" className="text-left" />
                                 <SortableHeader columnKey="accountId" title="Account" className="text-left" />
                                 <SortableHeader columnKey="type" title="Type" className="text-left" />
                                 <SortableHeader columnKey="amount" title="Amount" className="text-right" />

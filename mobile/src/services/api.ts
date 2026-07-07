@@ -9,7 +9,7 @@ export const setOnUnauthorized = (handler: () => void) => {
     onUnauthorized = handler;
 };
 
-const request = async (endpoint: string, options: RequestInit = {}): Promise<Response> => {
+export const apiFetch = async (endpoint: string, options: RequestInit = {}): Promise<Response> => {
     const token = await storage.getToken();
 
     const headers: Record<string, string> = {
@@ -20,7 +20,7 @@ const request = async (endpoint: string, options: RequestInit = {}): Promise<Res
 
     let response = await fetch(`${API_URL}${endpoint}`, { ...options, headers });
 
-    // Access token expired → try refresh once, then retry the request
+    // Access token expired → try refresh once, then retry the apiFetch
     if (response.status === 401) {
         const refreshToken = await storage.getRefreshToken();
         if (refreshToken) {
@@ -67,15 +67,15 @@ export const api = {
         transactions: Transaction[];
         budgets: Budget[];
         recurring: RecurringRule[];
-    }> => json(await request('/initial-data'), 'Failed to load data'),
+    }> => json(await apiFetch('/initial-data'), 'Failed to load data'),
 
     // Transactions
     createTransaction: async (data: Omit<Transaction, 'id'>): Promise<Transaction> =>
-        json(await request('/transactions', { method: 'POST', body: JSON.stringify(data) }), 'Failed to add transaction'),
-    parseTransactionText: async (data: { text: string; preferredType?: Transaction['type']; aiConfig: AiSettings }): Promise<{
+        json(await apiFetch('/transactions', { method: 'POST', body: JSON.stringify(data) }), 'Failed to add transaction'),
+    parseTransactionText: async (data: { text: string; preferredType?: Transaction['type'] }): Promise<{
         type: Transaction['type'];
         amount: number;
-        description: string;
+        note: string;
         date: string;
         accountId: string;
         categoryId: string;
@@ -84,23 +84,29 @@ export const api = {
         missingFields: string[];
         sourceText: string;
     }> =>
-        json(await request('/transactions/parse-text', { method: 'POST', body: JSON.stringify(data) }), 'Failed to parse transaction note'),
+        json(await apiFetch('/transactions/parse-text', { method: 'POST', body: JSON.stringify(data) }), 'Failed to parse transaction note'),
     updateTransaction: async (id: string, data: Partial<Transaction>): Promise<Transaction> =>
-        json(await request(`/transactions/${id}`, { method: 'PUT', body: JSON.stringify(data) }), 'Failed to update transaction'),
+        json(await apiFetch(`/transactions/${id}`, { method: 'PUT', body: JSON.stringify(data) }), 'Failed to update transaction'),
     deleteTransaction: async (id: string): Promise<void> =>
-        json(await request(`/transactions/${id}`, { method: 'DELETE' }), 'Failed to delete transaction'),
-    deleteAllTransactions: async (): Promise<void> =>
-        json(await request('/transactions/all', { method: 'DELETE' }), 'Failed to clear transactions'),
+        json(await apiFetch(`/transactions/${id}`, { method: 'DELETE' }), 'Failed to delete transaction'),
+    deleteAllTransactions: async (confirmationPhrase: string): Promise<void> =>
+        json(
+            await apiFetch('/transactions/all', {
+                method: 'DELETE',
+                body: JSON.stringify({ confirmationPhrase }),
+            }),
+            'Failed to clear transactions'
+        ),
     exportTransactionsCsv: async (): Promise<string> => {
-        const res = await request('/transactions/export');
+        const res = await apiFetch('/transactions/export');
         if (!res.ok) throw new Error('Failed to export transactions');
         return res.text();
     },
 
     // Recurring rules
-    getRecurring: async (): Promise<RecurringRule[]> => json(await request('/recurring'), 'Failed to load recurring rules'),
+    getRecurring: async (): Promise<RecurringRule[]> => json(await apiFetch('/recurring'), 'Failed to load recurring rules'),
     createRecurring: async (data: {
-        description: string;
+        note: string;
         amount: number;
         type: Transaction['type'];
         accountId: string;
@@ -109,37 +115,37 @@ export const api = {
         frequency: RecurringRule['frequency'];
         startDate: string;
         endDate?: string | null;
-        notes?: string | null;
+
     }): Promise<RecurringRule> =>
-        json(await request('/recurring', { method: 'POST', body: JSON.stringify(data) }), 'Failed to add recurring rule'),
+        json(await apiFetch('/recurring', { method: 'POST', body: JSON.stringify(data) }), 'Failed to add recurring rule'),
     updateRecurring: async (id: string, data: Partial<RecurringRule> & { startDate?: string }): Promise<RecurringRule> =>
-        json(await request(`/recurring/${id}`, { method: 'PUT', body: JSON.stringify(data) }), 'Failed to update recurring rule'),
+        json(await apiFetch(`/recurring/${id}`, { method: 'PUT', body: JSON.stringify(data) }), 'Failed to update recurring rule'),
     deleteRecurring: async (id: string): Promise<void> =>
-        json(await request(`/recurring/${id}`, { method: 'DELETE' }), 'Failed to delete recurring rule'),
+        json(await apiFetch(`/recurring/${id}`, { method: 'DELETE' }), 'Failed to delete recurring rule'),
 
     // Accounts
-    getAccounts: async (): Promise<Account[]> => json(await request('/accounts'), 'Failed to load accounts'),
+    getAccounts: async (): Promise<Account[]> => json(await apiFetch('/accounts'), 'Failed to load accounts'),
     createAccount: async (data: Omit<Account, 'id'>): Promise<Account> =>
-        json(await request('/accounts', { method: 'POST', body: JSON.stringify(data) }), 'Failed to add account'),
+        json(await apiFetch('/accounts', { method: 'POST', body: JSON.stringify(data) }), 'Failed to add account'),
     updateAccount: async (id: string, data: Partial<Account>): Promise<Account> =>
-        json(await request(`/accounts/${id}`, { method: 'PUT', body: JSON.stringify(data) }), 'Failed to update account'),
+        json(await apiFetch(`/accounts/${id}`, { method: 'PUT', body: JSON.stringify(data) }), 'Failed to update account'),
     deleteAccount: async (id: string): Promise<void> =>
-        json(await request(`/accounts/${id}`, { method: 'DELETE' }), 'Failed to delete account'),
+        json(await apiFetch(`/accounts/${id}`, { method: 'DELETE' }), 'Failed to delete account'),
 
     // Categories
     createCategory: async (data: Omit<Category, 'id'>): Promise<Category> =>
-        json(await request('/categories', { method: 'POST', body: JSON.stringify(data) }), 'Failed to add category'),
+        json(await apiFetch('/categories', { method: 'POST', body: JSON.stringify(data) }), 'Failed to add category'),
     updateCategory: async (id: string, data: Partial<Category>): Promise<Category> =>
-        json(await request(`/categories/${id}`, { method: 'PUT', body: JSON.stringify(data) }), 'Failed to update category'),
+        json(await apiFetch(`/categories/${id}`, { method: 'PUT', body: JSON.stringify(data) }), 'Failed to update category'),
     deleteCategory: async (id: string): Promise<void> =>
-        json(await request(`/categories/${id}`, { method: 'DELETE' }), 'Failed to delete category'),
+        json(await apiFetch(`/categories/${id}`, { method: 'DELETE' }), 'Failed to delete category'),
 
     // Budgets
-    getBudgets: async (): Promise<Budget[]> => json(await request('/budgets'), 'Failed to load budgets'),
-    setBudget: async (data: { categoryId: string; amount: number; month?: string; rollover?: boolean; alertThreshold?: number }): Promise<Budget> =>
-        json(await request('/budgets', { method: 'POST', body: JSON.stringify(data) }), 'Failed to set budget'),
+    getBudgets: async (): Promise<Budget[]> => json(await apiFetch('/budgets'), 'Failed to load budgets'),
+    setBudget: async (data: { categoryId: string; amount: number; month?: string | null; rollover?: boolean; alertThreshold?: number }): Promise<Budget> =>
+        json(await apiFetch('/budgets', { method: 'POST', body: JSON.stringify(data) }), 'Failed to set budget'),
     deleteBudget: async (id: string): Promise<void> =>
-        json(await request(`/budgets/${id}`, { method: 'DELETE' }), 'Failed to delete budget'),
+        json(await apiFetch(`/budgets/${id}`, { method: 'DELETE' }), 'Failed to delete budget'),
 
     // Auth
     signup: async (data: { email: string; password: string; name: string }): Promise<{ user: User; token: string; refreshToken: string; needsProfileCompletion: boolean }> => {
@@ -175,7 +181,21 @@ export const api = {
         return json(res, 'Failed to send reset email');
     },
     completeProfile: async (data: { currency: string; timezone?: string; country?: string }): Promise<{ user: User }> =>
-        json(await request('/auth/complete-profile', { method: 'PUT', body: JSON.stringify(data) }), 'Failed to complete profile'),
+        json(await apiFetch('/auth/complete-profile', { method: 'PUT', body: JSON.stringify(data) }), 'Failed to complete profile'),
     updateProfile: async (data: { name?: string; currency?: string; timezone?: string; theme?: string }): Promise<{ user: User }> =>
-        json(await request('/auth/update-profile', { method: 'PUT', body: JSON.stringify(data) }), 'Failed to update profile'),
+        json(await apiFetch('/auth/update-profile', { method: 'PUT', body: JSON.stringify(data) }), 'Failed to update profile'),
+
+    googleAuth: async (googleToken: string): Promise<{
+        user: User;
+        token: string;
+        refreshToken: string;
+        needsProfileCompletion?: boolean;
+    }> => {
+        const res = await fetch(`${API_URL}/auth/google`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ googleToken }),
+        });
+        return json(res, 'Google auth failed');
+    },
 };
