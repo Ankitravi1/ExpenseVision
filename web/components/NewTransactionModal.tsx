@@ -98,7 +98,7 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
             setVoiceParseError('Enable AI transaction parsing in Settings first.');
             return;
         }
-        if (!aiSettings.keys[aiSettings.provider]?.trim()) {
+        if (!aiSettings.keys[aiSettings.provider]?.length) {
             setVoiceParseError(`Add an AI API key for ${aiSettings.provider} in Settings first.`);
             return;
         }

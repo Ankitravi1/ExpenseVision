@@ -18,6 +18,7 @@ model User {
   theme           String?  @default("light")
   googleId        String?  @unique
   profilePicture  String?
+  expoPushToken   String?
 
   // Auth fields
   emailVerified       Boolean   @default(false)

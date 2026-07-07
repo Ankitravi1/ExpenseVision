@@ -58,6 +58,21 @@ export const NotificationCenter: React.FC = () => {
         }
     };
 
+    const deleteNotification = async (id: string) => {
+        try {
+            await api.fetch(`/notifications/${id}`, { method: 'DELETE' });
+            setNotifications(prev => {
+                const notif = prev.find(n => n.id === id);
+                if (notif && !notif.read) {
+                    setUnreadCount(count => Math.max(0, count - 1));
+                }
+                return prev.filter(n => n.id !== id);
+            });
+        } catch (error) {
+            console.error('Failed to delete notification', error);
+        }
+    };
+
     const clearAll = async () => {
         try {
             await api.fetch('/notifications', { method: 'DELETE' });
@@ -125,6 +140,16 @@ export const NotificationCenter: React.FC = () => {
                                                 <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">
                                                     {new Date(notification.createdAt).toLocaleString()}
                                                 </p>
+                                            </div>
+                                            <div className="flex gap-2 ml-auto items-center">
+                                                {!notification.read && (
+                                                    <button onClick={(e) => { e.stopPropagation(); markAsRead(notification.id); }} className="p-1.5 text-gray-400 hover:text-success rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors" title="Mark Read">
+                                                        <Icon name="Check" size={16} />
+                                                    </button>
+                                                )}
+                                                <button onClick={(e) => { e.stopPropagation(); deleteNotification(notification.id); }} className="p-1.5 text-gray-400 hover:text-danger rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors" title="Clear">
+                                                    <Icon name="Trash2" size={16} />
+                                                </button>
                                             </div>
                                         </div>
                                     </div>

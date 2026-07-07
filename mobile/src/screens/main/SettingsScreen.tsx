@@ -33,6 +33,7 @@ export default function SettingsScreen() {
     const [savingAiSettings, setSavingAiSettings] = useState(false);
     const [showClearAll, setShowClearAll] = useState(false);
     const [clearPhrase, setClearPhrase] = useState('');
+    const [revealedKeys, setRevealedKeys] = useState<Record<string, boolean>>({});
 
     useEffect(() => {
         getAiSettings().then(setAiSettings).catch(() => setAiSettings(defaultAiSettings));
@@ -274,13 +275,49 @@ export default function SettingsScreen() {
                     />
                 ) : null}
 
-                <Input
-                    label={`API Key for ${aiSettings.provider}`}
-                    value={aiSettings.keys[aiSettings.provider] || ''}
-                    onChangeText={keyVal => { setAiSaved(false); setAiSettings(prev => ({ ...prev, keys: { ...prev.keys, [aiSettings.provider]: keyVal } })); }}
-                    placeholder="sk-..."
-                    autoCapitalize="none"
-                    secureTextEntry
+                <FieldLabel>API Keys for {aiSettings.provider}</FieldLabel>
+                {(aiSettings.keys[aiSettings.provider] || []).map((keyStr, idx) => (
+                    <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm, gap: spacing.sm }}>
+                        <Input
+                            style={{ flex: 1 }}
+                            value={keyStr}
+                            onChangeText={val => {
+                                setAiSaved(false);
+                                setAiSettings(prev => {
+                                    const newKeys = [...(prev.keys[prev.provider] || [])];
+                                    newKeys[idx] = val;
+                                    return { ...prev, keys: { ...prev.keys, [prev.provider]: newKeys } };
+                                });
+                            }}
+                            secureTextEntry={!revealedKeys[`${aiSettings.provider}-${idx}`]}
+                            placeholder="sk-..."
+                            autoCapitalize="none"
+                        />
+                        <TouchableOpacity onPress={() => setRevealedKeys(prev => ({ ...prev, [`${aiSettings.provider}-${idx}`]: !prev[`${aiSettings.provider}-${idx}`] }))}>
+                            <MaterialCommunityIcons name={revealedKeys[`${aiSettings.provider}-${idx}`] ? 'eye-off' : 'eye'} size={24} color={theme.colors.textSecondary} />
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => {
+                            setAiSaved(false);
+                            setAiSettings(prev => {
+                                const newKeys = [...(prev.keys[prev.provider] || [])];
+                                newKeys.splice(idx, 1);
+                                return { ...prev, keys: { ...prev.keys, [prev.provider]: newKeys } };
+                            });
+                        }}>
+                            <MaterialCommunityIcons name="trash-can-outline" size={24} color={theme.colors.danger} />
+                        </TouchableOpacity>
+                    </View>
+                ))}
+                <Button 
+                    title="Add API Key" 
+                    onPress={() => {
+                        setAiSaved(false);
+                        setAiSettings(prev => {
+                            const newKeys = [...(prev.keys[prev.provider] || []), ''];
+                            return { ...prev, keys: { ...prev.keys, [prev.provider]: newKeys } };
+                        });
+                    }}
+                    style={{ marginBottom: spacing.md, backgroundColor: theme.colors.card, borderColor: theme.colors.primary }}
                 />
 
                 <Button 

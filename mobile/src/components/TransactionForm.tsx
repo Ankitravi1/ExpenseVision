@@ -76,7 +76,7 @@ export const TransactionForm: React.FC<Props> = ({ visible, onClose, editing }) 
     const handleParseQuickEntry = async () => {
         const aiSettings = await getAiSettings();
         if (!aiSettings.enabled) return Alert.alert('AI disabled', 'Enable AI transaction parsing in Settings first.');
-        if (!aiSettings.keys || !aiSettings.keys[aiSettings.provider]?.trim()) return Alert.alert('Missing API key', `Add your AI API key for ${aiSettings.provider} in Settings first.`);
+        if (!aiSettings.keys || !aiSettings.keys[aiSettings.provider]?.length) return Alert.alert('Missing API key', `Add your AI API key for ${aiSettings.provider} in Settings first.`);
         if (!quickEntry.trim()) return Alert.alert('Missing note', 'Type or dictate a transaction note first.');
 
         setParsing(true);

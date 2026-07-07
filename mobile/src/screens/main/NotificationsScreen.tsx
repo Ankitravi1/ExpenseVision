@@ -39,6 +39,17 @@ export default function NotificationsScreen({ navigation }: any) {
         }
     };
 
+    const clearNotification = async (id: string) => {
+        try {
+            const res = await apiFetch(`/notifications/${id}`, { method: 'DELETE' });
+            if (res.ok) {
+                setNotifications(prev => prev.filter(n => n.id !== id));
+            }
+        } catch (error) {
+            console.error('Failed to clear notification', error);
+        }
+    };
+
     const clearAll = async () => {
         try {
             const res = await apiFetch('/notifications', { method: 'DELETE' });
@@ -101,6 +112,16 @@ export default function NotificationsScreen({ navigation }: any) {
                                     {new Date(item.createdAt).toLocaleString()}
                                 </Text>
                             </View>
+                            <View style={styles.actions}>
+                                {!item.read && (
+                                    <TouchableOpacity onPress={() => markAsRead(item.id)} style={styles.actionButton}>
+                                        <MaterialCommunityIcons name="check" size={20} color={theme.colors.success} />
+                                    </TouchableOpacity>
+                                )}
+                                <TouchableOpacity onPress={() => clearNotification(item.id)} style={styles.actionButton}>
+                                    <MaterialCommunityIcons name="trash-can-outline" size={20} color={theme.colors.danger} />
+                                </TouchableOpacity>
+                            </View>
                         </TouchableOpacity>
                     )}
                     contentContainerStyle={styles.listContent}
@@ -142,4 +163,12 @@ const styles = StyleSheet.create({
     itemTitle: { fontSize: 15, fontWeight: '600', marginBottom: 2 },
     itemMessage: { fontSize: 14, marginBottom: 4 },
     itemDate: { fontSize: 12 },
+    actions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.sm,
+    },
+    actionButton: {
+        padding: spacing.xs,
+    },
 });

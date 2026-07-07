@@ -9,7 +9,7 @@ const settingsSchema = z.object({
     provider: z.enum(['deepseek', 'openai', 'openrouter', 'gemini', 'custom']),
     model: z.string().min(1),
     baseUrl: z.string().nullish(),
-    keys: z.record(z.string()).nullish(),
+    keys: z.record(z.array(z.string())).nullish(),
     customModels: z.array(z.string()).nullish()
 });
 
@@ -60,13 +60,15 @@ router.get('/', async (req, res, next) => {
 
         if (!settings) return res.json(defaultSettings);
 
-        let decryptedKeys: Record<string, string> = {};
+        let decryptedKeys: Record<string, string[]> = {};
         let parsedCustomModels: string[] = [];
         try {
             if (settings.keys) {
                 const encryptedMap = JSON.parse(settings.keys);
                 for (const [k, v] of Object.entries(encryptedMap)) {
-                    decryptedKeys[k] = decrypt(v as string);
+                    if (Array.isArray(v)) {
+                        decryptedKeys[k] = v.map((encryptedKey: string) => decrypt(encryptedKey));
+                    }
                 }
             }
             if (settings.customModels) {
@@ -98,11 +100,11 @@ router.put('/', async (req, res, next) => {
         const userId = (req as any).userId;
         const data = settingsSchema.parse(req.body);
 
-        const encryptedKeys: Record<string, string> = {};
+        const encryptedKeys: Record<string, string[]> = {};
         if (data.keys) {
             for (const [k, v] of Object.entries(data.keys)) {
-                if (v && v.trim()) {
-                    encryptedKeys[k] = encrypt(v.trim());
+                if (Array.isArray(v) && v.length > 0) {
+                    encryptedKeys[k] = v.map((key: string) => encrypt(key.trim()));
                 }
             }
         }

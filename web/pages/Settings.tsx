@@ -376,54 +376,99 @@ export const Settings: React.FC = () => {
                     </div>
 
                     <div>
-                        <label htmlFor="ai-api-key" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">API Key for {aiSettings.provider}</label>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">API Keys for {aiSettings.provider}</label>
+                        <div className="space-y-2 mb-3">
+                            {(aiSettings.keys[aiSettings.provider] || []).map((key, index) => (
+                                <div key={index} className="flex items-center gap-2">
+                                    <input
+                                        type={document.getElementById(`reveal-key-${index}`)?.getAttribute('data-revealed') === 'true' ? 'text' : 'password'}
+                                        value={key}
+                                        readOnly
+                                        className="flex-1 bg-gray-100 border-transparent rounded-lg p-3 text-base dark:bg-gray-700 dark:text-gray-100"
+                                    />
+                                    <button
+                                        id={`reveal-key-${index}`}
+                                        type="button"
+                                        data-revealed="false"
+                                        className="btn btn-secondary h-full"
+                                        onClick={(e) => {
+                                            const btn = e.currentTarget;
+                                            const isRevealed = btn.getAttribute('data-revealed') === 'true';
+                                            btn.setAttribute('data-revealed', (!isRevealed).toString());
+                                            const input = btn.previousElementSibling as HTMLInputElement;
+                                            if (input) {
+                                                input.type = isRevealed ? 'password' : 'text';
+                                            }
+                                        }}
+                                        title="Reveal/Hide Key"
+                                    >
+                                        <Icon name="Eye" size={16} />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="btn btn-danger h-full text-white"
+                                        onClick={() => {
+                                            setAiSaved(false);
+                                            setAiSettings(prev => {
+                                                const currentKeys = prev.keys[prev.provider] || [];
+                                                return { 
+                                                    ...prev, 
+                                                    keys: { 
+                                                        ...prev.keys, 
+                                                        [prev.provider]: currentKeys.filter((_, i) => i !== index) 
+                                                    } 
+                                                };
+                                            });
+                                        }}
+                                        title="Delete Key"
+                                    >
+                                        <Icon name="Trash2" size={16} />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
                         <div className="flex items-center gap-2">
                             <input
-                                id="ai-api-key"
-                                type={document.getElementById('reveal-key')?.getAttribute('data-revealed') === 'true' ? 'text' : 'password'}
-                                value={aiSettings.keys[aiSettings.provider] || ''}
-                                onChange={(e) => {
-                                    setAiSaved(false);
-                                    setAiSettings(prev => ({ 
-                                        ...prev, 
-                                        keys: { ...prev.keys, [prev.provider]: e.target.value }
-                                    }));
-                                }}
-                                placeholder="sk-..."
+                                id="new-ai-api-key"
+                                type="text"
+                                placeholder="Add new sk-..."
                                 className="flex-1 bg-gray-100 border-transparent rounded-lg p-3 focus:ring-2 focus:ring-primary focus:bg-white text-base dark:bg-gray-700 dark:text-gray-100 dark:focus:bg-gray-600"
-                            />
-                            <button
-                                id="reveal-key"
-                                type="button"
-                                data-revealed="false"
-                                className="btn btn-secondary h-full"
-                                onClick={(e) => {
-                                    const btn = e.currentTarget;
-                                    const isRevealed = btn.getAttribute('data-revealed') === 'true';
-                                    btn.setAttribute('data-revealed', (!isRevealed).toString());
-                                    const input = document.getElementById('ai-api-key') as HTMLInputElement;
-                                    if (input) {
-                                        input.type = isRevealed ? 'password' : 'text';
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        const input = e.target as HTMLInputElement;
+                                        if (input.value.trim()) {
+                                            setAiSaved(false);
+                                            setAiSettings(prev => ({ 
+                                                ...prev, 
+                                                keys: { 
+                                                    ...prev.keys, 
+                                                    [prev.provider]: [...(prev.keys[prev.provider] || []), input.value.trim()] 
+                                                }
+                                            }));
+                                            input.value = '';
+                                        }
                                     }
                                 }}
-                                title="Reveal/Hide Key"
-                            >
-                                <Icon name="Eye" size={16} />
-                            </button>
+                            />
                             <button
                                 type="button"
-                                className="btn btn-danger h-full text-white"
+                                className="btn btn-secondary whitespace-nowrap h-full"
                                 onClick={() => {
-                                    setAiSaved(false);
-                                    setAiSettings(prev => {
-                                        const newKeys = { ...prev.keys };
-                                        delete newKeys[prev.provider];
-                                        return { ...prev, keys: newKeys };
-                                    });
+                                    const input = document.getElementById('new-ai-api-key') as HTMLInputElement;
+                                    if (input && input.value.trim()) {
+                                        setAiSaved(false);
+                                        setAiSettings(prev => ({ 
+                                            ...prev, 
+                                            keys: { 
+                                                ...prev.keys, 
+                                                [prev.provider]: [...(prev.keys[prev.provider] || []), input.value.trim()] 
+                                            }
+                                        }));
+                                        input.value = '';
+                                    }
                                 }}
-                                title="Delete Key"
                             >
-                                <Icon name="Trash2" size={16} />
+                                <Icon name="Plus" size={16} className="mr-1" /> Add
                             </button>
                         </div>
                     </div>

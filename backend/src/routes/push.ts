@@ -1,5 +1,6 @@
 import express from 'express';
 import webpush from 'web-push';
+import { Expo } from 'expo-server-sdk';
 import { authenticateToken } from '../middleware/auth';
 import { prisma } from '../lib/prisma';
 
@@ -16,6 +17,9 @@ if (!isPushEnabled) {
         process.env.VAPID_PRIVATE_KEY!
     );
 }
+
+// Configure Expo Push
+const expo = new Expo({ accessToken: process.env.EXPO_ACCESS_TOKEN });
 
 // GET /api/push/vapid-key
 router.get('/vapid-key', authenticateToken, (req, res) => {
@@ -79,28 +83,54 @@ router.delete('/subscribe', authenticateToken, async (req, res) => {
 
 // Helper to send notification (can be imported elsewhere)
 export const sendNotification = async (userId: string, payload: any) => {
-    if (!isPushEnabled) return;
     try {
-        const subscriptions = await prisma.pushSubscription.findMany({
-            where: { userId }
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            include: { pushSubscriptions: true }
         });
 
-        const notifications = subscriptions.map(sub => {
-            const pushSubscription = {
-                endpoint: sub.endpoint,
-                keys: JSON.parse(sub.keys)
+        if (!user) return;
+
+        const promises: Promise<any>[] = [];
+
+        // Web Push
+        if (isPushEnabled && user.pushSubscriptions.length > 0) {
+            const webPushPromises = user.pushSubscriptions.map(sub => {
+                const pushSubscription = {
+                    endpoint: sub.endpoint,
+                    keys: JSON.parse(sub.keys)
+                };
+                return webpush.sendNotification(pushSubscription, JSON.stringify(payload))
+                    .catch(async err => {
+                        if (err.statusCode === 410 || err.statusCode === 404) {
+                            // Subscription expired or invalid, delete it
+                            await prisma.pushSubscription.delete({ where: { id: sub.id } });
+                        }
+                        console.error('Web Push error:', err);
+                    });
+            });
+            promises.push(...webPushPromises);
+        }
+
+        // Expo Push
+        if (user.expoPushToken && Expo.isExpoPushToken(user.expoPushToken)) {
+            const message = {
+                to: user.expoPushToken,
+                sound: 'default' as const,
+                title: payload.title || 'ExpenseVision',
+                body: payload.message || payload.body || '',
+                data: payload,
             };
-            return webpush.sendNotification(pushSubscription, JSON.stringify(payload))
-                .catch(async err => {
-                    if (err.statusCode === 410 || err.statusCode === 404) {
-                        // Subscription expired or invalid, delete it
-                        await prisma.pushSubscription.delete({ where: { id: sub.id } });
-                    }
-                    console.error('Push error:', err);
-                });
-        });
+            promises.push(
+                expo.sendPushNotificationsAsync([message]).catch(err => {
+                    console.error('Expo Push error:', err);
+                })
+            );
+        }
 
-        await Promise.all(notifications);
+        if (promises.length > 0) {
+            await Promise.all(promises);
+        }
     } catch (error) {
         console.error('Failed to send notifications:', error);
     }

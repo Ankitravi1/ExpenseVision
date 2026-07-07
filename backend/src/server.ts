@@ -80,6 +80,8 @@ app.use('/api/push', apiLimiter, authenticateToken, pushRouter);
 app.use('/api/recurring', apiLimiter, authenticateToken, recurringRouter);
 app.use('/api/ai-settings', apiLimiter, authenticateToken, aiSettingsRouter);
 app.use('/api/notifications', apiLimiter, authenticateToken, notificationsRouter);
+import profileRouter from './routes/profile.js';
+app.use('/api/profile', apiLimiter, authenticateToken, profileRouter);
 
 // Initial data endpoint
 app.get('/api/initial-data', apiLimiter, authenticateToken, async (req, res, next) => {

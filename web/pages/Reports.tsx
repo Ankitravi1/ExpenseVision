@@ -201,7 +201,7 @@ export const Reports: React.FC = () => {
                     </div>
                 </Card>
                 <Card>
-                     <h3 className="text-lg font-semibold mb-2">Detailed Breakdown</h3>
+                     <h3 className="text-lg font-semibold mb-2">Percentage by category</h3>
                      <div className="divide-y divide-gray-200">
                         {expenseData.map((item, index) => (
                             <CategoryDetailRow

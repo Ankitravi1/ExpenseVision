@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
+import { PieChart } from 'react-native-chart-kit';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -91,7 +92,17 @@ export default function ReportsScreen() {
         return { rows, total: cur.total, income: cur.income, prevTotal: prev.total, biggestChange, pace, totalDeltaPct };
     }, [transactions, categories, budgets, month, prevMonth, currentMonth]);
 
-    const barColors = [theme.colors.primary, theme.colors.success, theme.colors.warning, theme.colors.danger];
+    const barColors = [theme.colors.primary, theme.colors.success, theme.colors.warning, theme.colors.danger, '#8b5cf6', '#ec4899', '#14b8a6'];
+
+    const pieChartData = useMemo(() => {
+        return report.rows.map((row, i) => ({
+            name: row.category?.name || 'Uncategorized',
+            amount: row.amount,
+            color: barColors[i % barColors.length],
+            legendFontColor: theme.colors.textSecondary,
+            legendFontSize: 12
+        }));
+    }, [report.rows, theme, barColors]);
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top']}>
@@ -206,7 +217,20 @@ export default function ReportsScreen() {
                     {report.rows.length === 0 ? (
                         <EmptyState icon="chart-pie" title="No expenses this month" />
                     ) : (
-                        report.rows.map((row, i) => (
+                        <>
+                            <PieChart
+                                data={pieChartData}
+                                width={Dimensions.get('window').width - spacing.md * 4}
+                                height={220}
+                                chartConfig={{
+                                    color: (opacity = 1) => theme.colors.text,
+                                }}
+                                accessor={"amount"}
+                                backgroundColor={"transparent"}
+                                paddingLeft={"15"}
+                                absolute
+                            />
+                            {report.rows.map((row, i) => (
                             <View key={row.categoryId} style={{ marginBottom: spacing.md }}>
                                 <View style={styles.catHeader}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
@@ -228,7 +252,8 @@ export default function ReportsScreen() {
                                     />
                                 </View>
                             </View>
-                        ))
+                            ))}
+                        </>
                     )}
                 </Card>
 

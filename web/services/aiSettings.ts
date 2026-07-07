@@ -6,7 +6,7 @@ export interface AiSettings {
     enabled: boolean;
     provider: AiProvider;
     model: string;
-    keys: Record<string, string>;
+    keys: Record<string, string[]>;
     customModels: string[];
     baseUrl?: string;
 }
