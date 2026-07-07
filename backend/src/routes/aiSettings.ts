@@ -9,7 +9,8 @@ const settingsSchema = z.object({
     provider: z.enum(['deepseek', 'openai', 'openrouter', 'gemini', 'custom']),
     model: z.string().min(1),
     baseUrl: z.string().nullish(),
-    apiKey: z.string().nullish()
+    keys: z.record(z.string()).nullish(),
+    customModels: z.array(z.string()).nullish()
 });
 
 const defaultSettings = {
@@ -17,7 +18,8 @@ const defaultSettings = {
     provider: 'deepseek',
     model: 'deepseek-v4-flash',
     baseUrl: null,
-    apiKey: ''
+    keys: {},
+    customModels: []
 };
 
 const getKey = (): Buffer | null => {
@@ -58,12 +60,29 @@ router.get('/', async (req, res, next) => {
 
         if (!settings) return res.json(defaultSettings);
 
+        let decryptedKeys: Record<string, string> = {};
+        let parsedCustomModels: string[] = [];
+        try {
+            if (settings.keys) {
+                const encryptedMap = JSON.parse(settings.keys);
+                for (const [k, v] of Object.entries(encryptedMap)) {
+                    decryptedKeys[k] = decrypt(v as string);
+                }
+            }
+            if (settings.customModels) {
+                parsedCustomModels = JSON.parse(settings.customModels);
+            }
+        } catch (e) {
+            console.error('Failed to parse keys or custom models', e);
+        }
+
         res.json({
             enabled: settings.enabled,
             provider: settings.provider,
             model: settings.model,
             baseUrl: settings.baseUrl,
-            apiKey: decrypt(settings.encryptedApiKey)
+            keys: decryptedKeys,
+            customModels: parsedCustomModels
         });
     } catch (error: any) {
         if (error.message?.includes('AI_SETTINGS_SECRET')) {
@@ -79,7 +98,18 @@ router.put('/', async (req, res, next) => {
         const userId = (req as any).userId;
         const data = settingsSchema.parse(req.body);
 
-        const encryptedApiKey = data.apiKey?.trim() ? encrypt(data.apiKey.trim()) : null;
+        const encryptedKeys: Record<string, string> = {};
+        if (data.keys) {
+            for (const [k, v] of Object.entries(data.keys)) {
+                if (v && v.trim()) {
+                    encryptedKeys[k] = encrypt(v.trim());
+                }
+            }
+        }
+        
+        const keysJson = Object.keys(encryptedKeys).length ? JSON.stringify(encryptedKeys) : null;
+        const customModelsJson = data.customModels?.length ? JSON.stringify(data.customModels) : null;
+
         const saved = await prisma.aiSettings.upsert({
             where: { userId },
             create: {
@@ -88,14 +118,16 @@ router.put('/', async (req, res, next) => {
                 provider: data.provider,
                 model: data.model,
                 baseUrl: data.baseUrl || null,
-                encryptedApiKey
+                keys: keysJson,
+                customModels: customModelsJson
             },
             update: {
                 enabled: data.enabled,
                 provider: data.provider,
                 model: data.model,
                 baseUrl: data.baseUrl || null,
-                encryptedApiKey
+                keys: keysJson,
+                customModels: customModelsJson
             }
         });
 
@@ -104,7 +136,8 @@ router.put('/', async (req, res, next) => {
             provider: saved.provider,
             model: saved.model,
             baseUrl: saved.baseUrl,
-            apiKey: data.apiKey?.trim() || ''
+            keys: data.keys || {},
+            customModels: data.customModels || []
         });
     } catch (error: any) {
         if (error instanceof z.ZodError) {

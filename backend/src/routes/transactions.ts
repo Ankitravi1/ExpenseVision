@@ -41,12 +41,24 @@ const checkBudgetAlert = async (prisma: any, userId: string, categoryId: string,
     const threshold = (budget.alertThreshold ?? 100) / 100;
     if (totalSpent >= budget.amount * threshold) {
         const over = totalSpent > budget.amount;
+        const title = over ? 'Budget Alert 🚨' : 'Budget Warning ⚠️';
+        const message = over
+            ? `You've exceeded your budget for ${budget.category.name}! Spent: ${totalSpent}, Limit: ${budget.amount}`
+            : `You've reached ${Math.round((totalSpent / budget.amount) * 100)}% of your ${budget.category.name} budget (${totalSpent} of ${budget.amount})`;
+        
+        // Save persistent notification
+        await prisma.notification.create({
+            data: {
+                userId,
+                title,
+                message
+            }
+        });
+
         const { sendNotification } = await import('./push.js');
         await sendNotification(userId, {
-            title: over ? 'Budget Alert 🚨' : 'Budget Warning ⚠️',
-            body: over
-                ? `You've exceeded your budget for ${budget.category.name}! Spent: ${totalSpent}, Limit: ${budget.amount}`
-                : `You've reached ${Math.round((totalSpent / budget.amount) * 100)}% of your ${budget.category.name} budget (${totalSpent} of ${budget.amount})`,
+            title,
+            body: message,
             icon: '/pwa-192x192.png'
         });
     }

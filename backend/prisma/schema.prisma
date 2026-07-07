@@ -45,6 +45,7 @@ model User {
   refreshTokens   RefreshToken[]
   pushSubscriptions PushSubscription[]
   aiSettings      AiSettings?
+  notifications   Notification[]
 }
 
 model PushSubscription {
@@ -165,6 +166,19 @@ model RecurringRule {
   @@index([userId, active, nextRun])
 }
 
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId, read])
+}
+
 model AiSettings {
   id              String   @id @default(cuid())
   userId          String   @unique
@@ -172,7 +186,8 @@ model AiSettings {
   provider        String   @default("deepseek")
   model           String   @default("deepseek-v4-flash")
   baseUrl         String?
-  encryptedApiKey String?
+  keys            String?  // JSON string: { "openai": "encryptedKey", ... }
+  customModels    String?  // JSON string array: ["model1", "model2"]
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

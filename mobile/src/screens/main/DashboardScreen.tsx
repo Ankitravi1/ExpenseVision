@@ -82,6 +82,12 @@ export default function DashboardScreen() {
                     </View>
                     <View style={styles.headerRight}>
                         <TouchableOpacity
+                            onPress={() => (navigation as any).navigate('Notifications')}
+                            style={[styles.iconButton, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder, borderWidth: 1, marginRight: spacing.sm }]}
+                        >
+                            <MaterialCommunityIcons name="bell-outline" size={22} color={theme.colors.textSecondary} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
                             onPress={() => (navigation as any).navigate('Reports')}
                             style={[styles.iconButton, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder, borderWidth: 1 }]}
                         >

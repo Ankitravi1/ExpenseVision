@@ -74,9 +74,14 @@ The following main tasks define the upcoming major features for ExpenseVision. E
 **Why:** The current SQLite and placeholder-email setup is meant for personal use. Scaling requires robust infrastructure.
 **How:**
 - [ ] **PostgreSQL Migration:** Replace SQLite with PostgreSQL in Prisma (`provider = "postgresql"`). Create initial migration.
-- [ ] **SMTP Email Integration:** Integrate `nodemailer` with a real provider (e.g., SendGrid, AWS SES) for verified forgot-password / reset-link flows.
+- [ ] **Real Password Reset Mechanism:** Integrate `nodemailer` with a real provider (e.g., SendGrid, AWS SES) for verified forgot-password and secure reset-link flows.
 - [ ] **Mobile Push Notifications:** Integrate Expo Push Notifications (requires obtaining an Expo token and storing it alongside the user in the DB) to replace or supplement Web Push.
 
+### 3.6 Mobile Swipe Gestures (Instagram-style)
+**Why:** Modern mobile apps rely on fluid gesture controls to navigate.
+**How:**
+- [ ] **PanResponder & Reanimated:** Implement fluid left, up, and down swipe gestures using `react-native-reanimated` and `react-native-gesture-handler`.
+- [ ] **Interaction:** Map these gestures to app functionality (e.g., swipe down to dismiss modals, swipe left/right to switch tabs or categories) to mimic premium native app experiences like Instagram.
 ### 3.5 Regional Integrations (India-specific)
 **Why:** For users in India, auto-tracking UPI and bank balances is highly desired.
 **How:**

@@ -1,5 +1,14 @@
 
 
+export interface Notification {
+  id: string;
+  userId: string;
+  title: string;
+  message: string;
+  read: boolean;
+  createdAt: string;
+}
+
 export type Page = 'Dashboard' | 'Transactions' | 'Recurring' | 'Budgets' | 'Accounts' | 'Categories' | 'Reports' | 'Profile' | 'Settings';
 
 

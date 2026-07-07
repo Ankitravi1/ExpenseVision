@@ -19,6 +19,7 @@ import SettingsScreen from '../screens/main/SettingsScreen';
 import CategoriesScreen from '../screens/main/CategoriesScreen';
 import RecurringScreen from '../screens/main/RecurringScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
+import NotificationsScreen from '../screens/main/NotificationsScreen';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
@@ -228,6 +229,7 @@ function MainDrawer() {
             <Drawer.Screen name="Recurring" component={RecurringScreen} />
             <Drawer.Screen name="Settings" component={SettingsScreen} />
             <Drawer.Screen name="Profile" component={ProfileScreen} />
+            <Drawer.Screen name="Notifications" component={NotificationsScreen} />
         </Drawer.Navigator>
     );
 }

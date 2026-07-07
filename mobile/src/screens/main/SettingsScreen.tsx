@@ -46,12 +46,16 @@ export default function SettingsScreen() {
         }));
     };
 
+    const [aiSaved, setAiSaved] = useState(false);
+
     const handleSaveAiSettings = async () => {
         setSavingAiSettings(true);
         try {
             await saveAiSettings(aiSettings);
-            Alert.alert('Saved', 'AI settings updated.');
-            setShowAiSettings(false);
+            setAiSaved(true);
+            setTimeout(() => setAiSaved(false), 2500);
+            // Alert.alert('Saved', 'AI settings updated.');
+            // Let the modal stay open and button turn green
         } catch (err: any) {
             Alert.alert('Error', err.message || 'Failed to save AI settings');
         } finally {
@@ -232,40 +236,59 @@ export default function SettingsScreen() {
                 />
 
                 <FieldLabel>Model</FieldLabel>
-                {providerModels[aiSettings.provider].filter(Boolean).length > 0 ? (
+                {[...(providerModels[aiSettings.provider] || []), ...aiSettings.customModels].filter(Boolean).length > 0 ? (
                     <ChipSelector
-                        options={providerModels[aiSettings.provider].filter(Boolean).map(model => ({ value: model, label: model }))}
+                        options={[...(providerModels[aiSettings.provider] || []), ...aiSettings.customModels].filter(Boolean).map(model => ({ value: model, label: model }))}
                         value={aiSettings.model}
-                        onChange={model => setAiSettings(prev => ({ ...prev, model }))}
+                        onChange={model => { setAiSaved(false); setAiSettings(prev => ({ ...prev, model })); }}
                     />
                 ) : null}
                 <Input
                     value={aiSettings.model}
-                    onChangeText={model => setAiSettings(prev => ({ ...prev, model }))}
+                    onChangeText={model => { setAiSaved(false); setAiSettings(prev => ({ ...prev, model })); }}
                     placeholder="deepseek-v4-flash"
                     autoCapitalize="none"
+                />
+
+                <FieldLabel>Add Custom Model</FieldLabel>
+                <Input
+                    placeholder="e.g. gpt-4-turbo"
+                    autoCapitalize="none"
+                    returnKeyType="done"
+                    onSubmitEditing={(e) => {
+                        const val = e.nativeEvent.text.trim();
+                        if (val && !aiSettings.customModels.includes(val)) {
+                            setAiSaved(false);
+                            setAiSettings(prev => ({ ...prev, customModels: [...prev.customModels, val] }));
+                        }
+                    }}
                 />
 
                 {aiSettings.provider === 'custom' ? (
                     <Input
                         label="Base URL"
                         value={aiSettings.baseUrl || ''}
-                        onChangeText={baseUrl => setAiSettings(prev => ({ ...prev, baseUrl }))}
+                        onChangeText={baseUrl => { setAiSaved(false); setAiSettings(prev => ({ ...prev, baseUrl })); }}
                         placeholder="https://your-provider.example/v1"
                         autoCapitalize="none"
                     />
                 ) : null}
 
                 <Input
-                    label="API Key"
-                    value={aiSettings.apiKey}
-                    onChangeText={apiKey => setAiSettings(prev => ({ ...prev, apiKey }))}
+                    label={`API Key for ${aiSettings.provider}`}
+                    value={aiSettings.keys[aiSettings.provider] || ''}
+                    onChangeText={keyVal => { setAiSaved(false); setAiSettings(prev => ({ ...prev, keys: { ...prev.keys, [aiSettings.provider]: keyVal } })); }}
                     placeholder="sk-..."
                     autoCapitalize="none"
                     secureTextEntry
                 />
 
-                <Button title="Save AI Settings" onPress={handleSaveAiSettings} loading={savingAiSettings} />
+                <Button 
+                    title={aiSaved ? "Saved ✓" : "Save AI Settings"} 
+                    onPress={handleSaveAiSettings} 
+                    loading={savingAiSettings} 
+                    style={aiSaved ? { backgroundColor: theme.colors.success, borderColor: theme.colors.success } : undefined} 
+                />
             </SheetModal>
 
 

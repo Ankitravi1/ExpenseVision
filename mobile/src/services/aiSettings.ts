@@ -6,7 +6,8 @@ export interface AiSettings {
     enabled: boolean;
     provider: AiProvider;
     model: string;
-    apiKey: string;
+    keys: Record<string, string>;
+    customModels: string[];
     baseUrl?: string;
 }
 
@@ -22,7 +23,8 @@ export const defaultAiSettings: AiSettings = {
     enabled: false,
     provider: 'deepseek',
     model: 'deepseek-v4-flash',
-    apiKey: '',
+    keys: {},
+    customModels: [],
     baseUrl: '',
 };
 

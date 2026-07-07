@@ -10,6 +10,7 @@ import authRouter from './routes/auth.js';
 import pushRouter from './routes/push.js';
 import recurringRouter, { materializeRecurringRules } from './routes/recurring.js';
 import aiSettingsRouter from './routes/aiSettings.js';
+import notificationsRouter from './routes/notifications.js';
 import { budgetsWithSpent } from './services/budgets.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { authenticateToken } from './middleware/auth.js';
@@ -78,6 +79,7 @@ app.use('/api/budgets', apiLimiter, authenticateToken, budgetsRouter);
 app.use('/api/push', apiLimiter, authenticateToken, pushRouter);
 app.use('/api/recurring', apiLimiter, authenticateToken, recurringRouter);
 app.use('/api/ai-settings', apiLimiter, authenticateToken, aiSettingsRouter);
+app.use('/api/notifications', apiLimiter, authenticateToken, notificationsRouter);
 
 // Initial data endpoint
 app.get('/api/initial-data', apiLimiter, authenticateToken, async (req, res, next) => {

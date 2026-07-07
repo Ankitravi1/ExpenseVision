@@ -151,42 +151,7 @@ export const Settings: React.FC = () => {
         <div className="space-y-6 max-w-4xl">
             <h2 className="text-3xl font-bold text-gray-darkest dark:text-gray-50">Settings</h2>
 
-            {/* Appearance */}
-            <Card>
-                <h3 className="text-xl font-semibold mb-4 text-gray-darkest dark:text-gray-50">Appearance</h3>
-                <div className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                            Theme
-                        </label>
-                        <div className="grid grid-cols-2 gap-4 max-w-md">
-                            <button
-                                onClick={() => handleThemeChange('light')}
-                                className={`p-4 rounded-lg border-2 transition-all ${theme === 'light'
-                                    ? 'border-primary bg-primary-light dark:bg-primary/20'
-                                    : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                                    }`}
-                            >
-                                <Icon name="Sun" size={24} className="mx-auto mb-2" />
-                                <p className="text-sm font-medium text-center">Light</p>
-                            </button>
-                            <button
-                                onClick={() => handleThemeChange('dark')}
-                                className={`p-4 rounded-lg border-2 transition-all ${theme === 'dark'
-                                    ? 'border-primary bg-primary-light dark:bg-primary/20'
-                                    : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                                    }`}
-                            >
-                                <Icon name="Moon" size={24} className="mx-auto mb-2" />
-                                <p className="text-sm font-medium text-center">Dark</p>
-                            </button>
-                        </div>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-3">
-                            Choose your preferred color scheme.
-                        </p>
-                    </div>
-                </div>
-            </Card>
+
 
             {/* Notifications */}
             <Card>
@@ -310,6 +275,7 @@ export const Settings: React.FC = () => {
                             >
                                 <option value="deepseek">DeepSeek</option>
                                 <option value="openai">OpenAI</option>
+                                <option value="gemini">Gemini</option>
                                 <option value="openrouter">OpenRouter</option>
                                 <option value="custom">Custom OpenAI-compatible</option>
                             </select>
@@ -329,7 +295,7 @@ export const Settings: React.FC = () => {
                                 className="block w-full bg-gray-100 border-transparent rounded-lg p-3 focus:ring-2 focus:ring-primary focus:bg-white text-base dark:bg-gray-700 dark:text-gray-100 dark:focus:bg-gray-600"
                             />
                             <datalist id="ai-model-options">
-                                {providerModels[aiSettings.provider].filter(Boolean).map(model => (
+                                {[...(providerModels[aiSettings.provider] || []), ...aiSettings.customModels].filter(Boolean).map(model => (
                                     <option key={model} value={model} />
                                 ))}
                             </datalist>
@@ -352,24 +318,122 @@ export const Settings: React.FC = () => {
                         </div>
                     )}
 
+                    <div className="mt-4">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Custom Models</label>
+                        <div className="flex gap-2 mb-2">
+                            <input
+                                id="new-custom-model"
+                                type="text"
+                                placeholder="Add custom model name"
+                                className="flex-1 bg-gray-100 border-transparent rounded-lg p-3 focus:ring-2 focus:ring-primary focus:bg-white text-base dark:bg-gray-700 dark:text-gray-100 dark:focus:bg-gray-600"
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        const input = e.target as HTMLInputElement;
+                                        if (input.value.trim() && !aiSettings.customModels.includes(input.value.trim())) {
+                                            setAiSaved(false);
+                                            setAiSettings(prev => ({ ...prev, customModels: [...prev.customModels, input.value.trim()] }));
+                                            input.value = '';
+                                        }
+                                    }
+                                }}
+                            />
+                            <button
+                                className="btn btn-secondary whitespace-nowrap"
+                                onClick={() => {
+                                    const input = document.getElementById('new-custom-model') as HTMLInputElement;
+                                    if (input.value.trim() && !aiSettings.customModels.includes(input.value.trim())) {
+                                        setAiSaved(false);
+                                        setAiSettings(prev => ({ ...prev, customModels: [...prev.customModels, input.value.trim()] }));
+                                        input.value = '';
+                                    }
+                                }}
+                            >
+                                <Icon name="Plus" size={16} className="mr-1" /> Add
+                            </button>
+                        </div>
+                        {aiSettings.customModels.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mt-2">
+                                {aiSettings.customModels.map(model => (
+                                    <div key={model} className="flex items-center gap-2 bg-gray-100 dark:bg-gray-700 px-3 py-1.5 rounded-full text-sm">
+                                        <span className="text-gray-700 dark:text-gray-300">{model}</span>
+                                        <button
+                                            onClick={() => {
+                                                setAiSaved(false);
+                                                setAiSettings(prev => ({
+                                                    ...prev,
+                                                    customModels: prev.customModels.filter(m => m !== model)
+                                                }));
+                                            }}
+                                            className="text-gray-400 hover:text-danger focus:outline-none"
+                                            aria-label="Remove model"
+                                        >
+                                            <Icon name="X" size={14} />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
                     <div>
-                        <label htmlFor="ai-api-key" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">API Key</label>
-                        <input
-                            id="ai-api-key"
-                            type="password"
-                            value={aiSettings.apiKey}
-                            onChange={(e) => {
-                                setAiSaved(false);
-                                setAiSettings(prev => ({ ...prev, apiKey: e.target.value }));
-                            }}
-                            placeholder="sk-..."
-                            className="block w-full bg-gray-100 border-transparent rounded-lg p-3 focus:ring-2 focus:ring-primary focus:bg-white text-base dark:bg-gray-700 dark:text-gray-100 dark:focus:bg-gray-600"
-                        />
+                        <label htmlFor="ai-api-key" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">API Key for {aiSettings.provider}</label>
+                        <div className="flex items-center gap-2">
+                            <input
+                                id="ai-api-key"
+                                type={document.getElementById('reveal-key')?.getAttribute('data-revealed') === 'true' ? 'text' : 'password'}
+                                value={aiSettings.keys[aiSettings.provider] || ''}
+                                onChange={(e) => {
+                                    setAiSaved(false);
+                                    setAiSettings(prev => ({ 
+                                        ...prev, 
+                                        keys: { ...prev.keys, [prev.provider]: e.target.value }
+                                    }));
+                                }}
+                                placeholder="sk-..."
+                                className="flex-1 bg-gray-100 border-transparent rounded-lg p-3 focus:ring-2 focus:ring-primary focus:bg-white text-base dark:bg-gray-700 dark:text-gray-100 dark:focus:bg-gray-600"
+                            />
+                            <button
+                                id="reveal-key"
+                                type="button"
+                                data-revealed="false"
+                                className="btn btn-secondary h-full"
+                                onClick={(e) => {
+                                    const btn = e.currentTarget;
+                                    const isRevealed = btn.getAttribute('data-revealed') === 'true';
+                                    btn.setAttribute('data-revealed', (!isRevealed).toString());
+                                    const input = document.getElementById('ai-api-key') as HTMLInputElement;
+                                    if (input) {
+                                        input.type = isRevealed ? 'password' : 'text';
+                                    }
+                                }}
+                                title="Reveal/Hide Key"
+                            >
+                                <Icon name="Eye" size={16} />
+                            </button>
+                            <button
+                                type="button"
+                                className="btn btn-danger h-full text-white"
+                                onClick={() => {
+                                    setAiSaved(false);
+                                    setAiSettings(prev => {
+                                        const newKeys = { ...prev.keys };
+                                        delete newKeys[prev.provider];
+                                        return { ...prev, keys: newKeys };
+                                    });
+                                }}
+                                title="Delete Key"
+                            >
+                                <Icon name="Trash2" size={16} />
+                            </button>
+                        </div>
                     </div>
 
                     <div className="flex justify-end">
-                        <button onClick={handleSaveAiSettings} className="btn btn-primary">
-                            <Icon name="Save" size={16} className="mr-2" />
+                        <button 
+                            onClick={handleSaveAiSettings} 
+                            className={`btn ${aiSaved ? 'bg-green-600 hover:bg-green-700 text-white' : 'btn-primary'}`}
+                        >
+                            {aiSaved ? <Icon name="Check" size={16} className="mr-2" /> : <Icon name="Save" size={16} className="mr-2" />}
                             {aiSaved ? 'Saved' : 'Save AI Settings'}
                         </button>
                     </div>

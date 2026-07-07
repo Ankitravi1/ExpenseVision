@@ -156,6 +156,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ activePage, setActivePage, isC
                   <Icon name="Settings" className="mr-3" size={16} /> Settings
                 </li>
                 <li
+                  className="px-4 py-2.5 hover:bg-gray-700/50 flex items-center cursor-pointer transition-colors"
+                  onClick={() => {
+                    toggleTheme();
+                  }}
+                >
+                  <Icon name={theme === 'light' ? 'Moon' : 'Sun'} className="mr-3" size={16} /> {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
+                </li>
+                <li
                   className="px-4 py-2.5 hover:bg-gray-700/50 flex items-center cursor-pointer text-red-400 transition-colors"
                   onClick={() => {
                     if (onLogout) {
