@@ -6,6 +6,8 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 import { authService } from '../services/auth';
 import { pushService } from '../services/push';
 import { AiProvider, AiSettings, defaultAiSettings, getAiSettings, providerModels, saveAiSettings } from '../services/aiSettings';
+import { ImportTransactionsModal } from '../components/ImportTransactionsModal';
+import { api } from '../services/api';
 
 export const Settings: React.FC = () => {
     const context = useContext(AppContext);
@@ -17,9 +19,11 @@ export const Settings: React.FC = () => {
     const [emailReports, setEmailReports] = useState(false);
     const [clearConfirm, setClearConfirm] = useState(false);
     const [clearPhrase, setClearPhrase] = useState('');
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [aiSettings, setAiSettings] = useState<AiSettings>(defaultAiSettings);
     const [aiSaved, setAiSaved] = useState(false);
     const [aiError, setAiError] = useState('');
+    const [vapidConfigured, setVapidConfigured] = useState(true);
 
     useEffect(() => {
         // Check if push is supported and subscribed
@@ -34,6 +38,9 @@ export const Settings: React.FC = () => {
         getAiSettings()
             .then(setAiSettings)
             .catch(err => setAiError(err.message || 'Failed to load AI settings'));
+
+        api.getVapidKey()
+            .catch(() => setVapidConfigured(false));
     }, []);
 
     const handleThemeChange = (newTheme: 'light' | 'dark') => {
@@ -183,9 +190,17 @@ export const Settings: React.FC = () => {
 
             {/* Notifications */}
             <Card>
-                <h3 className="text-xl font-semibold mb-4 text-gray-darkest dark:text-gray-50">Notifications</h3>
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                    <h3 className="text-xl font-semibold mb-4 text-gray-darkest dark:text-gray-50">Notifications</h3>
+                    {!vapidConfigured && (
+                        <div className="mb-4 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 flex items-start gap-2">
+                            <Icon name="AlertTriangle" size={16} className="text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                            <p className="text-sm text-amber-700 dark:text-amber-300">
+                                Push notifications are not configured on this server. Contact the administrator to set up VAPID keys.
+                            </p>
+                        </div>
+                    )}
+                    <div className="space-y-4">
+                        <div className={`flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg ${!vapidConfigured ? 'opacity-50' : ''}`}>
                         <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1">
                                 <Icon name="Bell" size={18} className="text-gray-600 dark:text-gray-400" />
@@ -195,18 +210,20 @@ export const Settings: React.FC = () => {
                                 Allow this browser to receive ExpenseVision notifications
                             </p>
                         </div>
-                        <label className="relative inline-flex items-center cursor-pointer ml-4">
+                        <label className={`relative inline-flex items-center ${vapidConfigured ? 'cursor-pointer' : 'cursor-not-allowed'} ml-4`}>
                             <input
                                 type="checkbox"
                                 checked={notifications}
-                                onChange={(e) => handleNotificationToggle(e.target.checked)}
+                                onChange={(e) => vapidConfigured && handleNotificationToggle(e.target.checked)}
+                                disabled={!vapidConfigured}
                                 className="sr-only peer"
                             />
                             <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 dark:peer-focus:ring-primary/40 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
                         </label>
+                        </div>
                     </div>
 
-                    <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                    <div className={`flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg ${!vapidConfigured ? 'opacity-50' : ''}`}>
                         <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1">
                                 <Icon name="AlertCircle" size={18} className="text-gray-600 dark:text-gray-400" />
@@ -216,11 +233,12 @@ export const Settings: React.FC = () => {
                                 Get notified when a new expense pushes a category over budget
                             </p>
                         </div>
-                        <label className="relative inline-flex items-center cursor-pointer ml-4">
+                        <label className={`relative inline-flex items-center ${vapidConfigured ? 'cursor-pointer' : 'cursor-not-allowed'} ml-4`}>
                             <input
                                 type="checkbox"
                                 checked={budgetAlerts}
-                                onChange={(e) => handleBudgetAlertsToggle(e.target.checked)}
+                                onChange={(e) => vapidConfigured && handleBudgetAlertsToggle(e.target.checked)}
+                                disabled={!vapidConfigured}
                                 className="sr-only peer"
                             />
                             <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 dark:peer-focus:ring-primary/40 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
@@ -247,7 +265,6 @@ export const Settings: React.FC = () => {
                             <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 dark:peer-focus:ring-primary/40 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
                         </label>
                     </div>
-                </div>
             </Card>
 
             {/* AI */}
@@ -388,6 +405,22 @@ export const Settings: React.FC = () => {
                     <div className="flex items-start justify-between p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
                         <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2">
+                                <Icon name="Upload" size={20} className="text-primary" />
+                                <h4 className="font-semibold text-gray-darkest dark:text-gray-50">Import Data</h4>
+                            </div>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                                Import transactions from a CSV file
+                            </p>
+                        </div>
+                        <button onClick={() => setIsImportModalOpen(true)} className="btn btn-secondary ml-4">
+                            <Icon name="Upload" size={16} className="mr-2" />
+                            Import CSV
+                        </button>
+                    </div>
+
+                    <div className="flex items-start justify-between p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                        <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
                                 <Icon name="Download" size={20} className="text-primary" />
                                 <h4 className="font-semibold text-gray-darkest dark:text-gray-50">Export Data</h4>
                             </div>
@@ -450,6 +483,11 @@ export const Settings: React.FC = () => {
                 cancelText="Cancel"
                 variant="danger"
                 requirePhrase="DELETE"
+            />
+            <ImportTransactionsModal
+                isOpen={isImportModalOpen}
+                onClose={() => setIsImportModalOpen(false)}
+                onImportSuccess={() => {}}
             />
         </div>
     );

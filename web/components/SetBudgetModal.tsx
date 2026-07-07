@@ -17,12 +17,12 @@ export const SetBudgetModal: React.FC<SetBudgetModalProps> = ({ isOpen, onClose,
     const [amount, setAmount] = useState('');
     const [categoryId, setCategoryId] = useState('');
     const [rollover, setRollover] = useState(false);
-    const [alertThreshold, setAlertThreshold] = useState('100');
+    const [alertThreshold, setAlertThreshold] = useState('90');
 
     const applyBudgetFields = (budget?: { amount: number; rollover?: boolean; alertThreshold?: number }) => {
         setAmount(budget ? budget.amount.toString() : '');
         setRollover(budget?.rollover ?? false);
-        setAlertThreshold(String(budget?.alertThreshold ?? 100));
+        setAlertThreshold(String(budget?.alertThreshold ?? 90));
     };
 
     useEffect(() => {
@@ -30,19 +30,21 @@ export const SetBudgetModal: React.FC<SetBudgetModalProps> = ({ isOpen, onClose,
 
         const findBudget = (catId: string) => {
             if (month) {
-                return context.budgets.find(b => b.categoryId === catId && b.month === month);
+                return context.budgets.find(b => b.categoryId === catId && b.month === month) || 
+                       context.budgets.find(b => b.categoryId === catId && (!b.month || b.month === ""));
             }
-            return context.budgets.find(b => b.categoryId === catId);
+            return context.budgets.find(b => b.categoryId === catId && (!b.month || b.month === ""));
         };
 
         if (preSelectedCategoryId) {
             setCategoryId(preSelectedCategoryId);
             applyBudgetFields(findBudget(preSelectedCategoryId));
         } else if (context.categories) {
-            const firstExpense = context.categories.find(c => c.type === 'expense');
-            if (firstExpense) {
-                setCategoryId(firstExpense.id);
-                applyBudgetFields(findBudget(firstExpense.id));
+            const available = context.categories.filter(c => c.type === 'expense' && !findBudget(c.id));
+            const firstAvailable = available[0] || context.categories.find(c => c.type === 'expense');
+            if (firstAvailable) {
+                setCategoryId(firstAvailable.id);
+                applyBudgetFields(findBudget(firstAvailable.id));
             }
         }
     }, [isOpen, preSelectedCategoryId, month, context?.categories, context?.budgets]);
@@ -53,9 +55,10 @@ export const SetBudgetModal: React.FC<SetBudgetModalProps> = ({ isOpen, onClose,
 
         let existingBudget;
         if (month) {
-            existingBudget = context?.budgets.find(b => b.categoryId === newCatId && b.month === month);
+            existingBudget = context?.budgets.find(b => b.categoryId === newCatId && b.month === month) ||
+                             context?.budgets.find(b => b.categoryId === newCatId && (!b.month || b.month === ""));
         } else {
-            existingBudget = context?.budgets.find(b => b.categoryId === newCatId);
+            existingBudget = context?.budgets.find(b => b.categoryId === newCatId && (!b.month || b.month === ""));
         }
 
         applyBudgetFields(existingBudget);
@@ -65,21 +68,35 @@ export const SetBudgetModal: React.FC<SetBudgetModalProps> = ({ isOpen, onClose,
     const { setBudget, categories, budgets, currency } = context;
 
     const expenseCategories = categories.filter(c => c.type === 'expense');
+    
+    // Filter available categories for new budgets
+    const availableCategories = preSelectedCategoryId 
+        ? expenseCategories 
+        : expenseCategories.filter(c => {
+            if (month) {
+                return !budgets.find(b => b.categoryId === c.id && (b.month === month || !b.month || b.month === ""));
+            }
+            return !budgets.find(b => b.categoryId === c.id && (!b.month || b.month === ""));
+        });
+    const optionsToRender = preSelectedCategoryId ? expenseCategories : availableCategories;
+
+    const effectiveCategoryId = preSelectedCategoryId || categoryId;
+
     const existingBudget = month
-        ? budgets.find(b => b.categoryId === categoryId && b.month === month)
-        : budgets.find(b => b.categoryId === categoryId);
+        ? (budgets.find(b => b.categoryId === effectiveCategoryId && b.month === month) || budgets.find(b => b.categoryId === effectiveCategoryId && (!b.month || b.month === "")))
+        : budgets.find(b => b.categoryId === effectiveCategoryId && (!b.month || b.month === ""));
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!amount || !categoryId) return;
+        if (!amount || !effectiveCategoryId) return;
 
         const threshold = parseFloat(alertThreshold);
         const budgetPayload = {
-            categoryId,
+            categoryId: effectiveCategoryId,
             amount: parseFloat(amount),
-            month: month || undefined,
+            month: existingBudget?.month === "" ? "" : (month || undefined), // If existing budget is recurring, keep it recurring
             rollover,
-            alertThreshold: threshold >= 1 && threshold <= 500 ? threshold : 100,
+            alertThreshold: threshold >= 1 && threshold <= 500 ? threshold : 90,
         };
 
         setBudget({
@@ -130,12 +147,12 @@ export const SetBudgetModal: React.FC<SetBudgetModalProps> = ({ isOpen, onClose,
                             <label htmlFor="budgetCategory" className={labelStyles}>Category</label>
                             <select
                                 id="budgetCategory"
-                                value={categoryId}
+                                value={effectiveCategoryId}
                                 onChange={handleCategoryChange}
                                 className={inputStyles}
                                 disabled={!!preSelectedCategoryId}
                             >
-                                {expenseCategories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+                                {optionsToRender.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
                             </select>
                         </div>
 
@@ -163,9 +180,9 @@ export const SetBudgetModal: React.FC<SetBudgetModalProps> = ({ isOpen, onClose,
                                 id="budgetThreshold"
                                 value={alertThreshold}
                                 onChange={e => setAlertThreshold(e.target.value)}
-                                min={1}
+                                min={0}
                                 max={500}
-                                step={5}
+                                step="any"
                                 className={inputStyles}
                             />
                         </div>

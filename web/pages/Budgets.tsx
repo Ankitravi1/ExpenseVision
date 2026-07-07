@@ -86,22 +86,7 @@ const BudgetCard: React.FC<{ budget: Budget; onEdit: () => void }> = ({ budget, 
     );
 };
 
-const UnbudgetedCategory: React.FC<{ categoryName: string, icon: string, onSetBudget: () => void }> = ({ categoryName, icon, onSetBudget }) => (
-    <div className="flex items-center justify-between p-4 border-b last:border-0 border-gray-200 dark:border-gray-700">
-        <div className="flex items-center">
-            <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center mr-4">
-                <Icon name={icon} className="text-gray-dark dark:text-gray-300" />
-            </div>
-            <p className="font-medium">{categoryName}</p>
-        </div>
-        <button
-            onClick={onSetBudget}
-            className="font-semibold text-primary hover:text-primary-hover text-sm border border-primary px-3 py-1.5 rounded-md"
-        >
-            SET BUDGET
-        </button>
-    </div>
-);
+
 
 export const Budgets: React.FC = () => {
     const [currentDate, setCurrentDate] = useState(new Date());
@@ -141,9 +126,6 @@ export const Budgets: React.FC = () => {
     const totalRemaining = totalBudget - totalSpent;
     const overallPercentage = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
 
-    const budgetedCategoryIds = new Set(filteredBudgets.map(b => b.categoryId));
-    const unbudgetedCategories = categories.filter(c => c.type === 'expense' && !budgetedCategoryIds.has(c.id));
-
     const openSetBudget = (categoryId?: string) => {
         setSelectedCategoryId(categoryId);
         setIsModalOpen(true);
@@ -170,10 +152,11 @@ export const Budgets: React.FC = () => {
                 <div className="flex justify-between items-center">
                     <h2 className="text-3xl font-bold text-gray-darkest dark:text-gray-50">Budget Management</h2>
                     <div className="flex items-center gap-3">
-                        {/* TODO: Budget Profile Dropdown - Phase 2 */}
                         <button
                             onClick={() => openSetBudget()}
-                            className="btn btn-primary flex items-center gap-2"
+                            className="btn btn-primary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={filteredBudgets.length >= categories.filter(c => c.type === 'expense').length}
+                            title={filteredBudgets.length >= categories.filter(c => c.type === 'expense').length ? "All categories budgeted" : ""}
                         >
                             <Icon name="Plus" size={18} />
                             Set Budget
@@ -230,25 +213,6 @@ export const Budgets: React.FC = () => {
                         )}
                     </div>
                 </div>
-
-                {unbudgetedCategories.length > 0 && (
-                    <Card>
-                        <h3 className="text-lg font-semibold mb-2 dark:text-gray-50">Unbudgeted Categories</h3>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                            Set budgets for these expense categories to track your spending
-                        </p>
-                        <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                            {unbudgetedCategories.map(cat => (
-                                <UnbudgetedCategory
-                                    key={cat.id}
-                                    categoryName={cat.name}
-                                    icon={cat.icon}
-                                    onSetBudget={() => openSetBudget(cat.id)}
-                                />
-                            ))}
-                        </div>
-                    </Card>
-                )}
             </div>
 
             <SetBudgetModal

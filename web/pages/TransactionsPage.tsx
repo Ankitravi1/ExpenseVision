@@ -76,7 +76,6 @@ const TransactionRow: React.FC<{ transaction: Transaction; onEdit: () => void }>
 }
 
 
-import { ImportTransactionsModal } from '../components/ImportTransactionsModal';
 
 // ... (existing imports)
 
@@ -102,7 +101,7 @@ export const TransactionsPage: React.FC = () => {
     // Edit Modal State
     const [editTransaction, setEditTransaction] = useState<Transaction | null>(null);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+
 
     const requestSort = (key: keyof Transaction | 'accountName') => {
         let direction: 'asc' | 'desc' = 'asc';
@@ -163,12 +162,7 @@ export const TransactionsPage: React.FC = () => {
         </th>
     );
 
-    const handleImportSuccess = (minDate: string, maxDate: string) => {
-        setStartDate(isoDateToDisplay(minDate));
-        setEndDate(isoDateToDisplay(maxDate));
-    };
-
-    return (
+    return (
         <>
             <Card>
                 <div className="flex flex-wrap justify-between items-center mb-4 gap-4">
@@ -203,13 +197,6 @@ export const TransactionsPage: React.FC = () => {
                                 Show All
                             </button>
                         </div>
-                        <button
-                            onClick={() => setIsImportModalOpen(true)}
-                            className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors text-sm font-medium text-gray-700 dark:text-gray-200"
-                        >
-                            <Icon name="Upload" size={16} />
-                            Import CSV
-                        </button>
                         <ExportButton />
                     </div>
                 </div>
@@ -264,12 +251,6 @@ export const TransactionsPage: React.FC = () => {
                     onDelete={handleDelete}
                 />
             )}
-
-            <ImportTransactionsModal
-                isOpen={isImportModalOpen}
-                onClose={() => setIsImportModalOpen(false)}
-                onImportSuccess={handleImportSuccess}
-            />
         </>
     );
 };

@@ -18,7 +18,7 @@ export const BudgetForm: React.FC<Props> = ({ visible, onClose, editing }) => {
     const [categoryId, setCategoryId] = useState<string | null>(null);
     const [amount, setAmount] = useState('');
     const [rollover, setRollover] = useState(false);
-    const [threshold, setThreshold] = useState('100');
+    const [threshold, setThreshold] = useState('90');
     const [saving, setSaving] = useState(false);
 
     const budgetedCategoryIds = new Set(budgets.map(b => b.categoryId));
@@ -29,7 +29,7 @@ export const BudgetForm: React.FC<Props> = ({ visible, onClose, editing }) => {
             setCategoryId(editing?.categoryId || null);
             setAmount(editing ? String(editing.amount) : '');
             setRollover(editing?.rollover ?? false);
-            setThreshold(String(editing?.alertThreshold ?? 100));
+            setThreshold(String(editing?.alertThreshold ?? 90));
         }
     }, [visible, editing]);
 
@@ -79,7 +79,7 @@ export const BudgetForm: React.FC<Props> = ({ visible, onClose, editing }) => {
                 value={threshold}
                 onChangeText={setThreshold}
                 keyboardType="number-pad"
-                placeholder="100"
+                placeholder="90"
             />
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.lg }}>
                 <View style={{ flex: 1, marginRight: spacing.md }}>

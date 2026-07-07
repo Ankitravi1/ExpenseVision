@@ -26,17 +26,22 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
     const [date, setDate] = useState(isoDateToDisplay(todayIsoDate()));
     const [time, setTime] = useState(new Date().toTimeString().slice(0, 5));
     const [accountId, setAccountId] = useState(''); // From Account (Expense/Transfer) or To Account (Income)
+
     const [transferToAccountId, setTransferToAccountId] = useState(''); // Only for Transfer
     const [categoryId, setCategoryId] = useState('');
     const [isMounted, setIsMounted] = useState(false);
     const [voiceText, setVoiceText] = useState('');
     const [isParsingVoiceText, setIsParsingVoiceText] = useState(false);
     const [voiceParseError, setVoiceParseError] = useState('');
+    const [aiEnabled, setAiEnabled] = useState(false);
     const nativeDateInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         setIsMounted(true);
-    }, []);
+        if (isOpen) {
+            getAiSettings().then(settings => setAiEnabled(settings.enabled));
+        }
+    }, [isOpen]);
 
     useEffect(() => {
         if (type !== 'transfer' && context?.accounts && context.accounts.length > 0 && !accountId) {
@@ -247,7 +252,7 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
                             ))}
                         </div>
 
-                        {!transaction && (
+                        {!transaction && aiEnabled && (
                             <div className="rounded-lg border border-primary/20 bg-primary-light/40 p-4 dark:bg-primary/10 dark:border-primary/30">
                                 <div className="flex items-center gap-2 mb-3">
                                     <Icon name="Mic2" size={18} className="text-primary" />

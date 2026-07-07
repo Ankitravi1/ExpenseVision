@@ -6,37 +6,29 @@ import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useNavigation } from '@react-navigation/native';
-import { Card, SheetModal, ChipSelector, FieldLabel, Input, Button, OptionSheet, warningHaptic } from '../../components/ui';
+import { Card, SheetModal, ChipSelector, FieldLabel, Input, Button, warningHaptic } from '../../components/ui';
 import { CategoryIcon } from '../../components/CategoryIcon';
 import { CategoryForm } from '../../components/CategoryForm';
 import { RecurringForm } from '../../components/RecurringForm';
-import { CURRENCIES, formatCurrency } from '../../utils/currency';
+import { formatCurrency } from '../../utils/currency';
 import { isoDateToDisplay } from '../../utils/date';
 import { shareTransactionsCsv } from '../../utils/exportCsv';
 import { spacing } from '../../theme';
 import { Category, RecurringRule } from '../../types';
 
-const COMMON_TIMEZONES = [
-    'Asia/Kolkata', 'Asia/Dubai', 'Asia/Singapore', 'Asia/Tokyo', 'Asia/Shanghai',
-    'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Europe/Moscow',
-    'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
-    'America/Sao_Paulo', 'Australia/Sydney', 'Pacific/Auckland', 'UTC',
-];
 import * as DocumentPicker from 'expo-document-picker';
+import * as LegacyFS from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import { AiProvider, AiSettings, defaultAiSettings, getAiSettings, providerModels, saveAiSettings } from '../../services/aiSettings';
 
 export default function SettingsScreen() {
     const navigation = useNavigation();
-    const { user, logout, updateProfile } = useAuth();
+    const { user } = useAuth();
     const { categories, recurring, deleteCategory, deleteRecurring, clearAllTransactions, transactions, refresh } = useData();
-    const { theme, mode, toggleTheme } = useTheme();
-    const [showCurrency, setShowCurrency] = useState(false);
+    const { theme } = useTheme();
     const [exporting, setExporting] = useState(false);
     const [importing, setImporting] = useState(false);
-    const [showEditName, setShowEditName] = useState(false);
     const [showAiSettings, setShowAiSettings] = useState(false);
-    const [name, setName] = useState(user?.name || '');
-    const [savingName, setSavingName] = useState(false);
     const [aiSettings, setAiSettings] = useState<AiSettings>(defaultAiSettings);
     const [savingAiSettings, setSavingAiSettings] = useState(false);
     const [showClearAll, setShowClearAll] = useState(false);
@@ -45,28 +37,6 @@ export default function SettingsScreen() {
     useEffect(() => {
         getAiSettings().then(setAiSettings).catch(() => setAiSettings(defaultAiSettings));
     }, []);
-
-    const handleCurrencyChange = async (code: string) => {
-        try {
-            await updateProfile({ currency: code });
-            setShowCurrency(false);
-        } catch (err: any) {
-            Alert.alert('Error', err.message || 'Failed to update currency');
-        }
-    };
-
-    const handleSaveName = async () => {
-        if (!name.trim()) return;
-        setSavingName(true);
-        try {
-            await updateProfile({ name: name.trim() });
-            setShowEditName(false);
-        } catch (err: any) {
-            Alert.alert('Error', err.message || 'Failed to update name');
-        } finally {
-            setSavingName(false);
-        }
-    };
 
     const handleAiProviderChange = (provider: AiProvider) => {
         setAiSettings(prev => ({
@@ -89,13 +59,6 @@ export default function SettingsScreen() {
         }
     };
 
-    const handleTimezoneChange = async (tz: string) => {
-        try {
-            await updateProfile({ timezone: tz });
-        } catch (err: any) {
-            Alert.alert('Error', err.message || 'Failed to update timezone');
-        }
-    };
 
     const handleExport = async () => {
         setExporting(true);
@@ -148,6 +111,27 @@ export default function SettingsScreen() {
         }
     };
 
+    const handleDownloadTemplate = async () => {
+        try {
+            const csvContent = 'Date,Note,Amount,Type,Category,Account,Transfer to Account\n' +
+                '2025-01-01,Groceries at Whole Foods,125.50,expense,Groceries,Checking Account,\n' +
+                '02-01-2025,Salary January,4500.00,income,Salary,Savings Account,\n' +
+                '03-01-2025,Credit card bill payment,1000.00,transfer,,Checking Account,Credit Card\n';
+
+            const fileUri = (LegacyFS.documentDirectory || '') + 'transaction_import_template.csv';
+            await LegacyFS.writeAsStringAsync(fileUri, csvContent, {
+                encoding: LegacyFS.EncodingType.UTF8,
+            });
+            if (await Sharing.isAvailableAsync()) {
+                await Sharing.shareAsync(fileUri, { mimeType: 'text/csv', dialogTitle: 'Download CSV Template' });
+            } else {
+                Alert.alert('Error', 'Sharing is not available on this device');
+            }
+        } catch (err: any) {
+            Alert.alert('Error', 'Could not create template file');
+        }
+    };
+
     const confirmClearAll = () => {
         warningHaptic();
         setShowClearAll(true);
@@ -167,12 +151,6 @@ export default function SettingsScreen() {
         }
     };
 
-    const confirmLogout = () => {
-        Alert.alert('Log out', 'Are you sure you want to log out?', [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Log out', style: 'destructive', onPress: logout },
-        ]);
-    };
 
     const Row: React.FC<{ icon: keyof typeof MaterialCommunityIcons.glyphMap; label: string; value?: string; onPress?: () => void; right?: React.ReactNode; danger?: boolean }> = ({ icon, label, value, onPress, right, danger }) => (
         <TouchableOpacity
@@ -205,47 +183,16 @@ export default function SettingsScreen() {
                     <Text style={[styles.title, { color: theme.colors.text }]}>Settings</Text>
                 </View>
 
-                {/* Profile */}
-                <Card style={{ marginBottom: spacing.md, alignItems: 'center', paddingVertical: spacing.lg }}>
-                    <View style={[styles.avatar, { backgroundColor: theme.colors.primary }]}>
-                        <Text style={styles.avatarText}>{(user?.name || 'U').trim().charAt(0).toUpperCase()}</Text>
-                    </View>
-                    <Text style={{ color: theme.colors.text, fontWeight: '700', fontSize: 18, marginTop: spacing.sm }}>{user?.name}</Text>
-                    <Text style={{ color: theme.colors.textTertiary, fontSize: 13 }}>{user?.email}</Text>
-                </Card>
 
                 <Card style={{ marginBottom: spacing.md, paddingVertical: 0 }}>
-                    <Row icon="account-edit" label="Edit name" onPress={() => { setName(user?.name || ''); setShowEditName(true); }} />
-                    <Row icon="currency-usd" label="Currency" value={user?.currency || 'INR'} onPress={() => setShowCurrency(true)} />
                     <Row icon="creation" label="AI transaction parsing" value={aiSettings.enabled ? aiSettings.model : 'Off'} onPress={() => setShowAiSettings(true)} />
-                    <Row
-                        icon="theme-light-dark"
-                        label="Dark mode"
-                        right={<Switch value={mode === 'dark'} onValueChange={toggleTheme} trackColor={{ true: theme.colors.primary }} />}
-                    />
                 </Card>
 
                 <Card style={{ marginBottom: spacing.md, paddingVertical: 0 }}>
-                    <View style={{ paddingVertical: spacing.sm }}>
-                        <OptionSheet
-                            label="Timezone"
-                            options={[
-                                ...(user?.timezone && !COMMON_TIMEZONES.includes(user.timezone)
-                                    ? [{ value: user.timezone, label: user.timezone }]
-                                    : []),
-                                ...COMMON_TIMEZONES.map(tz => ({ value: tz, label: tz })),
-                            ]}
-                            value={user?.timezone || 'UTC'}
-                            onChange={handleTimezoneChange}
-                        />
-                    </View>
+                    <Row icon="file-download-outline" label="Download CSV template" onPress={handleDownloadTemplate} />
                     <Row icon="file-import-outline" label={importing ? 'Importing…' : 'Import transactions (CSV)'} onPress={importing ? undefined : handleImport} />
                     <Row icon="export-variant" label={exporting ? 'Exporting…' : 'Export transactions (CSV)'} onPress={exporting ? undefined : handleExport} />
                     <Row icon="delete-sweep" label="Clear all transactions" onPress={confirmClearAll} danger />
-                </Card>
-
-                <Card style={{ paddingVertical: 0 }}>
-                    <Row icon="logout" label="Log out" onPress={confirmLogout} danger />
                 </Card>
 
                 <Text style={{ color: theme.colors.textTertiary, textAlign: 'center', marginTop: spacing.lg, fontSize: 12 }}>
@@ -254,20 +201,6 @@ export default function SettingsScreen() {
             </ScrollView>
 
             {/* Currency picker */}
-            <SheetModal visible={showCurrency} onClose={() => setShowCurrency(false)} title="Currency">
-                <FieldLabel>Choose your currency</FieldLabel>
-                <ChipSelector
-                    options={CURRENCIES.map(c => ({ value: c.code, label: `${c.symbol} ${c.code}` }))}
-                    value={user?.currency || 'INR'}
-                    onChange={handleCurrencyChange}
-                />
-            </SheetModal>
-
-            {/* Edit name */}
-            <SheetModal visible={showEditName} onClose={() => setShowEditName(false)} title="Edit name">
-                <Input label="Name" value={name} onChangeText={setName} />
-                <Button title="Save" onPress={handleSaveName} loading={savingName} />
-            </SheetModal>
 
             {/* AI settings */}
             <SheetModal visible={showAiSettings} onClose={() => setShowAiSettings(false)} title="AI transaction parsing">
@@ -280,7 +213,7 @@ export default function SettingsScreen() {
                     </View>
                     <Switch
                         value={aiSettings.enabled}
-                        onValueChange={enabled => setAiSettings(prev => ({ ...prev, enabled }))}
+                        onValueChange={(enabled: boolean) => setAiSettings(prev => ({ ...prev, enabled }))}
                         trackColor={{ true: theme.colors.primary }}
                     />
                 </View>

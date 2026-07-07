@@ -1,5 +1,5 @@
-import React from 'react';
-import { ActivityIndicator, View, Text, TouchableOpacity, StyleSheet, Switch } from 'react-native';
+import React, { useState } from 'react';
+import { ActivityIndicator, View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -18,6 +18,7 @@ import ReportsScreen from '../screens/main/ReportsScreen';
 import SettingsScreen from '../screens/main/SettingsScreen';
 import CategoriesScreen from '../screens/main/CategoriesScreen';
 import RecurringScreen from '../screens/main/RecurringScreen';
+import ProfileScreen from '../screens/main/ProfileScreen';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
@@ -58,6 +59,7 @@ function DrawerContentComponent({ navigation }: any) {
     const { theme, mode, toggleTheme } = useTheme();
     const { user, logout } = useAuth();
     const { categories, recurring, transactions } = useData();
+    const [userMenuOpen, setUserMenuOpen] = useState(false);
 
     const DrawerItem: React.FC<{
         icon: keyof typeof MaterialCommunityIcons.glyphMap;
@@ -65,7 +67,8 @@ function DrawerContentComponent({ navigation }: any) {
         onPress: () => void;
         badge?: string;
         danger?: boolean;
-    }> = ({ icon, label, onPress, badge, danger }) => (
+        rightElement?: React.ReactNode;
+    }> = ({ icon, label, onPress, badge, danger, rightElement }) => (
         <TouchableOpacity
             onPress={onPress}
             style={[styles.drawerItem, { backgroundColor: danger ? theme.colors.dangerBg : 'transparent' }]}
@@ -73,38 +76,38 @@ function DrawerContentComponent({ navigation }: any) {
         >
             <MaterialCommunityIcons name={icon} size={24} color={danger ? theme.colors.danger : theme.colors.textSecondary} />
             <Text style={[styles.drawerLabel, { color: danger ? theme.colors.danger : theme.colors.text }]}>{label}</Text>
-            {badge ? (
+            {rightElement || (badge ? (
                 <View style={[styles.badge, { backgroundColor: danger ? theme.colors.danger : theme.colors.primary }]}>
                     <Text style={styles.badgeText}>{badge}</Text>
                 </View>
-            ) : null}
+            ) : null)}
         </TouchableOpacity>
     );
 
     const goToTab = (screen: string, params?: Record<string, unknown>) => {
         navigation.navigate('Main', { screen, params });
         navigation.closeDrawer();
+        setUserMenuOpen(false);
     };
 
     const goToDrawerScreen = (screen: string) => {
         navigation.navigate(screen);
         navigation.closeDrawer();
+        setUserMenuOpen(false);
     };
+
+    const handleLogout = () => {
+        navigation.closeDrawer();
+        setUserMenuOpen(false);
+        logout();
+    };
+
+    const initials = (user?.name || 'U').trim().charAt(0).toUpperCase();
 
     return (
         <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-            <View style={styles.drawerHeader}>
-                <View style={[styles.avatar, { backgroundColor: theme.colors.primary }]}>
-                    <Text style={styles.avatarText}>{(user?.name || 'U').trim().charAt(0).toUpperCase()}</Text>
-                </View>
-                <View style={styles.headerInfo}>
-                    <Text style={[styles.headerName, { color: theme.colors.text }]}>{user?.name}</Text>
-                    <Text style={[styles.headerEmail, { color: theme.colors.textTertiary }]}>{user?.email}</Text>
-                </View>
-            </View>
-
-            <View style={styles.section}>
-                <DrawerItem icon="plus-circle" label="Add transaction" onPress={() => goToTab('Transactions', { openForm: true })} />
+            {/* Main nav items */}
+            <View style={[styles.section, { marginTop: spacing.xl + spacing.lg }]}>
                 <DrawerItem icon="view-dashboard-outline" label="Dashboard" onPress={() => goToTab('Dashboard')} />
                 <DrawerItem icon="swap-horizontal" label="Transactions" badge={`${transactions.length}`} onPress={() => goToTab('Transactions')} />
                 <DrawerItem icon="target" label="Budgets" onPress={() => goToTab('Budgets')} />
@@ -112,29 +115,97 @@ function DrawerContentComponent({ navigation }: any) {
             </View>
 
             <View style={styles.section}>
-                <View style={styles.sectionDivider} />
+                <View style={[styles.sectionDivider, { backgroundColor: theme.colors.separator }]} />
                 <DrawerItem icon="chart-pie" label="Reports" onPress={() => goToDrawerScreen('Reports')} />
                 <DrawerItem icon="tag-multiple" label="Categories" badge={`${categories.length}`} onPress={() => goToDrawerScreen('Categories')} />
                 <DrawerItem icon="repeat" label="Recurring" badge={`${recurring.length}`} onPress={() => goToDrawerScreen('Recurring')} />
-                <DrawerItem icon="cog-outline" label="Settings" onPress={() => goToDrawerScreen('Settings')} />
             </View>
 
-            <View style={styles.section}>
-                <View style={styles.sectionDivider} />
-                <View style={styles.drawerToggleRow}>
-                    <MaterialCommunityIcons name="theme-light-dark" size={24} color={theme.colors.textSecondary} />
-                    <Text style={[styles.drawerLabel, { color: theme.colors.text, flex: 1 }]}>Dark mode</Text>
-                    <Switch value={mode === 'dark'} onValueChange={toggleTheme} trackColor={{ true: theme.colors.primary }} />
-                </View>
-            </View>
+            {/* Spacer */}
+            <View style={{ flex: 1 }} />
 
-            <View style={styles.section}>
-                <DrawerItem icon="logout" label="Log out" danger onPress={logout} />
-            </View>
-
-            <Text style={{ color: theme.colors.textTertiary, textAlign: 'center', marginTop: spacing.lg, fontSize: 12, paddingBottom: spacing.xl }}>
+            {/* Sync note */}
+            <Text style={{ color: theme.colors.textTertiary, textAlign: 'center', fontSize: 11, marginBottom: spacing.sm, paddingHorizontal: spacing.md }}>
                 ExpenseVision · synced with your web account
             </Text>
+
+            {/* Add Transaction — prominent button just above user pill */}
+            <TouchableOpacity
+                onPress={() => goToTab('Transactions', { openForm: true })}
+                style={[styles.addTxnButton, { backgroundColor: theme.colors.primary }]}
+                activeOpacity={0.85}
+            >
+                <MaterialCommunityIcons name="plus" size={22} color="#fff" />
+                <Text style={styles.addTxnLabel}>Add Transaction</Text>
+            </TouchableOpacity>
+
+            {/* User menu (expands upward from the pill) */}
+            {userMenuOpen && (
+                <View style={[styles.userMenu, { backgroundColor: theme.colors.card, borderColor: theme.colors.separator }]}>
+                    {/* Dark mode toggle inside user menu */}
+                    <TouchableOpacity
+                        style={styles.userMenuItem}
+                        onPress={toggleTheme}
+                    >
+                        <MaterialCommunityIcons
+                            name={mode === 'dark' ? 'weather-sunny' : 'weather-night'}
+                            size={20}
+                            color={theme.colors.text}
+                        />
+                        <Text style={[styles.userMenuLabel, { color: theme.colors.text }]}>
+                            {mode === 'dark' ? 'Light mode' : 'Dark mode'}
+                        </Text>
+                    </TouchableOpacity>
+
+                    <View style={[styles.menuDivider, { backgroundColor: theme.colors.separator }]} />
+
+                    <TouchableOpacity
+                        style={styles.userMenuItem}
+                        onPress={() => goToDrawerScreen('Profile')}
+                    >
+                        <MaterialCommunityIcons name="account-outline" size={20} color={theme.colors.text} />
+                        <Text style={[styles.userMenuLabel, { color: theme.colors.text }]}>Profile</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.userMenuItem}
+                        onPress={() => goToDrawerScreen('Settings')}
+                    >
+                        <MaterialCommunityIcons name="cog-outline" size={20} color={theme.colors.text} />
+                        <Text style={[styles.userMenuLabel, { color: theme.colors.text }]}>Settings</Text>
+                    </TouchableOpacity>
+
+                    <View style={[styles.menuDivider, { backgroundColor: theme.colors.separator }]} />
+
+                    <TouchableOpacity
+                        style={styles.userMenuItem}
+                        onPress={handleLogout}
+                    >
+                        <MaterialCommunityIcons name="logout" size={20} color={theme.colors.danger} />
+                        <Text style={[styles.userMenuLabel, { color: theme.colors.danger }]}>Log out</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
+
+            {/* User pill — always visible at bottom */}
+            <TouchableOpacity
+                onPress={() => setUserMenuOpen(v => !v)}
+                style={[styles.userPill, { backgroundColor: theme.colors.card, borderColor: theme.colors.separator }]}
+                activeOpacity={0.8}
+            >
+                <View style={[styles.pillAvatar, { backgroundColor: theme.colors.primary }]}>
+                    <Text style={styles.pillAvatarText}>{initials}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                    <Text style={[styles.pillName, { color: theme.colors.text }]} numberOfLines={1}>{user?.name}</Text>
+                    <Text style={[styles.pillEmail, { color: theme.colors.textTertiary }]} numberOfLines={1}>{user?.email}</Text>
+                </View>
+                <MaterialCommunityIcons
+                    name={userMenuOpen ? 'chevron-down' : 'chevron-up'}
+                    size={20}
+                    color={theme.colors.textTertiary}
+                />
+            </TouchableOpacity>
         </View>
     );
 }
@@ -156,6 +227,7 @@ function MainDrawer() {
             <Drawer.Screen name="Categories" component={CategoriesScreen} />
             <Drawer.Screen name="Recurring" component={RecurringScreen} />
             <Drawer.Screen name="Settings" component={SettingsScreen} />
+            <Drawer.Screen name="Profile" component={ProfileScreen} />
         </Drawer.Navigator>
     );
 }
@@ -196,46 +268,17 @@ export default function AppNavigator() {
 }
 
 const styles = StyleSheet.create({
-    drawerHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: spacing.lg,
-        paddingTop: spacing.xl,
-        borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: '#334155',
-        gap: spacing.md,
-    },
-    avatar: {
-        width: 56,
-        height: 56,
-        borderRadius: 28,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    avatarText: {
-        color: '#fff',
-        fontSize: 22,
-        fontWeight: '800',
-    },
-    headerInfo: {
-        flex: 1,
-    },
-    headerName: {
-        fontSize: 16,
-        fontWeight: '700',
-    },
-    headerEmail: {
-        fontSize: 13,
-        marginTop: 2,
-    },
     section: {
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.sm,
     },
     sectionDivider: {
         height: StyleSheet.hairlineWidth,
-        backgroundColor: '#334155',
         marginVertical: spacing.sm,
+    },
+    menuDivider: {
+        height: StyleSheet.hairlineWidth,
+        marginHorizontal: spacing.md,
     },
     drawerItem: {
         flexDirection: 'row',
@@ -263,11 +306,71 @@ const styles = StyleSheet.create({
         fontSize: 11,
         fontWeight: '700',
     },
-    drawerToggleRow: {
+    // Add Transaction button just above user pill
+    addTxnButton: {
         flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'center',
+        marginHorizontal: spacing.md,
+        marginBottom: spacing.sm,
+        paddingVertical: 13,
+        borderRadius: radius.lg,
+        gap: spacing.sm,
+    },
+    addTxnLabel: {
+        color: '#fff',
+        fontSize: 15,
+        fontWeight: '700',
+    },
+    // User pill at the bottom
+    userPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginHorizontal: spacing.md,
+        marginBottom: spacing.lg,
+        padding: spacing.sm,
+        borderRadius: radius.lg,
+        borderWidth: 1,
+        gap: spacing.sm,
+    },
+    pillAvatar: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+    },
+    pillAvatarText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '800',
+    },
+    pillName: {
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    pillEmail: {
+        fontSize: 12,
+        marginTop: 1,
+    },
+    // User menu popup above the pill
+    userMenu: {
+        marginHorizontal: spacing.md,
+        marginBottom: spacing.sm,
+        borderRadius: radius.lg,
+        borderWidth: 1,
+        overflow: 'hidden',
+    },
+    userMenuItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: spacing.md,
         paddingVertical: 14,
-        paddingHorizontal: spacing.sm,
         gap: spacing.md,
+    },
+    userMenuLabel: {
+        fontSize: 15,
+        fontWeight: '500',
     },
 });

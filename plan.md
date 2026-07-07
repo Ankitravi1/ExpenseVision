@@ -1,46 +1,84 @@
-# ExpenseVision Plan
+# ExpenseVision Project Plan
 
-## Completed foundation
+## 1. Foundation (Completed)
 
-### v0.1 - Web Foundation
-- [x] Core CRUD for accounts, categories, transactions, and budgets
-- [x] Bulk CSV import/export
-- [x] Timezone support
-- [x] Web push notifications for budget alerts
+### 1.1 Web Application Foundation
+- [x] Implement core CRUD operations for accounts, categories, transactions, and budgets.
+- [x] Build bulk CSV import/export functionality.
+- [x] Configure timezone support across the application.
+- [x] Implement Web Push Notifications for budget alerts.
 
-### v0.2 - Mobile & Transaction Entry
-- [x] Android mobile app with shared backend data sync
-- [x] Native date picker, bottom-sheet pickers, haptics, and swipe-to-delete
-- [x] Optional AI-assisted quick transaction parsing
-- [x] Mobile bottom Add Transaction action and drawer shortcuts
-- [x] Expo SDK 54 / Expo Go dev workflow for emulator, LAN phone, and USB phone
+### 1.2 Mobile App & Transaction Entry
+- [x] Develop Android mobile app (Expo) with shared backend data sync.
+- [x] Create native UI patterns: native date picker, bottom-sheet pickers, haptics, and swipe-to-delete.
+- [x] Integrate optional AI-assisted quick transaction parsing.
+- [x] Build drawer navigation shortcuts and a bottom tab action bar.
+- [x] Establish Expo SDK 54 / Expo Go development workflow (emulator, LAN phone, USB phone).
 
-### v0.3 - Recurring, Budgets & Insights
-- [x] Recurring transactions for rent, EMI, salary, and subscriptions
-- [x] Budget roll-over and per-budget alert thresholds
-- [x] Reports insights for spending changes and budget pace
-- [x] Swagger / OpenAPI documentation with bearer auth
+### 1.3 Recurring, Budgets & Insights
+- [x] Build recurring transaction engine (rent, EMI, salary, subscriptions).
+- [x] Implement budget roll-over and per-budget alert thresholds (defaults to 90%).
+- [x] Develop Reports insights (spending changes, budget pace).
+- [x] Provide Swagger / OpenAPI documentation with Bearer authentication.
 
-## Current fix phase 2 (Feedback)
-- [x] Fix mobile signup keyboard overlap using KeyboardAwareScrollView or behavior tweaks.
-- [x] Fix mobile Google sign-in missing (use EXPO_PUBLIC_ env prefix).
-- [x] Rename DB `description` to `note` via Prisma migration and update UI labels everywhere.
+## 2. Refinement & Fixes Phase (Completed)
+
+### 2.1 Mobile UI & Layout Polishing
+- [x] Fix mobile signup keyboard overlap (inputs now scroll above the keyboard).
+- [x] Add Hamburger Menu globally to all main mobile screens.
+- [x] Redesign Drawer layout: move "Add transaction" to the bottom, just above the new user pill.
+- [x] Migrate user settings (Currency & Timezone) into a dedicated editable Profile Screen.
+- [x] Add CSV template download to Mobile Settings.
+
+### 2.2 Unification & Backend Integrity
+- [x] Rename DB `description` to `note` via Prisma migration and unify labels.
 - [x] Unify Recurring Transactions UI (mobile/web) to use "First occurrence" and end-date toggles.
-- [x] Add Gemini API option for AI parsing.
-- [x] Secure AI Parsing: Move LLM call to backend so keys stay hidden from frontend.
-- [x] Hide Quick Entry UI when AI Parsing is disabled.
-- [x] Fix Budget UI input validation (Web step error, Mobile missing validation).
-- [x] Prevent duplicate budgets in DB (unique constraint on category + month).
-- [x] Add Hamburger Menu to all main mobile screens (not just Dashboard).
-- [x] Add Import Transactions (CSV) option to Mobile Settings.
+- [x] Enforce unique constraints on Category + Month to prevent duplicate budgets.
+- [x] Secure AI Parsing by moving LLM requests to the backend (keeps API keys hidden from frontend).
+- [x] Add Gemini API as an option alongside OpenAI and DeepSeek.
 
-## Later work (Big Features)
-- [ ] Voice-based Quick Entry: Mic button auto-saves transactions in background (Web & Mobile).
-- [ ] Camera receipt parsing using AI Vision.
-- [ ] Add real forgot-password email delivery and reset-link flow for production SMTP.
-- [ ] AI-based smart import for PDF/image statements.
-- [ ] Real-time sync with refresh on focus or websockets.
-- [ ] Mobile push notifications for budget alerts.
-- [ ] UPI payment intent integration.
-- [ ] Bank Account Aggregator integration.
-- [ ] Migrate database from SQLite to PostgreSQL for production/multi-user support.
+### 2.3 Web UI Bug Fixes
+- [x] Disable "Set Budget" when all categories are already budgeted.
+- [x] Fix budget modal step inputs and `alertThreshold` default value handling.
+- [x] Fix budget deletion bug for recurring budgets created on mobile.
+- [x] Remove unused "Unbudgeted Categories" UI.
+- [x] Hide AI Quick Entry UI dynamically when AI Parsing is disabled.
+- [x] Gracefully hide push notification toggle when backend VAPID keys are missing.
+
+## 3. Future Roadmap (To Do)
+
+The following main tasks define the upcoming major features for ExpenseVision. Each task is broken down into sub-tasks detailing the *why* and *how*.
+
+### 3.1 Voice-Based Background Quick Entry
+**Why:** Typing transactions manually is tedious. Allowing users to tap a mic, speak "spent 10 dollars on coffee", and have it auto-save reduces friction.
+**How:**
+- [ ] **Web:** Integrate the Web Speech API (`webkitSpeechRecognition`) for browser dictation. Send the transcript directly to the backend AI parser.
+- [ ] **Mobile:** Use `expo-speech-recognition` or `react-native-voice` to capture dictation on Android. 
+- [ ] **Backend:** Expose a direct POST endpoint that takes raw text, parses it via AI, and automatically saves the transaction without needing an intermediate draft confirmation.
+
+### 3.2 Real-Time Data Synchronization
+**Why:** Users switching between Web and Mobile should see changes instantly without needing to manually refresh or pull-to-refresh.
+**How:**
+- [ ] **Socket.IO:** Implement Socket.IO on the Express backend.
+- [ ] **Client Integration:** Add socket listeners to Web and Mobile React Contexts.
+- [ ] **Event Emitting:** Emit `transaction_added`, `budget_updated`, etc., from backend routes.
+
+### 3.3 Receipt & Statement Parsing (AI Vision)
+**Why:** Users often want to upload a photo of a receipt or a PDF bank statement for bulk importing.
+**How:**
+- [ ] **Image Upload:** Add an image picker to Expo (Mobile) and a file input (Web).
+- [ ] **Vision API:** Send the image/PDF to Google Gemini 1.5 Pro (or equivalent Vision model) with a strict prompt to return a JSON array of transactions.
+- [ ] **Preview UI:** Present the parsed array in a staging UI so the user can verify amounts and categories before committing to the DB.
+
+### 3.4 Production Readiness & Security
+**Why:** The current SQLite and placeholder-email setup is meant for personal use. Scaling requires robust infrastructure.
+**How:**
+- [ ] **PostgreSQL Migration:** Replace SQLite with PostgreSQL in Prisma (`provider = "postgresql"`). Create initial migration.
+- [ ] **SMTP Email Integration:** Integrate `nodemailer` with a real provider (e.g., SendGrid, AWS SES) for verified forgot-password / reset-link flows.
+- [ ] **Mobile Push Notifications:** Integrate Expo Push Notifications (requires obtaining an Expo token and storing it alongside the user in the DB) to replace or supplement Web Push.
+
+### 3.5 Regional Integrations (India-specific)
+**Why:** For users in India, auto-tracking UPI and bank balances is highly desired.
+**How:**
+- [ ] **UPI Intent / SMS Parsing:** On Android, explore reading banking SMS messages (requires explicit user permissions, often restricted by Google Play) to auto-draft transactions.
+- [ ] **Account Aggregator (AA):** Research integrating with an AA gateway (like Setu) to securely fetch live bank balances.
