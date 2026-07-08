@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -24,9 +25,11 @@ export default function NotificationsScreen({ navigation }: any) {
         }
     };
 
-    useEffect(() => {
-        fetchNotifications();
-    }, []);
+    useFocusEffect(
+        React.useCallback(() => {
+            fetchNotifications();
+        }, [])
+    );
 
     const markAsRead = async (id: string) => {
         try {
@@ -99,7 +102,11 @@ export default function NotificationsScreen({ navigation }: any) {
                             ]}
                         >
                             <View style={[styles.dot, { backgroundColor: item.read ? 'transparent' : theme.colors.primary }]} />
-                            <View style={styles.content}>
+                            <TouchableOpacity 
+                                style={styles.content}
+                                activeOpacity={item.read ? 1 : 0.7}
+                                onPress={() => !item.read && markAsRead(item.id)}
+                            >
                                 <Text style={[styles.itemTitle, { color: item.read ? theme.colors.textSecondary : theme.colors.text }]}>
                                     {item.title}
                                 </Text>
@@ -109,13 +116,8 @@ export default function NotificationsScreen({ navigation }: any) {
                                 <Text style={[styles.itemDate, { color: theme.colors.textTertiary }]}>
                                     {new Date(item.createdAt).toLocaleString()}
                                 </Text>
-                            </View>
+                            </TouchableOpacity>
                             <View style={styles.actions}>
-                                {!item.read && (
-                                    <TouchableOpacity onPress={() => markAsRead(item.id)} style={styles.actionButton}>
-                                        <MaterialCommunityIcons name="check" size={20} color={theme.colors.success} />
-                                    </TouchableOpacity>
-                                )}
                                 <TouchableOpacity onPress={() => clearNotification(item.id)} style={styles.actionButton}>
                                     <MaterialCommunityIcons name="trash-can-outline" size={20} color={theme.colors.danger} />
                                 </TouchableOpacity>

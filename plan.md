@@ -87,3 +87,11 @@ The following main tasks define the upcoming major features for ExpenseVision. E
 **How:**
 - [ ] **UPI Intent / SMS Parsing:** On Android, explore reading banking SMS messages (requires explicit user permissions, often restricted by Google Play) to auto-draft transactions.
 - [ ] **Account Aggregator (AA):** Research integrating with an AA gateway (like Setu) to securely fetch live bank balances.
+
+### 3.7 Full Report Modification, Filtering, and Analysis (Version 3.0)
+**Why:** Users need advanced analytical reporting to understand their spending habits deeply, with custom date range filters, multi-category comparisons, and automated exports.
+**How:**
+- [ ] **Advanced Filtering:** Add dynamic filters for custom date ranges, accounts, categories, and transaction types (income vs. expense) to the Reports screen on both Web and Mobile.
+- [ ] **Comparative Reports:** Implement month-over-month and year-over-year spending comparison charts.
+- [ ] **AI-Powered Financial Insights:** Add an "AI Insights" button that uses Gemini to analyze current reports/spending patterns and generate actionable budgeting tips.
+- [ ] **Export Options:** Implement PDF and Excel export options for generated reports on both Web and Mobile.

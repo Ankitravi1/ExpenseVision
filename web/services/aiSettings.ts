@@ -1,6 +1,6 @@
 import { api } from './api';
 
-export type AiProvider = 'deepseek' | 'openai' | 'openrouter' | 'gemini' | 'custom';
+export type AiProvider = 'deepseek' | 'openai' | 'openrouter' | 'gemini' | 'custom' | string;
 
 export interface AiSettings {
     enabled: boolean;

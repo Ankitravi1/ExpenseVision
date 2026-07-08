@@ -257,13 +257,26 @@ router.post('/parse-text', async (req, res, next) => {
             return res.status(400).json({ error: 'AI transaction parsing is disabled' });
         }
         
-        const apiKey = decrypt(aiConfig.encryptedApiKey);
-        if (!apiKey) {
-            return res.status(400).json({ error: 'AI API key is missing' });
+        let apiKey = '';
+        if (aiConfig.keys) {
+            try {
+                const keysMap = JSON.parse(aiConfig.keys);
+                const providerKeys = keysMap[aiConfig.provider] || [];
+                if (providerKeys.length > 0) {
+                    apiKey = decrypt(providerKeys[0]); // Use the first key for the current provider
+                }
+            } catch (e) {
+                console.error('Failed to parse keys in transactions route:', e);
+            }
         }
 
-        if (aiConfig.provider === 'custom' && !aiConfig.baseUrl) {
-            return res.status(400).json({ error: 'Custom AI provider requires a base URL' });
+        if (!apiKey) {
+            return res.status(400).json({ error: `AI API key is missing for provider: ${aiConfig.provider}` });
+        }
+
+        const isDefaultProvider = ['deepseek', 'openai', 'openrouter', 'gemini'].includes(aiConfig.provider);
+        if (!isDefaultProvider && !aiConfig.baseUrl) {
+            return res.status(400).json({ error: `AI provider ${aiConfig.provider} requires a base URL` });
         }
 
         const [accounts, categories] = await Promise.all([

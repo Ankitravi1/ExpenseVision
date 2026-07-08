@@ -6,20 +6,20 @@ const router = Router();
 
 const settingsSchema = z.object({
     enabled: z.boolean(),
-    provider: z.enum(['deepseek', 'openai', 'openrouter', 'gemini', 'custom']),
-    model: z.string().min(1),
+    provider: z.string().min(1),
+    model: z.string(), // Allow empty string for model initially
     baseUrl: z.string().nullish(),
     keys: z.record(z.array(z.string())).nullish(),
-    customModels: z.array(z.string()).nullish()
+    customModels: z.record(z.array(z.string())).nullish()
 });
 
 const defaultSettings = {
     enabled: false,
     provider: 'deepseek',
-    model: 'deepseek-v4-flash',
+    model: '',
     baseUrl: null,
     keys: {},
-    customModels: []
+    customModels: {}
 };
 
 const getKey = (): Buffer | null => {
@@ -61,7 +61,7 @@ router.get('/', async (req, res, next) => {
         if (!settings) return res.json(defaultSettings);
 
         let decryptedKeys: Record<string, string[]> = {};
-        let parsedCustomModels: string[] = [];
+        let parsedCustomModels: Record<string, string[]> = {};
         try {
             if (settings.keys) {
                 const encryptedMap = JSON.parse(settings.keys);
@@ -110,7 +110,7 @@ router.put('/', async (req, res, next) => {
         }
         
         const keysJson = Object.keys(encryptedKeys).length ? JSON.stringify(encryptedKeys) : null;
-        const customModelsJson = data.customModels?.length ? JSON.stringify(data.customModels) : null;
+        const customModelsJson = data.customModels && Object.keys(data.customModels).length ? JSON.stringify(data.customModels) : null;
 
         const saved = await prisma.aiSettings.upsert({
             where: { userId },
@@ -139,7 +139,7 @@ router.put('/', async (req, res, next) => {
             model: saved.model,
             baseUrl: saved.baseUrl,
             keys: data.keys || {},
-            customModels: data.customModels || []
+            customModels: data.customModels || {}
         });
     } catch (error: any) {
         if (error instanceof z.ZodError) {

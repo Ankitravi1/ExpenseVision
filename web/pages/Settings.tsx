@@ -325,17 +325,69 @@ export const Settings: React.FC = () => {
                         <label htmlFor="ai-provider" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Provider</label>
                         <select
                             id="ai-provider"
-                            value={aiSettings.provider}
-                            onChange={(e) => handleAiProviderChange(e.target.value as AiProvider)}
+                            value={['deepseek', 'openai', 'gemini', 'openrouter'].includes(aiSettings.provider) ? aiSettings.provider : 'custom'}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                if (val === 'custom') {
+                                    handleAiProviderChange('custom');
+                                } else {
+                                    handleAiProviderChange(val);
+                                }
+                            }}
                             className="block w-full bg-gray-100 border-transparent rounded-lg p-3 focus:ring-2 focus:ring-primary focus:bg-white text-base dark:bg-gray-700 dark:text-gray-100 dark:focus:bg-gray-600"
                         >
                             <option value="deepseek">DeepSeek</option>
                             <option value="openai">OpenAI</option>
                             <option value="gemini">Gemini</option>
                             <option value="openrouter">OpenRouter</option>
-                            <option value="custom">Custom OpenAI-compatible</option>
+                            <option value="custom">Custom OpenAI-compatible model provider</option>
                         </select>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 italic">
+                            {aiSettings.provider === 'deepseek' && "Uses DeepSeek base URL: https://api.deepseek.com"}
+                            {aiSettings.provider === 'openai' && "Uses OpenAI base URL: https://api.openai.com/v1"}
+                            {aiSettings.provider === 'gemini' && "Uses Gemini base URL: https://generativelanguage.googleapis.com"}
+                            {aiSettings.provider === 'openrouter' && "Uses OpenRouter base URL: https://openrouter.ai/api/v1"}
+                        </p>
                     </div>
+
+                    {/* Custom provider name / details — shown when not a default provider or when custom is selected */}
+                    {(!['deepseek', 'openai', 'gemini', 'openrouter'].includes(aiSettings.provider) || aiSettings.provider === 'custom') && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label htmlFor="ai-custom-provider" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Custom Provider Name</label>
+                                <input
+                                    id="ai-custom-provider"
+                                    type="text"
+                                    value={aiSettings.provider === 'custom' ? '' : aiSettings.provider}
+                                    onChange={(e) => {
+                                        const val = e.target.value.trim() || 'custom';
+                                        setAiSaved(false);
+                                        setAiSettings(prev => ({
+                                            ...prev,
+                                            provider: val,
+                                            model: (prev.customModels[val] || [])[0] || ''
+                                        }));
+                                    }}
+                                    placeholder="e.g. groq"
+                                    className="block w-full bg-gray-100 border-transparent rounded-lg p-3 focus:ring-2 focus:ring-primary focus:bg-white text-base dark:bg-gray-700 dark:text-gray-100 dark:focus:bg-gray-600"
+                                />
+                            </div>
+                            <div>
+                                <label htmlFor="ai-base-url" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Base URL</label>
+                                <input
+                                    id="ai-base-url"
+                                    type="text"
+                                    value={aiSettings.baseUrl || ''}
+                                    onChange={(e) => {
+                                        setAiSaved(false);
+                                        setAiSettings(prev => ({ ...prev, baseUrl: e.target.value }));
+                                    }}
+                                    placeholder="https://api.groq.com/openai/v1"
+                                    className="block w-full bg-gray-100 border-transparent rounded-lg p-3 focus:ring-2 focus:ring-primary focus:bg-white text-base dark:bg-gray-700 dark:text-gray-100 dark:focus:bg-gray-600"
+                                />
+                            </div>
+                        </div>
+                    )}
 
                     {/* Models for current provider */}
                     <div className="p-4 bg-gray-50 dark:bg-gray-800/40 rounded-xl border border-gray-200 dark:border-gray-700">
@@ -436,23 +488,6 @@ export const Settings: React.FC = () => {
                             </button>
                         </div>
                     </div>
-
-                    {/* Base URL — custom provider only */}
-                    {aiSettings.provider === 'custom' && (
-                        <div>
-                            <label htmlFor="ai-base-url" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Base URL</label>
-                            <input
-                                id="ai-base-url"
-                                value={aiSettings.baseUrl || ''}
-                                onChange={(e) => {
-                                    setAiSaved(false);
-                                    setAiSettings(prev => ({ ...prev, baseUrl: e.target.value }));
-                                }}
-                                placeholder="https://your-provider.example/v1"
-                                className="block w-full bg-gray-100 border-transparent rounded-lg p-3 focus:ring-2 focus:ring-primary focus:bg-white text-base dark:bg-gray-700 dark:text-gray-100 dark:focus:bg-gray-600"
-                            />
-                        </div>
-                    )}
 
                     <div className="flex justify-end pt-1">
                         <button

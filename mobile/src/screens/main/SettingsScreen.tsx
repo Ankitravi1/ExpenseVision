@@ -15,10 +15,14 @@ import { isoDateToDisplay } from '../../utils/date';
 import { shareTransactionsCsv } from '../../utils/exportCsv';
 import { spacing } from '../../theme';
 import { Category, RecurringRule } from '../../types';
+import { apiFetch } from '../../services/api';
 
 import * as DocumentPicker from 'expo-document-picker';
 import * as LegacyFS from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
+import * as Device from 'expo-device';
 import { AiProvider, AiSettings, defaultAiSettings, getAiSettings, saveAiSettings } from '../../services/aiSettings';
 
 export default function SettingsScreen() {
@@ -34,6 +38,7 @@ export default function SettingsScreen() {
     const [aiSaved, setAiSaved] = useState(false);
     const [showClearAll, setShowClearAll] = useState(false);
     const [clearPhrase, setClearPhrase] = useState('');
+    const [notificationsEnabled, setNotificationsEnabled] = useState(!!user?.expoPushToken);
 
     // AI settings state
     const [newModelInput, setNewModelInput] = useState('');
@@ -42,7 +47,51 @@ export default function SettingsScreen() {
 
     useEffect(() => {
         getAiSettings().then(setAiSettings).catch(() => setAiSettings(defaultAiSettings));
-    }, []);
+        setNotificationsEnabled(!!user?.expoPushToken);
+    }, [user]);
+
+    const handleToggleNotifications = async (enabled: boolean) => {
+        setNotificationsEnabled(enabled);
+        try {
+            if (enabled) {
+                if (Device.isDevice && Constants.appOwnership !== 'expo') {
+                    const settings = await Notifications.getPermissionsAsync() as any;
+                    let granted = settings.status === 'granted' || settings.granted;
+                    if (!granted && settings.canAskAgain) {
+                        const newSettings = await Notifications.requestPermissionsAsync() as any;
+                        granted = newSettings.status === 'granted' || newSettings.granted;
+                    }
+                    if (!granted) {
+                        Alert.alert('Permission Denied', 'Please enable notifications in Android Settings.');
+                        setNotificationsEnabled(false);
+                        return;
+                    }
+                    
+                    const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId ?? 'dev';
+                    const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
+                    await apiFetch('/profile/expo-token', {
+                        method: 'POST',
+                        body: JSON.stringify({ token: tokenData.data }),
+                    });
+                    Alert.alert('Success', 'Push notifications enabled!');
+                } else {
+                    Alert.alert('Expo Go/Simulator Limitation', 'System push notifications only work on real devices with standalone development builds. In-app notifications will still function.');
+                    // Still set to true locally for simulation
+                }
+            } else {
+                await apiFetch('/profile/expo-token', {
+                    method: 'POST',
+                    body: JSON.stringify({ token: null }),
+                });
+                Alert.alert('Success', 'Push notifications disabled.');
+            }
+            refresh();
+        } catch (error) {
+            console.error('Failed to toggle notifications:', error);
+            setNotificationsEnabled(!enabled);
+            Alert.alert('Error', 'Failed to update notification settings.');
+        }
+    };
 
     const handleAiProviderChange = (provider: AiProvider) => {
         setRevealedKeys({});
@@ -245,6 +294,23 @@ export default function SettingsScreen() {
 
 
                 <Card style={{ marginBottom: spacing.md, paddingVertical: 0 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, paddingHorizontal: 16 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                            <MaterialCommunityIcons name="bell-outline" size={22} color={theme.colors.textSecondary} style={{ marginRight: 12 }} />
+                            <View>
+                                <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 15 }}>Enable Notifications</Text>
+                                <Text style={{ color: theme.colors.textTertiary, fontSize: 11, marginTop: 2 }}>Allow alerts on this device</Text>
+                            </View>
+                        </View>
+                        <Switch
+                            value={notificationsEnabled}
+                            onValueChange={handleToggleNotifications}
+                            trackColor={{ true: theme.colors.primary }}
+                        />
+                    </View>
+                </Card>
+
+                <Card style={{ marginBottom: spacing.md, paddingVertical: 0 }}>
                     <Row icon="creation" label="AI transaction parsing" value={aiSettings.enabled ? (aiSettings.model || aiSettings.provider) : 'Off'} onPress={() => setShowAiSettings(true)} />
                 </Card>
 
@@ -287,19 +353,48 @@ export default function SettingsScreen() {
                         { value: 'openrouter', label: 'OpenRouter' },
                         { value: 'custom', label: 'Custom' },
                     ]}
-                    value={aiSettings.provider}
-                    onChange={value => handleAiProviderChange(value as AiProvider)}
+                    value={['deepseek', 'openai', 'gemini', 'openrouter'].includes(aiSettings.provider) ? aiSettings.provider : 'custom'}
+                    onChange={value => {
+                        if (value === 'custom') {
+                            handleAiProviderChange('custom');
+                        } else {
+                            handleAiProviderChange(value as AiProvider);
+                        }
+                    }}
                 />
+                <Text style={{ color: theme.colors.textTertiary, fontSize: 11, fontStyle: 'italic', marginTop: 4, marginBottom: spacing.sm }}>
+                    {aiSettings.provider === 'deepseek' && "Uses DeepSeek base URL: https://api.deepseek.com"}
+                    {aiSettings.provider === 'openai' && "Uses OpenAI base URL: https://api.openai.com/v1"}
+                    {aiSettings.provider === 'gemini' && "Uses Gemini base URL: https://generativelanguage.googleapis.com"}
+                    {aiSettings.provider === 'openrouter' && "Uses OpenRouter base URL: https://openrouter.ai/api/v1"}
+                </Text>
 
-                {/* 3. Base URL (custom only) */}
-                {aiSettings.provider === 'custom' ? (
-                    <Input
-                        label="Base URL"
-                        value={aiSettings.baseUrl || ''}
-                        onChangeText={baseUrl => { setAiSaved(false); setAiSettings(prev => ({ ...prev, baseUrl })); }}
-                        placeholder="https://your-provider.example/v1"
-                        autoCapitalize="none"
-                    />
+                {/* 3. Custom provider name / details — shown when not a default provider or when custom is selected */}
+                {(!['deepseek', 'openai', 'gemini', 'openrouter'].includes(aiSettings.provider) || aiSettings.provider === 'custom') ? (
+                    <View style={{ gap: spacing.sm, marginBottom: spacing.sm }}>
+                        <Input
+                            label="Custom Provider Name"
+                            value={aiSettings.provider === 'custom' ? '' : aiSettings.provider}
+                            onChangeText={val => {
+                                const providerVal = val.trim() || 'custom';
+                                setAiSaved(false);
+                                setAiSettings(prev => ({
+                                    ...prev,
+                                    provider: providerVal,
+                                    model: (prev.customModels[providerVal] || [])[0] || ''
+                                }));
+                            }}
+                            placeholder="e.g. groq"
+                            autoCapitalize="none"
+                        />
+                        <Input
+                            label="Base URL"
+                            value={aiSettings.baseUrl || ''}
+                            onChangeText={baseUrl => { setAiSaved(false); setAiSettings(prev => ({ ...prev, baseUrl })); }}
+                            placeholder="https://api.groq.com/openai/v1"
+                            autoCapitalize="none"
+                        />
+                    </View>
                 ) : null}
 
                 {/* 4. Models for {provider} */}

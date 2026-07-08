@@ -67,4 +67,5 @@ export interface User {
     profilePicture?: string | null;
     profileComplete?: boolean;
     emailVerified?: boolean;
+    expoPushToken?: string | null;
 }

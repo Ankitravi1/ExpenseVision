@@ -57,4 +57,25 @@ router.delete('/', async (req, res, next) => {
     }
 });
 
+// DELETE /api/notifications/:id - Delete a specific notification
+router.delete('/:id', async (req, res, next) => {
+    try {
+        const prisma = (req as any).prisma;
+        const userId = (req as any).userId;
+        const { id } = req.params;
+
+        const result = await prisma.notification.deleteMany({
+            where: { id, userId }
+        });
+
+        if (result.count === 0) {
+            return res.status(404).json({ error: 'Notification not found' });
+        }
+
+        res.status(204).send();
+    } catch (error) {
+        next(error);
+    }
+});
+
 export default router;
