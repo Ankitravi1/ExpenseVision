@@ -24,6 +24,9 @@ export const Settings: React.FC = () => {
     const [aiSaved, setAiSaved] = useState(false);
     const [aiError, setAiError] = useState('');
     const [vapidConfigured, setVapidConfigured] = useState(true);
+    const [revealedKeys, setRevealedKeys] = useState<Record<string, boolean>>({});
+    const [newModelInput, setNewModelInput] = useState('');
+    const [showCustomModelInput, setShowCustomModelInput] = useState(false);
 
     useEffect(() => {
         // Check if push is supported and subscribed
@@ -129,6 +132,7 @@ export const Settings: React.FC = () => {
 
     const handleAiProviderChange = (provider: AiProvider) => {
         setAiSaved(false);
+        setRevealedKeys({});
         setAiSettings(prev => ({
             ...prev,
             provider,
@@ -283,22 +287,69 @@ export const Settings: React.FC = () => {
 
                         <div>
                             <label htmlFor="ai-model" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Model</label>
-                            <input
+                            <select
                                 id="ai-model"
-                                value={aiSettings.model}
-                                list="ai-model-options"
+                                value={showCustomModelInput ? 'custom' : aiSettings.model}
                                 onChange={(e) => {
-                                    setAiSaved(false);
-                                    setAiSettings(prev => ({ ...prev, model: e.target.value }));
+                                    if (e.target.value === 'custom') {
+                                        setShowCustomModelInput(true);
+                                        setNewModelInput('');
+                                    } else {
+                                        setShowCustomModelInput(false);
+                                        setAiSaved(false);
+                                        setAiSettings(prev => ({ ...prev, model: e.target.value }));
+                                    }
                                 }}
-                                placeholder="deepseek-v4-flash"
                                 className="block w-full bg-gray-100 border-transparent rounded-lg p-3 focus:ring-2 focus:ring-primary focus:bg-white text-base dark:bg-gray-700 dark:text-gray-100 dark:focus:bg-gray-600"
-                            />
-                            <datalist id="ai-model-options">
+                            >
                                 {[...(providerModels[aiSettings.provider] || []), ...aiSettings.customModels].filter(Boolean).map(model => (
-                                    <option key={model} value={model} />
+                                    <option key={model} value={model}>{model}</option>
                                 ))}
-                            </datalist>
+                                <option value="custom">+ Custom model...</option>
+                            </select>
+                            {showCustomModelInput && (
+                                <div className="flex gap-2 mt-2">
+                                    <input
+                                        type="text"
+                                        autoFocus
+                                        value={newModelInput}
+                                        onChange={e => setNewModelInput(e.target.value)}
+                                        onKeyDown={e => {
+                                            if (e.key === 'Enter' && newModelInput.trim()) {
+                                                const m = newModelInput.trim();
+                                                setAiSaved(false);
+                                                setAiSettings(prev => ({
+                                                    ...prev,
+                                                    model: m,
+                                                    customModels: prev.customModels.includes(m) ? prev.customModels : [...prev.customModels, m]
+                                                }));
+                                                setNewModelInput('');
+                                                setShowCustomModelInput(false);
+                                            }
+                                        }}
+                                        placeholder="e.g. gpt-4-turbo"
+                                        className="flex-1 bg-gray-100 border-transparent rounded-lg p-3 focus:ring-2 focus:ring-primary focus:bg-white text-base dark:bg-gray-700 dark:text-gray-100 dark:focus:bg-gray-600"
+                                    />
+                                    <button
+                                        className="btn btn-secondary whitespace-nowrap"
+                                        onClick={() => {
+                                            const m = newModelInput.trim();
+                                            if (m) {
+                                                setAiSaved(false);
+                                                setAiSettings(prev => ({
+                                                    ...prev,
+                                                    model: m,
+                                                    customModels: prev.customModels.includes(m) ? prev.customModels : [...prev.customModels, m]
+                                                }));
+                                                setNewModelInput('');
+                                                setShowCustomModelInput(false);
+                                            }
+                                        }}
+                                    >
+                                        <Icon name="Plus" size={16} className="mr-1" /> Add
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -381,28 +432,18 @@ export const Settings: React.FC = () => {
                             {(aiSettings.keys[aiSettings.provider] || []).map((key, index) => (
                                 <div key={index} className="flex items-center gap-2">
                                     <input
-                                        type={document.getElementById(`reveal-key-${index}`)?.getAttribute('data-revealed') === 'true' ? 'text' : 'password'}
+                                        type={revealedKeys[`${aiSettings.provider}-${index}`] ? 'text' : 'password'}
                                         value={key}
                                         readOnly
                                         className="flex-1 bg-gray-100 border-transparent rounded-lg p-3 text-base dark:bg-gray-700 dark:text-gray-100"
                                     />
                                     <button
-                                        id={`reveal-key-${index}`}
                                         type="button"
-                                        data-revealed="false"
                                         className="btn btn-secondary h-full"
-                                        onClick={(e) => {
-                                            const btn = e.currentTarget;
-                                            const isRevealed = btn.getAttribute('data-revealed') === 'true';
-                                            btn.setAttribute('data-revealed', (!isRevealed).toString());
-                                            const input = btn.previousElementSibling as HTMLInputElement;
-                                            if (input) {
-                                                input.type = isRevealed ? 'password' : 'text';
-                                            }
-                                        }}
+                                        onClick={() => setRevealedKeys(prev => ({ ...prev, [`${aiSettings.provider}-${index}`]: !prev[`${aiSettings.provider}-${index}`] }))}
                                         title="Reveal/Hide Key"
                                     >
-                                        <Icon name="Eye" size={16} />
+                                        <Icon name={revealedKeys[`${aiSettings.provider}-${index}`] ? 'EyeOff' : 'Eye'} size={16} />
                                     </button>
                                     <button
                                         type="button"

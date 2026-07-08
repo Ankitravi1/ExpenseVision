@@ -9,6 +9,7 @@ import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import * as Notifications from 'expo-notifications';
 import { apiFetch } from './src/services/api';
 import Constants from 'expo-constants';
+import * as Device from 'expo-device';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -35,6 +36,10 @@ function Root() {
           granted = newSettings.status === 'granted' || newSettings.granted;
         }
         if (!granted) return;
+        if (Constants.appOwnership === 'expo' || !Device.isDevice) {
+          console.log('Push notifications only work on real devices with development builds.');
+          return;
+        }
         
         const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId ?? 'dev';
         const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
@@ -44,7 +49,7 @@ function Root() {
           body: JSON.stringify({ token: tokenData.data }),
         });
       } catch (error) {
-        console.error('Failed to setup notifications:', error);
+        console.warn('Failed to get push token:', error);
       }
     }
     setupNotifications();

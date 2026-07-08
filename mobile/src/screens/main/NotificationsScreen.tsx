@@ -91,14 +91,12 @@ export default function NotificationsScreen({ navigation }: any) {
                     data={notifications}
                     keyExtractor={(item) => item.id}
                     renderItem={({ item }) => (
-                        <TouchableOpacity
-                            onPress={() => !item.read && markAsRead(item.id)}
+                        <View
                             style={[
                                 styles.notificationItem,
                                 { backgroundColor: item.read ? theme.colors.card : theme.colors.primary + '15' },
                                 { borderColor: theme.colors.separator }
                             ]}
-                            activeOpacity={item.read ? 1 : 0.7}
                         >
                             <View style={[styles.dot, { backgroundColor: item.read ? 'transparent' : theme.colors.primary }]} />
                             <View style={styles.content}>
@@ -122,7 +120,7 @@ export default function NotificationsScreen({ navigation }: any) {
                                     <MaterialCommunityIcons name="trash-can-outline" size={20} color={theme.colors.danger} />
                                 </TouchableOpacity>
                             </View>
-                        </TouchableOpacity>
+                        </View>
                     )}
                     contentContainerStyle={styles.listContent}
                 />

@@ -40,6 +40,8 @@ export default function SettingsScreen() {
     }, []);
 
     const handleAiProviderChange = (provider: AiProvider) => {
+        setRevealedKeys({});
+        setNewModelInput('');
         setAiSettings(prev => ({
             ...prev,
             provider,
@@ -48,6 +50,28 @@ export default function SettingsScreen() {
     };
 
     const [aiSaved, setAiSaved] = useState(false);
+    const [newModelInput, setNewModelInput] = useState('');
+
+    const addCustomModel = () => {
+        const val = newModelInput.trim();
+        if (!val) return;
+        setAiSaved(false);
+        setAiSettings(prev => {
+            const updated = prev.customModels.includes(val) ? prev.customModels : [...prev.customModels, val];
+            return { ...prev, customModels: updated, model: val };
+        });
+        setNewModelInput('');
+    };
+
+    const removeCustomModel = (m: string) => {
+        setAiSaved(false);
+        setAiSettings(prev => ({
+            ...prev,
+            customModels: prev.customModels.filter(cm => cm !== m),
+            model: prev.model === m ? (providerModels[prev.provider][0] || '') : prev.model,
+        }));
+    };
+
 
     const handleSaveAiSettings = async () => {
         setSavingAiSettings(true);
@@ -244,26 +268,39 @@ export default function SettingsScreen() {
                         onChange={model => { setAiSaved(false); setAiSettings(prev => ({ ...prev, model })); }}
                     />
                 ) : null}
-                <Input
-                    value={aiSettings.model}
-                    onChangeText={model => { setAiSaved(false); setAiSettings(prev => ({ ...prev, model })); }}
-                    placeholder="deepseek-v4-flash"
-                    autoCapitalize="none"
-                />
 
-                <FieldLabel>Add Custom Model</FieldLabel>
-                <Input
-                    placeholder="e.g. gpt-4-turbo"
-                    autoCapitalize="none"
-                    returnKeyType="done"
-                    onSubmitEditing={(e) => {
-                        const val = e.nativeEvent.text.trim();
-                        if (val && !aiSettings.customModels.includes(val)) {
-                            setAiSaved(false);
-                            setAiSettings(prev => ({ ...prev, customModels: [...prev.customModels, val] }));
-                        }
-                    }}
-                />
+                {/* Add custom model row */}
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                    <Input
+                        style={{ flex: 1 }}
+                        placeholder="Add custom model..."
+                        value={newModelInput}
+                        onChangeText={setNewModelInput}
+                        autoCapitalize="none"
+                        returnKeyType="done"
+                        onSubmitEditing={addCustomModel}
+                    />
+                    <TouchableOpacity
+                        onPress={addCustomModel}
+                        style={{ paddingHorizontal: 14, paddingVertical: 10, backgroundColor: theme.colors.primary, borderRadius: 10, alignItems: 'center', justifyContent: 'center' }}
+                    >
+                        <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>+</Text>
+                    </TouchableOpacity>
+                </View>
+                {/* Custom models with delete buttons */}
+                {aiSettings.customModels.length > 0 && (
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                        {aiSettings.customModels.map(cm => (
+                            <View key={cm} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.card, borderRadius: 20, borderWidth: 1, borderColor: theme.colors.separator, paddingVertical: 4, paddingHorizontal: 10, gap: 4 }}>
+                                <Text style={{ color: theme.colors.text, fontSize: 13 }}>{cm}</Text>
+                                <TouchableOpacity onPress={() => removeCustomModel(cm)} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
+                                    <Text style={{ color: theme.colors.danger, fontWeight: '700', fontSize: 14 }}>✕</Text>
+                                </TouchableOpacity>
+                            </View>
+                        ))}
+                    </View>
+                )}
+
 
                 {aiSettings.provider === 'custom' ? (
                     <Input

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -12,6 +12,7 @@ import { TransactionForm } from '../../components/TransactionForm';
 import { formatCurrency } from '../../utils/currency';
 import { isoDateToDisplay } from '../../utils/date';
 import { spacing, radius } from '../../theme';
+import { apiFetch } from '../../services/api';
 
 const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 
@@ -22,6 +23,14 @@ export default function DashboardScreen() {
     const navigation = useNavigation();
     const [showForm, setShowForm] = useState(false);
     const currency = user?.currency || 'INR';
+    const [unreadCount, setUnreadCount] = useState(0);
+
+    useEffect(() => {
+        apiFetch('/notifications')
+            .then(res => res.ok ? res.json() : [])
+            .then((data: any[]) => setUnreadCount(Array.isArray(data) ? data.filter((n: any) => !n.read).length : 0))
+            .catch(() => {});
+    }, []);
 
     const openDrawer = () => {
         (navigation as any).openDrawer?.();
@@ -86,6 +95,11 @@ export default function DashboardScreen() {
                             style={[styles.iconButton, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder, borderWidth: 1, marginRight: spacing.sm }]}
                         >
                             <MaterialCommunityIcons name="bell-outline" size={22} color={theme.colors.textSecondary} />
+                            {unreadCount > 0 && (
+                                <View style={styles.badge}>
+                                    <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+                                </View>
+                            )}
                         </TouchableOpacity>
                         <TouchableOpacity
                             onPress={() => (navigation as any).navigate('Reports')}
@@ -291,5 +305,22 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingVertical: 10,
         borderBottomWidth: StyleSheet.hairlineWidth,
+    },
+    badge: {
+        position: 'absolute',
+        top: -4,
+        right: -4,
+        backgroundColor: 'red',
+        borderRadius: 8,
+        minWidth: 16,
+        height: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 3,
+    },
+    badgeText: {
+        color: '#fff',
+        fontSize: 10,
+        fontWeight: '700',
     },
 });
