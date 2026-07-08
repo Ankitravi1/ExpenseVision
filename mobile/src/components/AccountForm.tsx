@@ -16,28 +16,28 @@ export const AccountForm: React.FC<Props> = ({ visible, onClose, editing }) => {
     const { addAccount, updateAccount } = useData();
     const [name, setName] = useState('');
     const [type, setType] = useState('Checking');
-    const [balance, setBalance] = useState('0');
+    const [initialBalance, setInitialBalance] = useState('0');
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
         if (visible) {
             setName(editing?.name || '');
             setType(editing?.type || 'Checking');
-            setBalance(editing ? String(editing.balance) : '0');
+            setInitialBalance(editing ? String(editing.initialBalance ?? editing.balance) : '0');
         }
     }, [visible, editing]);
 
     const handleSave = async () => {
         if (!name.trim()) return Alert.alert('Missing name', 'Enter an account name.');
-        const bal = parseFloat(balance);
-        if (Number.isNaN(bal)) return Alert.alert('Invalid balance', 'Enter a valid number.');
+        const initBal = parseFloat(initialBalance);
+        if (Number.isNaN(initBal)) return Alert.alert('Invalid initial amount', 'Enter a valid number.');
 
         setSaving(true);
         try {
             if (editing) {
-                await updateAccount(editing.id, { name: name.trim(), type, balance: bal });
+                await updateAccount(editing.id, { name: name.trim(), type, initialBalance: initBal });
             } else {
-                await addAccount({ name: name.trim(), type, balance: bal });
+                await addAccount({ name: name.trim(), type, initialBalance: initBal, balance: initBal });
             }
             onClose();
         } catch (err: any) {
@@ -56,7 +56,7 @@ export const AccountForm: React.FC<Props> = ({ visible, onClose, editing }) => {
                 value={type}
                 onChange={setType}
             />
-            <Input label={editing ? 'Balance' : 'Starting balance'} value={balance} onChangeText={setBalance} keyboardType="numbers-and-punctuation" />
+            <Input label="Initial Amount" value={initialBalance} onChangeText={setInitialBalance} keyboardType="decimal-pad" placeholder="0.00" />
             <Button title={editing ? 'Save Changes' : 'Add Account'} onPress={handleSave} loading={saving} />
         </SheetModal>
     );

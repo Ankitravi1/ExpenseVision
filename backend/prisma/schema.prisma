@@ -75,6 +75,7 @@ model Account {
   name      String
   type      String
   balance   Float    @default(0)
+  initialBalance Float @default(0)
   color     String?
   icon      String?
   logo      String?

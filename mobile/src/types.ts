@@ -39,6 +39,7 @@ export interface Account {
     name: string;
     type: string;
     balance: number;
+    initialBalance: number;
     color?: string | null;
     icon?: string | null;
     logo?: string | null;

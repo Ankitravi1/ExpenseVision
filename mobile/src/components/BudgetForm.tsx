@@ -10,9 +10,10 @@ interface Props {
     visible: boolean;
     onClose: () => void;
     editing?: Budget | null;
+    preSelectedCategoryId?: string | null;
 }
 
-export const BudgetForm: React.FC<Props> = ({ visible, onClose, editing }) => {
+export const BudgetForm: React.FC<Props> = ({ visible, onClose, editing, preSelectedCategoryId }) => {
     const { categories, setBudget, budgets } = useData();
     const { theme } = useTheme();
     const [categoryId, setCategoryId] = useState<string | null>(null);
@@ -22,16 +23,16 @@ export const BudgetForm: React.FC<Props> = ({ visible, onClose, editing }) => {
     const [saving, setSaving] = useState(false);
 
     const budgetedCategoryIds = new Set(budgets.map(b => b.categoryId));
-    const expenseCategories = categories.filter(c => c.type === 'expense' && (editing || !budgetedCategoryIds.has(c.id)));
+    const expenseCategories = categories.filter(c => c.type === 'expense' && (editing || c.id === preSelectedCategoryId || !budgetedCategoryIds.has(c.id)));
 
     useEffect(() => {
         if (visible) {
-            setCategoryId(editing?.categoryId || null);
+            setCategoryId(editing?.categoryId || preSelectedCategoryId || null);
             setAmount(editing ? String(editing.amount) : '');
             setRollover(editing?.rollover ?? false);
             setThreshold(String(editing?.alertThreshold ?? 90));
         }
-    }, [visible, editing]);
+    }, [visible, editing, preSelectedCategoryId]);
 
     const handleSave = async () => {
         if (!categoryId) return Alert.alert('Missing category', 'Select a category.');

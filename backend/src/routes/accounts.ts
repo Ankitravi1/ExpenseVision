@@ -7,7 +7,7 @@ const router = Router();
 const accountSchema = z.object({
     name: z.string().min(1),
     type: z.string(),
-    balance: z.number().default(0),
+    initialBalance: z.number().default(0),
     color: z.string().optional(),
     icon: z.string().optional(),
     logo: z.string().optional()
@@ -41,6 +41,7 @@ router.post('/', async (req, res, next) => {
         const account = await prisma.account.create({
             data: {
                 ...data,
+                balance: data.initialBalance, // Current balance starts at initial balance
                 userId
             }
         });
@@ -63,6 +64,16 @@ router.put('/:id', async (req, res, next) => {
         const { id } = req.params;
 
         const data = accountSchema.partial().parse(req.body);
+
+        // Fetch old account to calculate balance adjustment if initialBalance changed
+        const oldAccount = await prisma.account.findUnique({
+            where: { id }
+        });
+
+        if (data.initialBalance !== undefined && oldAccount) {
+            const diff = data.initialBalance - oldAccount.initialBalance;
+            (data as any).balance = oldAccount.balance + diff;
+        }
 
         const account = await prisma.account.updateMany({
             where: { id, userId },

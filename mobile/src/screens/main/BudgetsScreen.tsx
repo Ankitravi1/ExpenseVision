@@ -20,7 +20,19 @@ export default function BudgetsScreen() {
     const { theme } = useTheme();
     const [showForm, setShowForm] = useState(false);
     const [editing, setEditing] = useState<Budget | null>(null);
+    const [preSelectedCategoryId, setPreSelectedCategoryId] = useState<string | null>(null);
     const currency = user?.currency || 'INR';
+
+    const now = new Date();
+    const activeMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const budgetedCategoryIds = new Set(
+        budgets
+            .filter(b => b.month === activeMonth || !b.month || b.month === '')
+            .map(b => b.categoryId)
+    );
+    const unbudgetedCategories = categories.filter(
+        c => c.type === 'expense' && !budgetedCategoryIds.has(c.id)
+    );
 
     const confirmDelete = (b: Budget) => {
         const cat = categories.find(c => c.id === b.categoryId);
@@ -32,6 +44,37 @@ export default function BudgetsScreen() {
                 onPress: () => deleteBudget(b.id).catch(err => Alert.alert('Error', err.message)),
             },
         ]);
+    };
+
+    const renderFooter = () => {
+        if (unbudgetedCategories.length === 0) return <View style={{ height: spacing.lg }} />;
+        return (
+            <View style={styles.unbudgetedSection}>
+                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Unbudgeted Categories</Text>
+                <View style={{ gap: spacing.sm }}>
+                    {unbudgetedCategories.map(cat => (
+                        <View key={cat.id} style={[styles.unbudgetedRow, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder }]}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                                <CategoryIcon name={cat.icon} size={15} />
+                                <Text style={{ color: theme.colors.text, fontWeight: '600', marginLeft: spacing.sm, fontSize: 14 }}>
+                                    {cat.name}
+                                </Text>
+                            </View>
+                            <TouchableOpacity
+                                onPress={() => {
+                                    setPreSelectedCategoryId(cat.id);
+                                    setEditing(null);
+                                    setShowForm(true);
+                                }}
+                                style={[styles.quickAddButton, { backgroundColor: theme.colors.primary }]}
+                            >
+                                <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>Set Budget</Text>
+                            </TouchableOpacity>
+                        </View>
+                    ))}
+                </View>
+            </View>
+        );
     };
 
     return (
@@ -50,6 +93,7 @@ export default function BudgetsScreen() {
                 <TouchableOpacity
                     onPress={() => {
                         setEditing(null);
+                        setPreSelectedCategoryId(null);
                         setShowForm(true);
                     }}
                     style={[styles.addButton, { backgroundColor: theme.colors.primary }]}
@@ -63,6 +107,7 @@ export default function BudgetsScreen() {
                 keyExtractor={b => b.id}
                 contentContainerStyle={{ padding: spacing.md, paddingTop: 0, gap: spacing.sm }}
                 refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refresh} tintColor={theme.colors.primary} />}
+                extraData={{ budgets, categories }}
                 renderItem={({ item: b }) => {
                     const cat = categories.find(c => c.id === b.categoryId);
                     const limit = b.effectiveAmount ?? b.amount;
@@ -74,6 +119,7 @@ export default function BudgetsScreen() {
                         <TouchableOpacity
                             onPress={() => {
                                 setEditing(b);
+                                setPreSelectedCategoryId(null);
                                 setShowForm(true);
                             }}
                             onLongPress={() => confirmDelete(b)}
@@ -93,16 +139,21 @@ export default function BudgetsScreen() {
                             <View style={[styles.track, { backgroundColor: theme.colors.separator }]}>
                                 <View style={[styles.fill, { width: `${ratio * 100}%`, backgroundColor: barColor }]} />
                             </View>
+
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.xs }}>
+                                <Text style={{ color: theme.colors.textSecondary, fontSize: 12 }}>
+                                    {(ratio * 100).toFixed(1)}% used
+                                </Text>
+                                <Text style={{ color: limit - b.spent >= 0 ? theme.colors.success : theme.colors.danger, fontSize: 12, fontWeight: '500' }}>
+                                    {formatCurrency(Math.abs(limit - b.spent), currency)} {limit - b.spent >= 0 ? 'left' : 'over'}
+                                </Text>
+                            </View>
+
                             {b.rollover && (b.carryover ?? 0) !== 0 && (
                                 <Text style={{ color: theme.colors.textTertiary, fontSize: 12, marginTop: 4 }}>
                                     {(b.carryover ?? 0) > 0
                                         ? `Includes ${formatCurrency(b.carryover ?? 0, currency)} rolled over from last month`
                                         : `Reduced by ${formatCurrency(Math.abs(b.carryover ?? 0), currency)} overspent last month`}
-                                </Text>
-                            )}
-                            {over && (
-                                <Text style={{ color: theme.colors.danger, fontSize: 12, marginTop: 4 }}>
-                                    Over budget by {formatCurrency(b.spent - limit, currency)}
                                 </Text>
                             )}
                         </TouchableOpacity>
@@ -111,6 +162,7 @@ export default function BudgetsScreen() {
                 ListEmptyComponent={
                     <EmptyState icon="target" title="No budgets yet" subtitle="Tap + to set a monthly limit for a category." />
                 }
+                ListFooterComponent={renderFooter}
             />
 
             <BudgetForm
@@ -118,8 +170,10 @@ export default function BudgetsScreen() {
                 onClose={() => {
                     setShowForm(false);
                     setEditing(null);
+                    setPreSelectedCategoryId(null);
                 }}
                 editing={editing}
+                preSelectedCategoryId={preSelectedCategoryId}
             />
         </SafeAreaView>
     );
@@ -162,5 +216,27 @@ const styles = StyleSheet.create({
     fill: {
         height: 8,
         borderRadius: 4,
+    },
+    unbudgetedSection: {
+        marginTop: spacing.lg,
+        marginBottom: spacing.xl,
+    },
+    sectionTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        marginBottom: spacing.sm,
+    },
+    unbudgetedRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: spacing.md,
+        borderRadius: radius.md,
+        borderWidth: 1,
+        justifyContent: 'space-between',
+    },
+    quickAddButton: {
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.xs,
+        borderRadius: radius.sm,
     },
 });

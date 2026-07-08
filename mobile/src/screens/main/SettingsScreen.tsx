@@ -132,7 +132,7 @@ export default function SettingsScreen() {
         }
     };
 
-    const handleAiProviderChange = async (provider: AiProvider) => {
+    const handleAiProviderChange = (provider: AiProvider) => {
         setRevealedKeys({});
         setNewModelInput('');
         setNewKeyInput('');
@@ -142,21 +142,8 @@ export default function SettingsScreen() {
             model: (aiSettings.customModels[provider] || [])[0] || '',
         };
         setAiSettings(updated);
-
-        if (provider !== 'custom') {
-            try {
-                const saved = await saveAiSettings(updated);
-                setAiSettings(saved);
-                successHaptic();
-                setAiSaved(true);
-                setDirty(false);
-            } catch (err: any) {
-                Alert.alert('Error', err.message || 'Failed to save AI settings');
-            }
-        } else {
-            setAiSaved(false);
-            setDirty(true);
-        }
+        setAiSaved(false);
+        setDirty(true);
     };
 
     const addModel = () => {
@@ -241,6 +228,8 @@ export default function SettingsScreen() {
                         delete updatedKeys[providerToDelete];
                         const updatedCustomModels = { ...aiSettings.customModels };
                         delete updatedCustomModels[providerToDelete];
+                        const updatedBaseUrl = { ...aiSettings.baseUrl };
+                        delete updatedBaseUrl[providerToDelete];
 
                         const updated = {
                             ...aiSettings,
@@ -248,6 +237,7 @@ export default function SettingsScreen() {
                             model: '',
                             keys: updatedKeys,
                             customModels: updatedCustomModels,
+                            baseUrl: updatedBaseUrl,
                         };
 
                         setAiSettings(updated);
@@ -276,7 +266,7 @@ export default function SettingsScreen() {
                     provider: aiSettings.provider,
                     model: aiSettings.model,
                     apiKey: aiSettings.keys[aiSettings.provider]?.[0] || '',
-                    baseUrl: aiSettings.baseUrl,
+                    baseUrl: aiSettings.baseUrl[aiSettings.provider] || '',
                 }),
             });
             const data = await res.json().catch(() => ({}));
@@ -427,7 +417,7 @@ export default function SettingsScreen() {
         { value: 'gemini', label: 'Gemini' },
         { value: 'openrouter', label: 'OpenRouter' },
         ...extraProviders.map(p => ({ value: p, label: capitalize(p) })),
-        { value: 'custom', label: 'Add Provider' },
+        { value: 'custom', label: 'Add Provider (OpenAI-compatible)' },
     ];
 
     const isCustomOrUnknown = !defaults.includes(aiSettings.provider) && !extraProviders.includes(aiSettings.provider);
@@ -499,7 +489,32 @@ export default function SettingsScreen() {
                 </Card>
 
                 <Card style={{ marginBottom: spacing.md, paddingVertical: 0 }}>
-                    <Row icon="creation" label="AI transaction parsing" value={aiSettings.enabled ? (aiSettings.model || aiSettings.provider) : 'Off'} onPress={() => setShowAiSettings(true)} />
+                    <Row
+                        icon="creation"
+                        label="Enable AI Parsing"
+                        right={
+                            <Switch
+                                value={aiSettings.enabled}
+                                onValueChange={async (val) => {
+                                    const updated = { ...aiSettings, enabled: val };
+                                    setAiSettings(updated);
+                                    try {
+                                        await saveAiSettings(updated);
+                                        successHaptic();
+                                    } catch (err: any) {
+                                        Alert.alert('Error', err.message || 'Failed to save AI settings');
+                                    }
+                                }}
+                                trackColor={{ true: theme.colors.primary }}
+                            />
+                        }
+                    />
+                    <Row
+                        icon="cog-outline"
+                        label="AI Provider Settings"
+                        value={aiSettings.enabled ? (aiSettings.model || aiSettings.provider) : 'Off'}
+                        onPress={() => setShowAiSettings(true)}
+                    />
                 </Card>
 
                 <Card style={{ marginBottom: spacing.md, paddingVertical: 0 }}>
@@ -516,21 +531,6 @@ export default function SettingsScreen() {
 
             {/* AI settings */}
             <SheetModal visible={showAiSettings} onClose={() => setShowAiSettings(false)} title="AI transaction parsing">
-                {/* 1. Enable AI toggle */}
-                <View style={[styles.aiToggleRow, { borderBottomColor: theme.colors.separator }]}>
-                    <View style={{ flex: 1 }}>
-                        <Text style={{ color: theme.colors.text, fontWeight: '700' }}>Enable AI parsing</Text>
-                        <Text style={{ color: theme.colors.textTertiary, fontSize: 12, marginTop: 3 }}>
-                            Use typed or voice-dictated notes to fill transaction drafts.
-                        </Text>
-                    </View>
-                    <Switch
-                        value={aiSettings.enabled}
-                        onValueChange={(enabled: boolean) => { setAiSaved(false); setDirty(true); setAiSettings(prev => ({ ...prev, enabled })); }}
-                        trackColor={{ true: theme.colors.primary }}
-                    />
-                </View>
-
                 {/* 2. Provider */}
                 <FieldLabel>Provider</FieldLabel>
                 <ChipSelector
@@ -582,11 +582,11 @@ export default function SettingsScreen() {
                         </View>
                         <Input
                             label="Base URL"
-                            value={aiSettings.baseUrl || ''}
-                            onChangeText={baseUrl => {
+                            value={aiSettings.baseUrl[aiSettings.provider] || ''}
+                            onChangeText={value => {
                                 setAiSaved(false);
                                 setDirty(true);
-                                setAiSettings(prev => ({ ...prev, baseUrl }));
+                                setAiSettings(prev => ({ ...prev, baseUrl: { ...prev.baseUrl, [prev.provider]: value } }));
                             }}
                             placeholder="https://api.groq.com/openai/v1"
                             autoCapitalize="none"
@@ -681,7 +681,7 @@ export default function SettingsScreen() {
                         </TouchableOpacity>
                         <Input
                             style={{ flex: 1 }}
-                            value={keyStr}
+                            value={revealedKeys[`${aiSettings.provider}-${idx}`] ? keyStr : '•••••••••••••' + (keyStr.length > 3 ? keyStr.slice(-3) : keyStr)}
                             onChangeText={val => {
                                 setAiSaved(false);
                                 setDirty(true);
@@ -691,7 +691,6 @@ export default function SettingsScreen() {
                                     return { ...prev, keys: { ...prev.keys, [prev.provider]: newKeys } };
                                 });
                             }}
-                            secureTextEntry={!revealedKeys[`${aiSettings.provider}-${idx}`]}
                             placeholder="sk-..."
                             autoCapitalize="none"
                         />

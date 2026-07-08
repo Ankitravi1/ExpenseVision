@@ -275,7 +275,21 @@ router.post('/parse-text', async (req, res, next) => {
         }
 
         const isDefaultProvider = ['deepseek', 'openai', 'openrouter', 'gemini'].includes(aiConfig.provider);
-        if (!isDefaultProvider && !aiConfig.baseUrl) {
+        let resolvedBaseUrl = '';
+        if (aiConfig.baseUrl) {
+            try {
+                const parsed = JSON.parse(aiConfig.baseUrl);
+                if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+                    resolvedBaseUrl = parsed[aiConfig.provider] || '';
+                } else {
+                    resolvedBaseUrl = aiConfig.baseUrl;
+                }
+            } catch (e) {
+                resolvedBaseUrl = aiConfig.baseUrl;
+            }
+        }
+
+        if (!isDefaultProvider && !resolvedBaseUrl) {
             return res.status(400).json({ error: `AI provider ${aiConfig.provider} requires a base URL` });
         }
 
@@ -307,7 +321,7 @@ router.post('/parse-text', async (req, res, next) => {
             `User text: ${text}`
         ].join('\n');
 
-        const response = await fetch(getAiEndpoint(aiConfig.provider, aiConfig.baseUrl), {
+        const response = await fetch(getAiEndpoint(aiConfig.provider, resolvedBaseUrl), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

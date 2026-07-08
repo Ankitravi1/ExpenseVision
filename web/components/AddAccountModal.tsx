@@ -2,12 +2,14 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { AppContext } from '../App';
 import { Icon, iconList } from './Icon';
-import { AccountType } from '../types';
+import { Account, AccountType } from '../types';
 import { getCurrencySymbol } from '../utils/currency';
 
 interface AddAccountModalProps {
     isOpen: boolean;
     onClose: () => void;
+    account?: Account;
+    onDelete?: (id: string) => void;
 }
 
 const predefinedAccountTypes: { type: AccountType; icon: string; label: string }[] = [
@@ -32,7 +34,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ isOpen, onClos
         if (isOpen) { // Only reset/fill when modal opens
             if (account) {
                 setName(account.name);
-                setBalance(account.balance.toString());
+                setBalance((account.initialBalance !== undefined ? account.initialBalance : account.balance).toString());
 
                 const isPredefined = predefinedAccountTypes.some(t => t.type === account.type);
                 if (isPredefined) {
@@ -68,6 +70,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ isOpen, onClos
 
         const accountData = {
             name,
+            initialBalance: parseFloat(balance),
             balance: parseFloat(balance),
             type: finalType || 'Custom',
             icon: finalIcon
@@ -193,7 +196,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ isOpen, onClos
                         </div>
 
                         <div>
-                            <label htmlFor="initialBalance" className={labelStyles}>Initial Balance</label>
+                            <label htmlFor="initialBalance" className={labelStyles}>Initial Amount</label>
                             <div className="relative">
                                 <span className="absolute left-3 top-3.5 text-gray-500">{getCurrencySymbol(currency)}</span>
                                 <input

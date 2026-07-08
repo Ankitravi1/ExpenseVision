@@ -6,7 +6,7 @@ import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useNavigation } from '@react-navigation/native';
-import { EmptyState } from '../../components/ui';
+import { EmptyState, Card, SheetModal } from '../../components/ui';
 import { AccountForm } from '../../components/AccountForm';
 import { formatCurrency } from '../../utils/currency';
 import { spacing, radius } from '../../theme';
@@ -24,14 +24,26 @@ const TYPE_ICONS: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> =
 
 export default function AccountsScreen() {
     const navigation = useNavigation();
-    const { accounts, deleteAccount, isLoading, refresh } = useData();
+    const { accounts, deleteAccount, isLoading, refresh, transactions } = useData();
     const { user } = useAuth();
     const { theme } = useTheme();
     const [showForm, setShowForm] = useState(false);
     const [editing, setEditing] = useState<Account | null>(null);
+    const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+    const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
     const currency = user?.currency || 'INR';
 
     const total = accounts.reduce((sum, a) => sum + a.balance, 0);
+
+    const now = new Date();
+    const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const thisMonthTransactions = transactions.filter(t => t.date.startsWith(currentMonthStr));
+    const expensesThisMonth = thisMonthTransactions
+        .filter(t => t.type === 'expense')
+        .reduce((sum, t) => sum + t.amount, 0);
+    const incomeThisMonth = thisMonthTransactions
+        .filter(t => t.type === 'income')
+        .reduce((sum, t) => sum + t.amount, 0);
 
     const confirmDelete = (a: Account) => {
         Alert.alert('Delete account', `Delete "${a.name}"? Accounts with transactions cannot be deleted.`, [
@@ -44,11 +56,170 @@ export default function AccountsScreen() {
         ]);
     };
 
+    const getAccountTransactions = (accountId: string) => {
+        return transactions.filter(t => t.accountId === accountId || t.transferToAccountId === accountId);
+    };
+
+    const getTxAmountAndColor = (t: any, accountId: string) => {
+        let isDebit = false;
+        let prefix = '';
+        if (t.type === 'expense') {
+            isDebit = true;
+            prefix = '-';
+        } else if (t.type === 'income') {
+            isDebit = false;
+            prefix = '+';
+        } else if (t.type === 'transfer') {
+            if (t.accountId === accountId) {
+                isDebit = true;
+                prefix = '-';
+            } else {
+                isDebit = false;
+                prefix = '+';
+            }
+        }
+        return {
+            text: `${prefix}${formatCurrency(t.amount, currency)}`,
+            color: isDebit ? theme.colors.danger : theme.colors.success,
+        };
+    };
+
+    const renderAccountDetails = () => {
+        if (!selectedAccount) return null;
+        const txs = getAccountTransactions(selectedAccount.id);
+
+        const sorted = [...txs].sort((a, b) => {
+            return sortOrder === 'newest'
+                ? b.date.localeCompare(a.date)
+                : a.date.localeCompare(b.date);
+        });
+
+        const groups: { month: string; transactions: typeof sorted }[] = [];
+        sorted.forEach(t => {
+            const m = t.date.substring(0, 7);
+            let group = groups.find(g => g.month === m);
+            if (!group) {
+                group = { month: m, transactions: [] };
+                groups.push(group);
+            }
+            group.transactions.push(t);
+        });
+
+        return (
+            <View style={{ gap: spacing.md }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs }}>
+                    <View style={{ flexDirection: 'row', gap: spacing.xs }}>
+                        <TouchableOpacity
+                            onPress={() => setSortOrder('newest')}
+                            style={[
+                                styles.sortButton,
+                                {
+                                    backgroundColor: sortOrder === 'newest' ? theme.colors.primary : theme.colors.inputBg,
+                                    borderColor: sortOrder === 'newest' ? theme.colors.primary : theme.colors.inputBorder,
+                                },
+                            ]}
+                        >
+                            <Text style={{ color: sortOrder === 'newest' ? '#fff' : theme.colors.text, fontSize: 12, fontWeight: '600' }}>
+                                Newest
+                            </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            onPress={() => setSortOrder('oldest')}
+                            style={[
+                                styles.sortButton,
+                                {
+                                    backgroundColor: sortOrder === 'oldest' ? theme.colors.primary : theme.colors.inputBg,
+                                    borderColor: sortOrder === 'oldest' ? theme.colors.primary : theme.colors.inputBorder,
+                                },
+                            ]}
+                        >
+                            <Text style={{ color: sortOrder === 'oldest' ? '#fff' : theme.colors.text, fontSize: 12, fontWeight: '600' }}>
+                                Oldest
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    <TouchableOpacity
+                        onPress={() => {
+                            setEditing(selectedAccount);
+                            setSelectedAccount(null);
+                            setShowForm(true);
+                        }}
+                        style={[styles.editButton, { borderColor: theme.colors.primary }]}
+                    >
+                        <MaterialCommunityIcons name="pencil-outline" size={14} color={theme.colors.primary} />
+                        <Text style={{ color: theme.colors.primary, fontSize: 12, fontWeight: '600', marginLeft: 4 }}>
+                            Edit Account
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+
+                <Card style={{ padding: spacing.sm, backgroundColor: theme.colors.inputBg, borderColor: theme.colors.inputBorder }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                        <Text style={{ color: theme.colors.textSecondary, fontSize: 13 }}>Current Balance:</Text>
+                        <Text style={{ color: selectedAccount.balance < 0 ? theme.colors.danger : theme.colors.text, fontWeight: '700', fontSize: 14 }}>
+                            {formatCurrency(selectedAccount.balance, currency)}
+                        </Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+                        <Text style={{ color: theme.colors.textSecondary, fontSize: 13 }}>Initial Amount:</Text>
+                        <Text style={{ color: theme.colors.textSecondary, fontSize: 13 }}>
+                            {formatCurrency(selectedAccount.initialBalance ?? selectedAccount.balance, currency)}
+                        </Text>
+                    </View>
+                </Card>
+
+                {groups.length === 0 ? (
+                    <Text style={{ color: theme.colors.textTertiary, textAlign: 'center', marginVertical: spacing.xl, fontStyle: 'italic' }}>
+                        No transactions recorded for this account.
+                    </Text>
+                ) : (
+                    groups.map(group => {
+                        const [y, m] = group.month.split('-').map(Number);
+                        const monthName = new Date(y, m - 1, 1).toLocaleString('default', { month: 'long', year: 'numeric' });
+                        return (
+                            <View key={group.month} style={{ marginBottom: spacing.sm }}>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.colors.separator, paddingBottom: 4 }}>
+                                    <Text style={{ color: theme.colors.text, fontWeight: '700', fontSize: 14 }}>
+                                        {monthName}
+                                    </Text>
+                                    <Text style={{ color: theme.colors.textTertiary, fontSize: 11 }}>
+                                        {group.transactions.length} transaction{group.transactions.length === 1 ? '' : 's'}
+                                    </Text>
+                                </View>
+                                <View style={{ gap: 6 }}>
+                                    {group.transactions.map(t => {
+                                        const { text, color } = getTxAmountAndColor(t, selectedAccount.id);
+                                        const dayStr = t.date.split('-')[2];
+                                        return (
+                                            <View key={t.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 }}>
+                                                <View style={{ flex: 1, marginRight: spacing.md }}>
+                                                    <Text style={{ color: theme.colors.text, fontSize: 13 }} numberOfLines={1}>
+                                                        {t.note || 'Unspecified'}
+                                                    </Text>
+                                                    <Text style={{ color: theme.colors.textTertiary, fontSize: 11 }}>
+                                                        Day {dayStr} • {t.type}
+                                                    </Text>
+                                                </View>
+                                                <Text style={{ color, fontWeight: '600', fontSize: 13 }}>
+                                                    {text}
+                                                </Text>
+                                            </View>
+                                        );
+                                    })}
+                                </View>
+                            </View>
+                        );
+                    })
+                )}
+            </View>
+        );
+    };
+
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top']}>
             <View style={styles.header}>
-                <View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <TouchableOpacity
                         onPress={() => (navigation as any).openDrawer?.()}
                         style={{ marginRight: 12, padding: 4 }}
@@ -57,10 +228,6 @@ export default function AccountsScreen() {
                         <MaterialCommunityIcons name="menu" size={26} color={theme.colors.text} />
                     </TouchableOpacity>
                     <Text style={[styles.title, { color: theme.colors.text }]}>Accounts</Text>
-                </View>
-                    <Text style={{ color: theme.colors.textSecondary, fontSize: 13 }}>
-                        Total: <Text style={{ fontWeight: '700', color: theme.colors.text }}>{formatCurrency(total, currency)}</Text>
-                    </Text>
                 </View>
                 <TouchableOpacity
                     onPress={() => {
@@ -73,6 +240,36 @@ export default function AccountsScreen() {
                 </TouchableOpacity>
             </View>
 
+            {/* Combined Stats Card */}
+            <View style={{ paddingHorizontal: spacing.md, marginBottom: spacing.md }}>
+                <Card style={{ padding: spacing.md }}>
+                    <Text style={{ color: theme.colors.textSecondary, fontSize: 12, textTransform: 'uppercase', fontWeight: '700', letterSpacing: 0.5 }}>Combined Balance</Text>
+                    <Text style={{ color: theme.colors.text, fontSize: 26, fontWeight: '800', marginVertical: 4 }}>
+                        {formatCurrency(total, currency)}
+                    </Text>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.colors.separator, paddingTop: spacing.md, marginTop: spacing.xs }}>
+                        <View style={{ flex: 1 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                <MaterialCommunityIcons name="arrow-down-bold-circle-outline" size={16} color={theme.colors.success} />
+                                <Text style={{ color: theme.colors.textSecondary, fontSize: 11, fontWeight: '600' }}>Income this month</Text>
+                            </View>
+                            <Text style={{ color: theme.colors.success, fontSize: 16, fontWeight: '700', marginTop: 2 }}>
+                                {formatCurrency(incomeThisMonth, currency)}
+                            </Text>
+                        </View>
+                        <View style={{ flex: 1, borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: theme.colors.separator, paddingLeft: spacing.md }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                <MaterialCommunityIcons name="arrow-up-bold-circle-outline" size={16} color={theme.colors.danger} />
+                                <Text style={{ color: theme.colors.textSecondary, fontSize: 11, fontWeight: '600' }}>Expenses this month</Text>
+                            </View>
+                            <Text style={{ color: theme.colors.danger, fontSize: 16, fontWeight: '700', marginTop: 2 }}>
+                                {formatCurrency(expensesThisMonth, currency)}
+                            </Text>
+                        </View>
+                    </View>
+                </Card>
+            </View>
+
             <FlatList
                 data={accounts}
                 keyExtractor={a => a.id}
@@ -81,8 +278,7 @@ export default function AccountsScreen() {
                 renderItem={({ item: a }) => (
                     <TouchableOpacity
                         onPress={() => {
-                            setEditing(a);
-                            setShowForm(true);
+                            setSelectedAccount(a);
                         }}
                         onLongPress={() => confirmDelete(a)}
                         style={[styles.accountRow, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder }]}
@@ -104,7 +300,7 @@ export default function AccountsScreen() {
                     </TouchableOpacity>
                 )}
                 ListEmptyComponent={
-                    <EmptyState icon="wallet-outline" title="No accounts yet" subtitle="Tap + to add your first account. Tap an account to edit, long-press to delete." />
+                    <EmptyState icon="wallet-outline" title="No accounts yet" subtitle="Tap + to add your first account. Tap an account to view details, long-press to delete." />
                 }
             />
 
@@ -116,6 +312,14 @@ export default function AccountsScreen() {
                 }}
                 editing={editing}
             />
+
+            <SheetModal
+                visible={!!selectedAccount}
+                title={selectedAccount?.name || 'Account Records'}
+                onClose={() => setSelectedAccount(null)}
+            >
+                {renderAccountDetails()}
+            </SheetModal>
         </SafeAreaView>
     );
 }
@@ -151,5 +355,19 @@ const styles = StyleSheet.create({
         borderRadius: 22,
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    sortButton: {
+        paddingHorizontal: spacing.sm,
+        paddingVertical: 6,
+        borderRadius: radius.sm,
+        borderWidth: 1,
+    },
+    editButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: spacing.sm,
+        paddingVertical: 6,
+        borderRadius: radius.sm,
+        borderWidth: 1,
     },
 });

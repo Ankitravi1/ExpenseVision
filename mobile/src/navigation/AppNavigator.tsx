@@ -125,11 +125,6 @@ function DrawerContentComponent({ navigation }: any) {
             {/* Spacer */}
             <View style={{ flex: 1 }} />
 
-            {/* Sync note */}
-            <Text style={{ color: theme.colors.textTertiary, textAlign: 'center', fontSize: 11, marginBottom: spacing.sm, paddingHorizontal: spacing.md }}>
-                ExpenseVision · synced with your web account
-            </Text>
-
             {/* Add Transaction — prominent button just above user pill */}
             <TouchableOpacity
                 onPress={() => goToTab('Transactions', { openForm: true })}
@@ -143,23 +138,6 @@ function DrawerContentComponent({ navigation }: any) {
             {/* User menu (expands upward from the pill) */}
             {userMenuOpen && (
                 <View style={[styles.userMenu, { backgroundColor: theme.colors.card, borderColor: theme.colors.separator }]}>
-                    {/* Dark mode toggle inside user menu */}
-                    <TouchableOpacity
-                        style={styles.userMenuItem}
-                        onPress={toggleTheme}
-                    >
-                        <MaterialCommunityIcons
-                            name={mode === 'dark' ? 'weather-sunny' : 'weather-night'}
-                            size={20}
-                            color={theme.colors.text}
-                        />
-                        <Text style={[styles.userMenuLabel, { color: theme.colors.text }]}>
-                            {mode === 'dark' ? 'Light mode' : 'Dark mode'}
-                        </Text>
-                    </TouchableOpacity>
-
-                    <View style={[styles.menuDivider, { backgroundColor: theme.colors.separator }]} />
-
                     <TouchableOpacity
                         style={styles.userMenuItem}
                         onPress={() => goToDrawerScreen('Profile')}
@@ -178,6 +156,24 @@ function DrawerContentComponent({ navigation }: any) {
 
                     <View style={[styles.menuDivider, { backgroundColor: theme.colors.separator }]} />
 
+                    {/* Dark mode toggle inside user menu */}
+                    <TouchableOpacity
+                        style={styles.userMenuItem}
+                        onPress={toggleTheme}
+                    >
+                        <MaterialCommunityIcons
+                            name="palette-outline"
+                            size={20}
+                            color={theme.colors.text}
+                        />
+                        <Text style={[styles.userMenuLabel, { color: theme.colors.text }]}>Theme</Text>
+                        <Text style={{ color: theme.colors.textTertiary, fontSize: 13, marginLeft: 'auto' }}>
+                            {mode === 'dark' ? 'Dark' : 'Light'}
+                        </Text>
+                    </TouchableOpacity>
+
+                    <View style={[styles.menuDivider, { backgroundColor: theme.colors.separator }]} />
+
                     <TouchableOpacity
                         style={styles.userMenuItem}
                         onPress={handleLogout}
@@ -191,7 +187,7 @@ function DrawerContentComponent({ navigation }: any) {
             {/* User pill — always visible at bottom */}
             <TouchableOpacity
                 onPress={() => setUserMenuOpen(v => !v)}
-                style={[styles.userPill, { backgroundColor: theme.colors.card, borderColor: theme.colors.separator }]}
+                style={[styles.userPill, { backgroundColor: theme.colors.card, borderColor: theme.colors.separator, marginBottom: spacing.xs }]}
                 activeOpacity={0.8}
             >
                 <View style={[styles.pillAvatar, { backgroundColor: theme.colors.primary }]}>
@@ -207,6 +203,11 @@ function DrawerContentComponent({ navigation }: any) {
                     color={theme.colors.textTertiary}
                 />
             </TouchableOpacity>
+
+            {/* Sync note */}
+            <Text style={{ color: theme.colors.textTertiary, textAlign: 'center', fontSize: 11, marginBottom: spacing.md, paddingHorizontal: spacing.md }}>
+                ExpenseVision · synced with your web account
+            </Text>
         </View>
     );
 }

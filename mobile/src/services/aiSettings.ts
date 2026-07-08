@@ -8,7 +8,7 @@ export interface AiSettings {
     model: string;
     keys: Record<string, string[]>;
     customModels: Record<string, string[]>; // per-provider
-    baseUrl?: string;
+    baseUrl: Record<string, string>;
 }
 
 export const defaultAiSettings: AiSettings = {
@@ -17,6 +17,7 @@ export const defaultAiSettings: AiSettings = {
     model: '',
     keys: {},
     customModels: {},
+    baseUrl: {},
 };
 
 export const getAiSettings = async (): Promise<AiSettings> => {

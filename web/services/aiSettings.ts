@@ -8,7 +8,7 @@ export interface AiSettings {
     model: string;
     keys: Record<string, string[]>;          // per-provider list of encrypted API keys
     customModels: Record<string, string[]>;  // per-provider list of user-added model names
-    baseUrl?: string;
+    baseUrl: Record<string, string>;
 }
 
 export const defaultAiSettings: AiSettings = {
@@ -17,7 +17,7 @@ export const defaultAiSettings: AiSettings = {
     model: '',
     keys: {},
     customModels: {},
-    baseUrl: ''
+    baseUrl: {}
 };
 
 

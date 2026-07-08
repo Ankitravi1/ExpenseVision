@@ -32,7 +32,8 @@ export const Settings: React.FC = () => {
     const defaultProviders = ['deepseek', 'openai', 'gemini', 'openrouter'];
     const customConfiguredProviders = Array.from(new Set([
         ...Object.keys(aiSettings.keys || {}),
-        ...Object.keys(aiSettings.customModels || {})
+        ...Object.keys(aiSettings.customModels || {}),
+        ...Object.keys(aiSettings.baseUrl || {})
     ])).filter(p => !defaultProviders.includes(p) && p !== 'custom' && p.trim() !== '');
 
     useEffect(() => {
@@ -149,7 +150,7 @@ export const Settings: React.FC = () => {
         }
     };
 
-    const handleAiProviderChange = async (provider: AiProvider) => {
+    const handleAiProviderChange = (provider: AiProvider) => {
         setAiSaved(false);
         setRevealedKeys({});
         setNewModelInput('');
@@ -160,7 +161,6 @@ export const Settings: React.FC = () => {
             model: (aiSettings.customModels[provider] || [])[0] || ''
         };
         setAiSettings(updated);
-        await handleSaveAiSettings(updated);
     };
 
     const addModel = () => {
@@ -245,12 +245,16 @@ export const Settings: React.FC = () => {
         const updatedCustomModels = { ...aiSettings.customModels };
         delete updatedCustomModels[providerToDelete];
 
+        const updatedBaseUrl = { ...aiSettings.baseUrl };
+        delete updatedBaseUrl[providerToDelete];
+
         const newSettings: AiSettings = {
             ...aiSettings,
             provider: 'deepseek',
             model: '',
             keys: updatedKeys,
-            customModels: updatedCustomModels
+            customModels: updatedCustomModels,
+            baseUrl: updatedBaseUrl
         };
 
         setAiSettings(newSettings);
@@ -267,7 +271,7 @@ export const Settings: React.FC = () => {
                     provider: aiSettings.provider,
                     model: aiSettings.model,
                     apiKey,
-                    baseUrl: aiSettings.baseUrl
+                    baseUrl: aiSettings.baseUrl[aiSettings.provider] || ''
                 })
             });
             const data = await res.json().catch(() => ({}));
@@ -421,7 +425,7 @@ export const Settings: React.FC = () => {
                             {customConfiguredProviders.map(p => (
                                 <option key={p} value={p}>{p}</option>
                             ))}
-                            <option value="custom">Add Provider</option>
+                            <option value="custom">Add Provider (OpenAI-compatible)</option>
                         </select>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 italic">
                             {aiSettings.provider === 'deepseek' && "Uses DeepSeek base URL: https://api.deepseek.com"}
@@ -471,10 +475,17 @@ export const Settings: React.FC = () => {
                                 <input
                                     id="ai-base-url"
                                     type="text"
-                                    value={aiSettings.baseUrl || ''}
+                                    value={aiSettings.baseUrl[aiSettings.provider] || ''}
                                     onChange={(e) => {
+                                        const value = e.target.value;
                                         setAiSaved(false);
-                                        setAiSettings(prev => ({ ...prev, baseUrl: e.target.value }));
+                                        setAiSettings(prev => ({
+                                            ...prev,
+                                            baseUrl: {
+                                                ...(prev.baseUrl || {}),
+                                                [prev.provider]: value
+                                            }
+                                        }));
                                     }}
                                     placeholder="https://api.groq.com/openai/v1"
                                     className="block w-full bg-gray-100 border-transparent rounded-lg p-3 focus:ring-2 focus:ring-primary focus:bg-white text-base dark:bg-gray-700 dark:text-gray-100 dark:focus:bg-gray-600"
@@ -555,8 +566,8 @@ export const Settings: React.FC = () => {
                                         <Icon name="Star" size={15} className={index === 0 ? 'fill-current' : ''} />
                                     </button>
                                     <input
-                                        type={revealedKeys[`${aiSettings.provider}-${index}`] ? 'text' : 'password'}
-                                        value={key}
+                                        type="text"
+                                        value={revealedKeys[`${aiSettings.provider}-${index}`] ? key : '•••••••••••••' + (key.length > 3 ? key.slice(-3) : key)}
                                         readOnly
                                         className="flex-1 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm font-mono dark:text-gray-100"
                                     />

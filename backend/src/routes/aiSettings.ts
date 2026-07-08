@@ -8,7 +8,7 @@ const settingsSchema = z.object({
     enabled: z.boolean(),
     provider: z.string().min(1),
     model: z.string(), // Allow empty string for model initially
-    baseUrl: z.string().nullish(),
+    baseUrl: z.union([z.string(), z.record(z.string())]).nullish(),
     keys: z.record(z.array(z.string())).nullish(),
     customModels: z.record(z.array(z.string())).nullish()
 });
@@ -17,7 +17,7 @@ const defaultSettings = {
     enabled: false,
     provider: 'deepseek',
     model: '',
-    baseUrl: null,
+    baseUrl: {},
     keys: {},
     customModels: {}
 };
@@ -62,6 +62,7 @@ router.get('/', async (req, res, next) => {
 
         let decryptedKeys: Record<string, string[]> = {};
         let parsedCustomModels: Record<string, string[]> = {};
+        let parsedBaseUrl: Record<string, string> = {};
         try {
             if (settings.keys) {
                 const encryptedMap = JSON.parse(settings.keys);
@@ -74,15 +75,27 @@ router.get('/', async (req, res, next) => {
             if (settings.customModels) {
                 parsedCustomModels = JSON.parse(settings.customModels);
             }
+            if (settings.baseUrl) {
+                try {
+                    const parsed = JSON.parse(settings.baseUrl);
+                    if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+                        parsedBaseUrl = parsed;
+                    } else {
+                        parsedBaseUrl = { custom: settings.baseUrl };
+                    }
+                } catch (e) {
+                    parsedBaseUrl = { custom: settings.baseUrl };
+                }
+            }
         } catch (e) {
-            console.error('Failed to parse keys or custom models', e);
+            console.error('Failed to parse keys, custom models or baseUrl', e);
         }
 
         res.json({
             enabled: settings.enabled,
             provider: settings.provider,
             model: settings.model,
-            baseUrl: settings.baseUrl,
+            baseUrl: parsedBaseUrl,
             keys: decryptedKeys,
             customModels: parsedCustomModels
         });
@@ -112,6 +125,15 @@ router.put('/', async (req, res, next) => {
         const keysJson = Object.keys(encryptedKeys).length ? JSON.stringify(encryptedKeys) : null;
         const customModelsJson = data.customModels && Object.keys(data.customModels).length ? JSON.stringify(data.customModels) : null;
 
+        let baseUrlJson: string | null = null;
+        if (data.baseUrl) {
+            if (typeof data.baseUrl === 'object' && !Array.isArray(data.baseUrl)) {
+                baseUrlJson = JSON.stringify(data.baseUrl);
+            } else if (typeof data.baseUrl === 'string') {
+                baseUrlJson = JSON.stringify({ custom: data.baseUrl });
+            }
+        }
+
         const saved = await prisma.aiSettings.upsert({
             where: { userId },
             create: {
@@ -119,7 +141,7 @@ router.put('/', async (req, res, next) => {
                 enabled: data.enabled,
                 provider: data.provider,
                 model: data.model,
-                baseUrl: data.baseUrl || null,
+                baseUrl: baseUrlJson,
                 keys: keysJson,
                 customModels: customModelsJson
             },
@@ -127,17 +149,26 @@ router.put('/', async (req, res, next) => {
                 enabled: data.enabled,
                 provider: data.provider,
                 model: data.model,
-                baseUrl: data.baseUrl || null,
+                baseUrl: baseUrlJson,
                 keys: keysJson,
                 customModels: customModelsJson
             }
         });
 
+        let returnedBaseUrl: Record<string, string> = {};
+        if (saved.baseUrl) {
+            try {
+                returnedBaseUrl = JSON.parse(saved.baseUrl);
+            } catch (e) {
+                returnedBaseUrl = { custom: saved.baseUrl };
+            }
+        }
+
         res.json({
             enabled: saved.enabled,
             provider: saved.provider,
             model: saved.model,
-            baseUrl: saved.baseUrl,
+            baseUrl: returnedBaseUrl,
             keys: data.keys || {},
             customModels: data.customModels || {}
         });

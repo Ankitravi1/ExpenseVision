@@ -115,6 +115,10 @@ export const Budgets: React.FC = () => {
         });
     const filteredBudgets = [...budgets.filter(b => b.month === currentMonthStr), ...repeatingBudgets];
 
+    const unbudgetedCategories = categories.filter(
+        c => c.type === 'expense' && !filteredBudgets.some(b => b.categoryId === c.id)
+    );
+
     const { totalBudget, totalSpent } = filteredBudgets.reduce(
         (acc, budget) => ({
             totalBudget: acc.totalBudget + (budget.effectiveAmount ?? budget.amount),
@@ -213,6 +217,32 @@ export const Budgets: React.FC = () => {
                         )}
                     </div>
                 </div>
+
+                {unbudgetedCategories.length > 0 && (
+                    <div className="pt-4 border-t border-gray-100 dark:border-gray-800">
+                        <h3 className="text-xl font-semibold mb-4 text-gray-darkest dark:text-gray-50">Unbudgeted Categories</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                            {unbudgetedCategories.map(category => (
+                                <button
+                                    key={category.id}
+                                    type="button"
+                                    onClick={() => openSetBudget(category.id)}
+                                    className="flex items-center justify-between p-3.5 bg-white dark:bg-gray-800/40 rounded-xl border border-gray-200 dark:border-gray-700/80 hover:border-primary dark:hover:border-indigo-500 hover:bg-gray-50 dark:hover:bg-gray-800 hover:shadow-sm transition-all text-left group"
+                                >
+                                    <div className="flex items-center min-w-0 mr-2">
+                                        <div className="w-9 h-9 rounded-full bg-gray-50 dark:bg-gray-800 flex items-center justify-center mr-3 flex-shrink-0 group-hover:bg-primary-light dark:group-hover:bg-primary/20 transition-colors">
+                                            <Icon name={category.icon} className="text-gray-400 dark:text-gray-500 group-hover:text-primary dark:group-hover:text-indigo-300 transition-colors" size={16} />
+                                        </div>
+                                        <span className="font-medium text-sm text-gray-700 dark:text-gray-300 truncate group-hover:text-primary dark:group-hover:text-indigo-300 transition-colors">{category.name}</span>
+                                    </div>
+                                    <div className="w-7 h-7 rounded-lg border border-gray-200 dark:border-gray-700 flex items-center justify-center group-hover:border-primary dark:group-hover:border-indigo-500 transition-all">
+                                        <Icon name="Plus" size={14} className="text-gray-400 dark:text-gray-500 group-hover:text-primary dark:group-hover:text-indigo-300 group-hover:scale-110 transition-all flex-shrink-0" />
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
 
             <SetBudgetModal

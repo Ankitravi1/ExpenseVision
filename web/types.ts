@@ -41,6 +41,7 @@ export interface Account {
   name: string;
   type: AccountType;
   balance: number;
+  initialBalance: number;
   color?: string;
   icon?: string; // Added icon support
   logo?: string;
