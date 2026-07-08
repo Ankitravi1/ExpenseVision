@@ -100,11 +100,11 @@ export default function NotificationsScreen({ navigation }: any) {
                                 {
                                     backgroundColor: item.read ? theme.colors.card : theme.colors.primary + '15',
                                     borderColor: theme.colors.separator,
-                                    opacity: item.read ? 0.5 : 1.0,
+                                    opacity: item.read ? 0.4 : 1.0,
                                 }
                             ]}
                         >
-                            <View style={[styles.dot, { backgroundColor: item.read ? 'transparent' : theme.colors.primary }]} />
+                            <View style={[styles.dot, { backgroundColor: item.read ? 'transparent' : '#3b82f6' }]} />
                             <TouchableOpacity 
                                 style={styles.content}
                                 activeOpacity={item.read ? 1 : 0.7}

@@ -3,10 +3,12 @@ import { View, StyleSheet, TouchableOpacity, Animated, Easing } from 'react-nati
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { spacing } from '../theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export const CustomTabBar: React.FC<any> = ({ state, navigation }) => {
     const { theme } = useTheme();
     const { index } = state;
+    const insets = useSafeAreaInsets();
 
     const tabs = [
         { name: 'Dashboard', icon: 'view-dashboard-outline', label: 'Dashboard' },
@@ -31,7 +33,15 @@ export const CustomTabBar: React.FC<any> = ({ state, navigation }) => {
     };
 
     return (
-        <View style={[styles.container, { backgroundColor: theme.colors.tabBar, borderTopColor: theme.colors.cardBorder }]}>
+        <View style={[
+            styles.container,
+            {
+                backgroundColor: theme.colors.tabBar,
+                borderTopColor: theme.colors.cardBorder,
+                height: 72 + insets.bottom,
+                paddingBottom: insets.bottom || spacing.xs,
+            }
+        ]}>
             {tabs.map((tab) => {
                 if (tab.name === 'AddTransaction') {
                     return (

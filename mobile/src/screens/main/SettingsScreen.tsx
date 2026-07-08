@@ -226,6 +226,47 @@ export default function SettingsScreen() {
         }
     };
 
+    const handleDeleteProvider = () => {
+        const providerToDelete = aiSettings.provider;
+        Alert.alert(
+            "Delete Provider",
+            `Are you sure you want to delete the provider "${providerToDelete}" and all of its configured models and API keys?`,
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Delete",
+                    style: "destructive",
+                    onPress: async () => {
+                        const updatedKeys = { ...aiSettings.keys };
+                        delete updatedKeys[providerToDelete];
+                        const updatedCustomModels = { ...aiSettings.customModels };
+                        delete updatedCustomModels[providerToDelete];
+
+                        const updated = {
+                            ...aiSettings,
+                            provider: 'deepseek' as const,
+                            model: '',
+                            keys: updatedKeys,
+                            customModels: updatedCustomModels,
+                        };
+
+                        setAiSettings(updated);
+                        try {
+                            const saved = await saveAiSettings(updated);
+                            setAiSettings(saved);
+                            successHaptic();
+                            setAiSaved(true);
+                            setDirty(false);
+                            refresh();
+                        } catch (err: any) {
+                            Alert.alert('Error', err.message || 'Failed to delete provider');
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
     const handleTestConnection = async () => {
         setTestingConnection(true);
         try {
@@ -386,7 +427,7 @@ export default function SettingsScreen() {
         { value: 'gemini', label: 'Gemini' },
         { value: 'openrouter', label: 'OpenRouter' },
         ...extraProviders.map(p => ({ value: p, label: capitalize(p) })),
-        { value: 'custom', label: 'Custom' },
+        { value: 'custom', label: 'Add Provider' },
     ];
 
     const isCustomOrUnknown = !defaults.includes(aiSettings.provider) && !extraProviders.includes(aiSettings.provider);
@@ -507,22 +548,38 @@ export default function SettingsScreen() {
                 {/* 3. Custom provider name / details — shown when not a default provider or when custom is selected */}
                 {!defaults.includes(aiSettings.provider) ? (
                     <View style={{ gap: spacing.sm, marginBottom: spacing.sm }}>
-                        <Input
-                            label="Custom Provider Name"
-                            value={aiSettings.provider === 'custom' ? '' : aiSettings.provider}
-                            onChangeText={val => {
-                                const providerVal = val.trim();
-                                setAiSaved(false);
-                                setDirty(true);
-                                setAiSettings(prev => ({
-                                    ...prev,
-                                    provider: providerVal,
-                                    model: (prev.customModels[providerVal] || [])[0] || ''
-                                }));
-                            }}
-                            placeholder="e.g. groq"
-                            autoCapitalize="none"
-                        />
+                        <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm }}>
+                            <View style={{ flex: 1 }}>
+                                <Input
+                                    label="Custom Provider Name"
+                                    value={aiSettings.provider === 'custom' ? '' : aiSettings.provider}
+                                    onChangeText={val => {
+                                        const providerVal = val.trim();
+                                        setAiSaved(false);
+                                        setDirty(true);
+                                        setAiSettings(prev => ({
+                                            ...prev,
+                                            provider: providerVal,
+                                            model: (prev.customModels[providerVal] || [])[0] || ''
+                                        }));
+                                    }}
+                                    placeholder="e.g. groq"
+                                    autoCapitalize="none"
+                                />
+                            </View>
+                            <TouchableOpacity
+                                onPress={handleDeleteProvider}
+                                style={{
+                                    padding: 10,
+                                    marginBottom: spacing.md,
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+                                    height: 48,
+                                }}
+                            >
+                                <MaterialCommunityIcons name="trash-can-outline" size={24} color={theme.colors.danger} />
+                            </TouchableOpacity>
+                        </View>
                         <Input
                             label="Base URL"
                             value={aiSettings.baseUrl || ''}
@@ -617,9 +674,9 @@ export default function SettingsScreen() {
                             style={styles.keyAction}
                         >
                             <MaterialCommunityIcons
-                                name={idx === 0 ? 'radiobox-marked' : 'radiobox-blank'}
+                                name={idx === 0 ? 'star' : 'star-outline'}
                                 size={22}
-                                color={idx === 0 ? theme.colors.primary : theme.colors.textTertiary}
+                                color={idx === 0 ? '#f59e0b' : '#9ca3af'}
                             />
                         </TouchableOpacity>
                         <Input
@@ -683,7 +740,7 @@ export default function SettingsScreen() {
                         style={{ flex: 1 }}
                     />
                     <Button
-                        title={aiSaved && !dirty ? 'Saved ✓' : 'Save AI Settings'}
+                        title={aiSaved && !dirty ? 'Saved' : 'Save AI Settings'}
                         onPress={handleSaveAiSettings}
                         loading={savingAiSettings}
                         style={[

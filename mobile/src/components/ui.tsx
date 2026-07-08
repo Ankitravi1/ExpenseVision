@@ -11,6 +11,7 @@ import {
     Platform,
     ScrollView,
     TextInputProps,
+    Keyboard,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -240,6 +241,7 @@ export const OptionSheet: React.FC<{
             <TouchableOpacity
                 onPress={() => {
                     if (disabled) return;
+                    Keyboard.dismiss();
                     lightHaptic();
                     setOpen(true);
                 }}
@@ -329,6 +331,7 @@ export const DateField: React.FC<{
             <TouchableOpacity
                 onPress={() => {
                     if (disabled) return;
+                    Keyboard.dismiss();
                     lightHaptic();
                     setOpen(true);
                 }}

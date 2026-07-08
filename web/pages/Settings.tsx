@@ -229,6 +229,33 @@ export const Settings: React.FC = () => {
             };
         });
     };
+    
+    const handleDeleteProvider = async () => {
+        const providerToDelete = aiSettings.provider;
+        if (!providerToDelete || defaultProviders.includes(providerToDelete) || providerToDelete === 'custom') return;
+
+        const confirmed = window.confirm(`Are you sure you want to delete the provider "${providerToDelete}" and all of its configured models and API keys?`);
+        if (!confirmed) return;
+
+        setAiSaved(false);
+
+        const updatedKeys = { ...aiSettings.keys };
+        delete updatedKeys[providerToDelete];
+
+        const updatedCustomModels = { ...aiSettings.customModels };
+        delete updatedCustomModels[providerToDelete];
+
+        const newSettings: AiSettings = {
+            ...aiSettings,
+            provider: 'deepseek',
+            model: '',
+            keys: updatedKeys,
+            customModels: updatedCustomModels
+        };
+
+        setAiSettings(newSettings);
+        await handleSaveAiSettings(newSettings);
+    };
 
     const handleTestConnection = async () => {
         setIsTestingConnection(true);
@@ -394,7 +421,7 @@ export const Settings: React.FC = () => {
                             {customConfiguredProviders.map(p => (
                                 <option key={p} value={p}>{p}</option>
                             ))}
-                            <option value="custom">Custom OpenAI-compatible model provider</option>
+                            <option value="custom">Add Provider</option>
                         </select>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 italic">
                             {aiSettings.provider === 'deepseek' && "Uses DeepSeek base URL: https://api.deepseek.com"}
@@ -409,22 +436,35 @@ export const Settings: React.FC = () => {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label htmlFor="ai-custom-provider" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Custom Provider Name</label>
-                                <input
-                                    id="ai-custom-provider"
-                                    type="text"
-                                    value={aiSettings.provider === 'custom' ? '' : aiSettings.provider}
-                                    onChange={(e) => {
-                                        const val = e.target.value.trim() || 'custom';
-                                        setAiSaved(false);
-                                        setAiSettings(prev => ({
-                                            ...prev,
-                                            provider: val,
-                                            model: (prev.customModels[val] || [])[0] || ''
-                                        }));
-                                    }}
-                                    placeholder="e.g. groq"
-                                    className="block w-full bg-gray-100 border-transparent rounded-lg p-3 focus:ring-2 focus:ring-primary focus:bg-white text-base dark:bg-gray-700 dark:text-gray-100 dark:focus:bg-gray-600"
-                                />
+                                <div className="flex gap-2">
+                                    <input
+                                        id="ai-custom-provider"
+                                        type="text"
+                                        value={aiSettings.provider === 'custom' ? '' : aiSettings.provider}
+                                        onChange={(e) => {
+                                            const val = e.target.value.trim() || 'custom';
+                                            setAiSaved(false);
+                                            setAiSettings(prev => ({
+                                                ...prev,
+                                                provider: val,
+                                                model: (prev.customModels[val] || [])[0] || ''
+                                            }));
+                                        }}
+                                        placeholder="e.g. groq"
+                                        className="block flex-1 bg-gray-100 border-transparent rounded-lg p-3 focus:ring-2 focus:ring-primary focus:bg-white text-base dark:bg-gray-700 dark:text-gray-100 dark:focus:bg-gray-600"
+                                    />
+                                    {!defaultProviders.includes(aiSettings.provider) && aiSettings.provider !== 'custom' && (
+                                        <button
+                                            type="button"
+                                            onClick={handleDeleteProvider}
+                                            className="btn btn-danger flex items-center justify-center px-4"
+                                            title="Delete Provider"
+                                        >
+                                            <Icon name="Trash2" size={18} className="mr-1.5" />
+                                            <span>Delete Provider</span>
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                             <div>
                                 <label htmlFor="ai-base-url" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Base URL</label>
@@ -502,14 +542,18 @@ export const Settings: React.FC = () => {
                         <div className="space-y-2 mb-3">
                             {(aiSettings.keys[aiSettings.provider] || []).map((key, index) => (
                                 <div key={index} className="flex items-center gap-2">
-                                    <input
-                                        type="radio"
-                                        name={`active-key-${aiSettings.provider}`}
-                                        checked={index === 0}
-                                        onChange={() => handleSetActiveKey(index)}
-                                        className="h-4 w-4 text-primary focus:ring-primary border-gray-300 dark:border-gray-600 dark:bg-gray-700 cursor-pointer"
+                                    <button
+                                        type="button"
+                                        onClick={() => handleSetActiveKey(index)}
+                                        className={`p-2 rounded-lg border transition-colors flex items-center justify-center ${
+                                            index === 0
+                                                ? 'text-amber-500 fill-current bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800'
+                                                : 'text-gray-400 dark:text-gray-500 hover:text-amber-500 border-gray-200 dark:border-gray-600'
+                                        }`}
                                         title="Set as active key"
-                                    />
+                                    >
+                                        <Icon name="Star" size={15} className={index === 0 ? 'fill-current' : ''} />
+                                    </button>
                                     <input
                                         type={revealedKeys[`${aiSettings.provider}-${index}`] ? 'text' : 'password'}
                                         value={key}
@@ -573,7 +617,7 @@ export const Settings: React.FC = () => {
                             className={`btn transition-all duration-300 ${aiSaved ? 'bg-green-600 hover:bg-green-700 text-white' : 'btn-primary'}`}
                         >
                             {aiSaved
-                                ? <><Icon name="Check" size={16} className="mr-2" />Saved ✓</>
+                                ? <><Icon name="Check" size={16} className="mr-2" />Saved</>
                                 : <><Icon name="Save" size={16} className="mr-2" />Save AI Settings</>
                             }
                         </button>
