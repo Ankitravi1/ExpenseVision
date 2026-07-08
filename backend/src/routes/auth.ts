@@ -100,8 +100,6 @@ router.post('/signup', async (req, res) => {
         const emailEnabled = isEmailEnabled();
         const verificationToken = crypto.randomBytes(32).toString('hex');
 
-        const role = data.email.toLowerCase() === 'ankitravipro@gmail.com' ? 'superadmin' : 'user';
-
         // Create user with Stage 1 data only
         const user = await prisma.user.create({
             data: {
@@ -112,7 +110,6 @@ router.post('/signup', async (req, res) => {
                 emailVerified: !emailEnabled,
                 onboardingStage: 1,
                 profileComplete: false,
-                role
             },
             select: {
                 id: true,
@@ -209,15 +206,6 @@ router.post('/login', async (req, res) => {
             },
         });
 
-        let userRole = user.role;
-        if (user.email.toLowerCase() === 'ankitravipro@gmail.com' && user.role !== 'superadmin') {
-            await prisma.user.update({
-                where: { id: user.id },
-                data: { role: 'superadmin' }
-            });
-            userRole = 'superadmin';
-        }
-
         res.json({
             user: {
                 id: user.id,
@@ -230,7 +218,7 @@ router.post('/login', async (req, res) => {
                 profilePicture: user.profilePicture,
                 profileComplete: user.profileComplete,
                 emailVerified: user.emailVerified,
-                role: userRole,
+                role: user.role,
             },
             token,
             refreshToken: refreshToken.token,
@@ -280,8 +268,6 @@ router.post('/google', async (req, res) => {
 
         let isNewUser = false;
 
-        const targetRole = email.toLowerCase() === 'ankitravipro@gmail.com' ? 'superadmin' : 'user';
-
         if (!user) {
             // Create new user immediately with Stage 1 data
             user = await prisma.user.create({
@@ -294,21 +280,19 @@ router.post('/google', async (req, res) => {
                     password: null, // No password for Google users
                     onboardingStage: 1,
                     profileComplete: false,
-                    role: targetRole
                 },
             });
             isNewUser = true;
             // Seed default data for new Google user
             await seedUserData(user.id, prisma);
         } else {
-            // Link Google account to existing user or update role
+            // Link Google account to existing user
             user = await prisma.user.update({
                 where: { id: user.id },
                 data: {
                     googleId: googleId || user.googleId,
                     profilePicture: picture || user.profilePicture,
                     emailVerified: email_verified || user.emailVerified,  // Update email verification if verified by Google
-                    role: user.email.toLowerCase() === 'ankitravipro@gmail.com' ? 'superadmin' : user.role
                 },
             });
         }
