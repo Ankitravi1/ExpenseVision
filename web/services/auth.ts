@@ -11,6 +11,7 @@ export interface User {
     profilePicture?: string | null;
     profileComplete?: boolean;
     emailVerified?: boolean;
+    role?: string;
 }
 
 export interface SignupData {

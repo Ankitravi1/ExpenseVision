@@ -12,6 +12,7 @@ import { Reports } from './pages/Reports';
 import { Recurring } from './pages/Recurring';
 import { Profile } from './pages/Profile';
 import { Settings } from './pages/Settings';
+import { Admin } from './pages/Admin';
 import { LandingPage } from './pages/LandingPage';
 import { Login } from './pages/Login';
 import { Signup } from './pages/Signup';
@@ -41,6 +42,7 @@ const PAGE_PATHS: Record<Page, string> = {
   Reports: '/reports',
   Profile: '/profile',
   Settings: '/settings',
+  Admin: '/admin',
 };
 
 const pageForPath = (pathname: string): Page => {
@@ -528,6 +530,7 @@ const App: React.FC = () => {
       <Route path="/reports" element={<Reports />} />
       <Route path="/profile" element={<Profile />} />
       <Route path="/settings" element={<Settings />} />
+      <Route path="/admin" element={<Admin />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

@@ -20,6 +20,7 @@ import CategoriesScreen from '../screens/main/CategoriesScreen';
 import RecurringScreen from '../screens/main/RecurringScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
 import NotificationsScreen from '../screens/main/NotificationsScreen';
+import AdminScreen from '../screens/main/AdminScreen';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
@@ -120,6 +121,9 @@ function DrawerContentComponent({ navigation }: any) {
                 <DrawerItem icon="chart-pie" label="Reports" onPress={() => goToDrawerScreen('Reports')} />
                 <DrawerItem icon="tag-multiple" label="Categories" badge={`${categories.length}`} onPress={() => goToDrawerScreen('Categories')} />
                 <DrawerItem icon="repeat" label="Recurring" badge={`${recurring.length}`} onPress={() => goToDrawerScreen('Recurring')} />
+                {user?.role === 'superadmin' && (
+                    <DrawerItem icon="shield-outline" label="Admin" onPress={() => goToDrawerScreen('Admin')} />
+                )}
             </View>
 
             {/* Spacer */}
@@ -231,6 +235,7 @@ function MainDrawer() {
             <Drawer.Screen name="Settings" component={SettingsScreen} />
             <Drawer.Screen name="Profile" component={ProfileScreen} />
             <Drawer.Screen name="Notifications" component={NotificationsScreen} />
+            <Drawer.Screen name="Admin" component={AdminScreen} />
         </Drawer.Navigator>
     );
 }

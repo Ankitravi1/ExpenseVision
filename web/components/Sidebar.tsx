@@ -51,15 +51,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ activePage, setActivePage, isC
     setUser(currentUser);
   }, []);
 
-  const navItems: { icon: IconName; label: Page }[] = [
-    { icon: 'LayoutDashboard', label: 'Dashboard' },
-    { icon: 'ArrowLeftRight', label: 'Transactions' },
-    { icon: 'Repeat', label: 'Recurring' },
-    { icon: 'Target', label: 'Budgets' },
-    { icon: 'Wallet', label: 'Accounts' },
-    { icon: 'Tags', label: 'Categories' },
-    { icon: 'PieChart', label: 'Reports' },
-  ];
+  const navItems = React.useMemo((): { icon: IconName; label: Page }[] => {
+    const items: { icon: IconName; label: Page }[] = [
+      { icon: 'LayoutDashboard', label: 'Dashboard' },
+      { icon: 'ArrowLeftRight', label: 'Transactions' },
+      { icon: 'Repeat', label: 'Recurring' },
+      { icon: 'Target', label: 'Budgets' },
+      { icon: 'Wallet', label: 'Accounts' },
+      { icon: 'Tags', label: 'Categories' },
+      { icon: 'PieChart', label: 'Reports' },
+    ];
+    if (user?.role === 'superadmin') {
+      items.push({ icon: 'UserCheck', label: 'Admin' });
+    }
+    return items;
+  }, [user]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {

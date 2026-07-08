@@ -72,7 +72,9 @@ import {
   CheckCheck,
   Loader2,
   Star,
-  Key
+  Key,
+  RefreshCw,
+  UserCheck
 } from 'lucide-react';
 
 export type IconName = string;
@@ -155,7 +157,9 @@ const iconComponents: { [key: string]: React.ComponentType<any> } = {
   CheckCheck,
   Loader2,
   Star,
-  Key
+  Key,
+  RefreshCw,
+  UserCheck
 };
 
 export const iconList = Object.keys(iconComponents);

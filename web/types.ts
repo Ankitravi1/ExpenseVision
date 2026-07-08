@@ -9,7 +9,7 @@ export interface Notification {
   createdAt: string;
 }
 
-export type Page = 'Dashboard' | 'Transactions' | 'Recurring' | 'Budgets' | 'Accounts' | 'Categories' | 'Reports' | 'Profile' | 'Settings';
+export type Page = 'Dashboard' | 'Transactions' | 'Recurring' | 'Budgets' | 'Accounts' | 'Categories' | 'Reports' | 'Profile' | 'Settings' | 'Admin';
 
 
 export type TransactionType = 'income' | 'expense' | 'transfer';
@@ -89,4 +89,5 @@ export interface User {
   profilePicture?: string | null;
   profileComplete?: boolean;
   emailVerified?: boolean;
+  role?: string;
 }

@@ -11,6 +11,7 @@ import pushRouter from './routes/push.js';
 import recurringRouter, { materializeRecurringRules } from './routes/recurring.js';
 import aiSettingsRouter from './routes/aiSettings.js';
 import notificationsRouter from './routes/notifications.js';
+import adminRouter from './routes/admin.js';
 import { budgetsWithSpent } from './services/budgets.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { authenticateToken } from './middleware/auth.js';
@@ -82,6 +83,7 @@ app.use('/api/ai-settings', apiLimiter, authenticateToken, aiSettingsRouter);
 app.use('/api/notifications', apiLimiter, authenticateToken, notificationsRouter);
 import profileRouter from './routes/profile.js';
 app.use('/api/profile', apiLimiter, authenticateToken, profileRouter);
+app.use('/api/admin', apiLimiter, authenticateToken, adminRouter);
 
 // Initial data endpoint
 app.get('/api/initial-data', apiLimiter, authenticateToken, async (req, res, next) => {

@@ -712,7 +712,6 @@ router.delete('/all', async (req, res, next) => {
             });
         });
 
-        const prisma = (req as any).prisma;
         await syncAccountBalances(prisma, userId);
 
         res.status(204).send();
