@@ -5,7 +5,7 @@ import { AppContext } from '../App';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { authService } from '../services/auth';
 import { pushService } from '../services/push';
-import { AiProvider, AiSettings, defaultAiSettings, getAiSettings, providerModels, saveAiSettings } from '../services/aiSettings';
+import { AiProvider, AiSettings, defaultAiSettings, getAiSettings, saveAiSettings } from '../services/aiSettings';
 import { ImportTransactionsModal } from '../components/ImportTransactionsModal';
 import { api } from '../services/api';
 
@@ -26,7 +26,7 @@ export const Settings: React.FC = () => {
     const [vapidConfigured, setVapidConfigured] = useState(true);
     const [revealedKeys, setRevealedKeys] = useState<Record<string, boolean>>({});
     const [newModelInput, setNewModelInput] = useState('');
-    const [showCustomModelInput, setShowCustomModelInput] = useState(false);
+    const [newKeyInput, setNewKeyInput] = useState('');
 
     useEffect(() => {
         // Check if push is supported and subscribed
@@ -133,10 +133,60 @@ export const Settings: React.FC = () => {
     const handleAiProviderChange = (provider: AiProvider) => {
         setAiSaved(false);
         setRevealedKeys({});
+        setNewModelInput('');
+        setNewKeyInput('');
         setAiSettings(prev => ({
             ...prev,
             provider,
-            model: providerModels[provider][0] || ''
+            model: (prev.customModels[provider] || [])[0] || ''
+        }));
+    };
+
+    const addModel = () => {
+        const val = newModelInput.trim();
+        if (!val) return;
+        const existing = aiSettings.customModels[aiSettings.provider] || [];
+        if (existing.includes(val)) return;
+        setAiSaved(false);
+        setAiSettings(prev => ({
+            ...prev,
+            model: val,
+            customModels: { ...prev.customModels, [prev.provider]: [...existing, val] }
+        }));
+        setNewModelInput('');
+    };
+
+    const removeModel = (model: string) => {
+        setAiSaved(false);
+        setAiSettings(prev => {
+            const updated = (prev.customModels[prev.provider] || []).filter(m => m !== model);
+            return {
+                ...prev,
+                model: prev.model === model ? (updated[0] || '') : prev.model,
+                customModels: { ...prev.customModels, [prev.provider]: updated }
+            };
+        });
+    };
+
+    const addKey = () => {
+        const val = newKeyInput.trim();
+        if (!val) return;
+        setAiSaved(false);
+        setAiSettings(prev => ({
+            ...prev,
+            keys: { ...prev.keys, [prev.provider]: [...(prev.keys[prev.provider] || []), val] }
+        }));
+        setNewKeyInput('');
+    };
+
+    const removeKey = (index: number) => {
+        setAiSaved(false);
+        setAiSettings(prev => ({
+            ...prev,
+            keys: {
+                ...prev.keys,
+                [prev.provider]: (prev.keys[prev.provider] || []).filter((_, i) => i !== index)
+            }
         }));
     };
 
@@ -238,16 +288,18 @@ export const Settings: React.FC = () => {
 
             {/* AI */}
             <Card>
-                <h3 className="text-xl font-semibold mb-4 text-gray-darkest dark:text-gray-50">AI</h3>
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                <h3 className="text-xl font-semibold mb-1 text-gray-darkest dark:text-gray-50">AI Settings</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">Configure providers, models, and API keys for AI transaction parsing.</p>
+                <div className="space-y-5">
+                    {/* Enable toggle */}
+                    <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-200 dark:border-gray-700">
                         <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1">
-                                <Icon name="Sparkles" size={18} className="text-gray-600 dark:text-gray-400" />
+                                <Icon name="Sparkles" size={18} className="text-primary" />
                                 <h4 className="font-medium text-gray-darkest dark:text-gray-50">AI Transaction Parsing</h4>
                             </div>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                                Convert typed or dictated transaction notes into draft transactions.
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                                Convert typed or dictated notes into draft transactions automatically.
                             </p>
                         </div>
                         <label className="relative inline-flex items-center cursor-pointer ml-4">
@@ -268,91 +320,124 @@ export const Settings: React.FC = () => {
                         <p className="text-sm text-danger">{aiError}</p>
                     )}
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label htmlFor="ai-provider" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Provider</label>
-                            <select
-                                id="ai-provider"
-                                value={aiSettings.provider}
-                                onChange={(e) => handleAiProviderChange(e.target.value as AiProvider)}
-                                className="block w-full bg-gray-100 border-transparent rounded-lg p-3 focus:ring-2 focus:ring-primary focus:bg-white text-base dark:bg-gray-700 dark:text-gray-100 dark:focus:bg-gray-600"
-                            >
-                                <option value="deepseek">DeepSeek</option>
-                                <option value="openai">OpenAI</option>
-                                <option value="gemini">Gemini</option>
-                                <option value="openrouter">OpenRouter</option>
-                                <option value="custom">Custom OpenAI-compatible</option>
-                            </select>
-                        </div>
+                    {/* Provider selector */}
+                    <div>
+                        <label htmlFor="ai-provider" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Provider</label>
+                        <select
+                            id="ai-provider"
+                            value={aiSettings.provider}
+                            onChange={(e) => handleAiProviderChange(e.target.value as AiProvider)}
+                            className="block w-full bg-gray-100 border-transparent rounded-lg p-3 focus:ring-2 focus:ring-primary focus:bg-white text-base dark:bg-gray-700 dark:text-gray-100 dark:focus:bg-gray-600"
+                        >
+                            <option value="deepseek">DeepSeek</option>
+                            <option value="openai">OpenAI</option>
+                            <option value="gemini">Gemini</option>
+                            <option value="openrouter">OpenRouter</option>
+                            <option value="custom">Custom OpenAI-compatible</option>
+                        </select>
+                    </div>
 
-                        <div>
-                            <label htmlFor="ai-model" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Model</label>
-                            <select
-                                id="ai-model"
-                                value={showCustomModelInput ? 'custom' : aiSettings.model}
-                                onChange={(e) => {
-                                    if (e.target.value === 'custom') {
-                                        setShowCustomModelInput(true);
-                                        setNewModelInput('');
-                                    } else {
-                                        setShowCustomModelInput(false);
-                                        setAiSaved(false);
-                                        setAiSettings(prev => ({ ...prev, model: e.target.value }));
-                                    }
-                                }}
-                                className="block w-full bg-gray-100 border-transparent rounded-lg p-3 focus:ring-2 focus:ring-primary focus:bg-white text-base dark:bg-gray-700 dark:text-gray-100 dark:focus:bg-gray-600"
-                            >
-                                {[...(providerModels[aiSettings.provider] || []), ...aiSettings.customModels].filter(Boolean).map(model => (
-                                    <option key={model} value={model}>{model}</option>
-                                ))}
-                                <option value="custom">+ Custom model...</option>
-                            </select>
-                            {showCustomModelInput && (
-                                <div className="flex gap-2 mt-2">
-                                    <input
-                                        type="text"
-                                        autoFocus
-                                        value={newModelInput}
-                                        onChange={e => setNewModelInput(e.target.value)}
-                                        onKeyDown={e => {
-                                            if (e.key === 'Enter' && newModelInput.trim()) {
-                                                const m = newModelInput.trim();
-                                                setAiSaved(false);
-                                                setAiSettings(prev => ({
-                                                    ...prev,
-                                                    model: m,
-                                                    customModels: prev.customModels.includes(m) ? prev.customModels : [...prev.customModels, m]
-                                                }));
-                                                setNewModelInput('');
-                                                setShowCustomModelInput(false);
-                                            }
-                                        }}
-                                        placeholder="e.g. gpt-4-turbo"
-                                        className="flex-1 bg-gray-100 border-transparent rounded-lg p-3 focus:ring-2 focus:ring-primary focus:bg-white text-base dark:bg-gray-700 dark:text-gray-100 dark:focus:bg-gray-600"
-                                    />
-                                    <button
-                                        className="btn btn-secondary whitespace-nowrap"
-                                        onClick={() => {
-                                            const m = newModelInput.trim();
-                                            if (m) {
-                                                setAiSaved(false);
-                                                setAiSettings(prev => ({
-                                                    ...prev,
-                                                    model: m,
-                                                    customModels: prev.customModels.includes(m) ? prev.customModels : [...prev.customModels, m]
-                                                }));
-                                                setNewModelInput('');
-                                                setShowCustomModelInput(false);
-                                            }
-                                        }}
+                    {/* Models for current provider */}
+                    <div className="p-4 bg-gray-50 dark:bg-gray-800/40 rounded-xl border border-gray-200 dark:border-gray-700">
+                        <p className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3 capitalize">
+                            Models for {aiSettings.provider}
+                        </p>
+                        {(aiSettings.customModels[aiSettings.provider] || []).length === 0 ? (
+                            <p className="text-xs text-gray-400 dark:text-gray-500 mb-3 italic">No models added yet. Add one below to select it.</p>
+                        ) : (
+                            <div className="flex flex-wrap gap-2 mb-3">
+                                {(aiSettings.customModels[aiSettings.provider] || []).map(m => (
+                                    <div
+                                        key={m}
+                                        className={`group flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-all cursor-pointer select-none ${
+                                            aiSettings.model === m
+                                                ? 'bg-primary text-white border-primary shadow'
+                                                : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-600 hover:border-primary hover:text-primary dark:hover:text-primary'
+                                        }`}
+                                        onClick={() => { setAiSaved(false); setAiSettings(prev => ({ ...prev, model: m })); }}
                                     >
-                                        <Icon name="Plus" size={16} className="mr-1" /> Add
-                                    </button>
-                                </div>
-                            )}
+                                        <span>{m}</span>
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); removeModel(m); }}
+                                            className={`rounded-full p-0.5 transition-colors ${
+                                                aiSettings.model === m
+                                                    ? 'text-white/70 hover:text-white hover:bg-white/20'
+                                                    : 'text-gray-400 hover:text-danger hover:bg-red-50 dark:hover:bg-red-900/30'
+                                            }`}
+                                            aria-label={`Remove model ${m}`}
+                                        >
+                                            <Icon name="X" size={12} />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        <div className="flex gap-2">
+                            <input
+                                id="new-model-input"
+                                type="text"
+                                value={newModelInput}
+                                onChange={e => setNewModelInput(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter') addModel(); }}
+                                placeholder="Add model name (e.g. gpt-4-turbo)"
+                                className="flex-1 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-primary dark:text-gray-100 outline-none transition"
+                            />
+                            <button type="button" onClick={addModel} className="btn btn-secondary whitespace-nowrap text-sm py-2">
+                                <Icon name="Plus" size={15} className="mr-1" /> Add
+                            </button>
                         </div>
                     </div>
 
+                    {/* API Keys for current provider */}
+                    <div className="p-4 bg-gray-50 dark:bg-gray-800/40 rounded-xl border border-gray-200 dark:border-gray-700">
+                        <p className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3 capitalize">
+                            API Keys for {aiSettings.provider}
+                        </p>
+                        <div className="space-y-2 mb-3">
+                            {(aiSettings.keys[aiSettings.provider] || []).map((key, index) => (
+                                <div key={index} className="flex items-center gap-2">
+                                    <input
+                                        type={revealedKeys[`${aiSettings.provider}-${index}`] ? 'text' : 'password'}
+                                        value={key}
+                                        readOnly
+                                        className="flex-1 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm font-mono dark:text-gray-100"
+                                    />
+                                    <button
+                                        type="button"
+                                        className="btn btn-secondary p-2"
+                                        onClick={() => setRevealedKeys(prev => ({ ...prev, [`${aiSettings.provider}-${index}`]: !prev[`${aiSettings.provider}-${index}`] }))}
+                                        title="Reveal / Hide Key"
+                                    >
+                                        <Icon name={revealedKeys[`${aiSettings.provider}-${index}`] ? 'EyeOff' : 'Eye'} size={15} />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="btn btn-danger p-2 text-white"
+                                        onClick={() => removeKey(index)}
+                                        title="Delete Key"
+                                    >
+                                        <Icon name="Trash2" size={15} />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="flex gap-2">
+                            <input
+                                id="new-key-input"
+                                type="text"
+                                value={newKeyInput}
+                                onChange={e => setNewKeyInput(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter') addKey(); }}
+                                placeholder="Add new API key (sk-...)"
+                                className="flex-1 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-primary focus:border-primary dark:text-gray-100 outline-none transition"
+                            />
+                            <button type="button" onClick={addKey} className="btn btn-secondary whitespace-nowrap text-sm py-2">
+                                <Icon name="Plus" size={15} className="mr-1" /> Add
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Base URL — custom provider only */}
                     {aiSettings.provider === 'custom' && (
                         <div>
                             <label htmlFor="ai-base-url" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Base URL</label>
@@ -369,158 +454,15 @@ export const Settings: React.FC = () => {
                         </div>
                     )}
 
-                    <div className="mt-4">
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Custom Models</label>
-                        <div className="flex gap-2 mb-2">
-                            <input
-                                id="new-custom-model"
-                                type="text"
-                                placeholder="Add custom model name"
-                                className="flex-1 bg-gray-100 border-transparent rounded-lg p-3 focus:ring-2 focus:ring-primary focus:bg-white text-base dark:bg-gray-700 dark:text-gray-100 dark:focus:bg-gray-600"
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                        const input = e.target as HTMLInputElement;
-                                        if (input.value.trim() && !aiSettings.customModels.includes(input.value.trim())) {
-                                            setAiSaved(false);
-                                            setAiSettings(prev => ({ ...prev, customModels: [...prev.customModels, input.value.trim()] }));
-                                            input.value = '';
-                                        }
-                                    }
-                                }}
-                            />
-                            <button
-                                className="btn btn-secondary whitespace-nowrap"
-                                onClick={() => {
-                                    const input = document.getElementById('new-custom-model') as HTMLInputElement;
-                                    if (input.value.trim() && !aiSettings.customModels.includes(input.value.trim())) {
-                                        setAiSaved(false);
-                                        setAiSettings(prev => ({ ...prev, customModels: [...prev.customModels, input.value.trim()] }));
-                                        input.value = '';
-                                    }
-                                }}
-                            >
-                                <Icon name="Plus" size={16} className="mr-1" /> Add
-                            </button>
-                        </div>
-                        {aiSettings.customModels.length > 0 && (
-                            <div className="flex flex-wrap gap-2 mt-2">
-                                {aiSettings.customModels.map(model => (
-                                    <div key={model} className="flex items-center gap-2 bg-gray-100 dark:bg-gray-700 px-3 py-1.5 rounded-full text-sm">
-                                        <span className="text-gray-700 dark:text-gray-300">{model}</span>
-                                        <button
-                                            onClick={() => {
-                                                setAiSaved(false);
-                                                setAiSettings(prev => ({
-                                                    ...prev,
-                                                    customModels: prev.customModels.filter(m => m !== model)
-                                                }));
-                                            }}
-                                            className="text-gray-400 hover:text-danger focus:outline-none"
-                                            aria-label="Remove model"
-                                        >
-                                            <Icon name="X" size={14} />
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">API Keys for {aiSettings.provider}</label>
-                        <div className="space-y-2 mb-3">
-                            {(aiSettings.keys[aiSettings.provider] || []).map((key, index) => (
-                                <div key={index} className="flex items-center gap-2">
-                                    <input
-                                        type={revealedKeys[`${aiSettings.provider}-${index}`] ? 'text' : 'password'}
-                                        value={key}
-                                        readOnly
-                                        className="flex-1 bg-gray-100 border-transparent rounded-lg p-3 text-base dark:bg-gray-700 dark:text-gray-100"
-                                    />
-                                    <button
-                                        type="button"
-                                        className="btn btn-secondary h-full"
-                                        onClick={() => setRevealedKeys(prev => ({ ...prev, [`${aiSettings.provider}-${index}`]: !prev[`${aiSettings.provider}-${index}`] }))}
-                                        title="Reveal/Hide Key"
-                                    >
-                                        <Icon name={revealedKeys[`${aiSettings.provider}-${index}`] ? 'EyeOff' : 'Eye'} size={16} />
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="btn btn-danger h-full text-white"
-                                        onClick={() => {
-                                            setAiSaved(false);
-                                            setAiSettings(prev => {
-                                                const currentKeys = prev.keys[prev.provider] || [];
-                                                return { 
-                                                    ...prev, 
-                                                    keys: { 
-                                                        ...prev.keys, 
-                                                        [prev.provider]: currentKeys.filter((_, i) => i !== index) 
-                                                    } 
-                                                };
-                                            });
-                                        }}
-                                        title="Delete Key"
-                                    >
-                                        <Icon name="Trash2" size={16} />
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <input
-                                id="new-ai-api-key"
-                                type="text"
-                                placeholder="Add new sk-..."
-                                className="flex-1 bg-gray-100 border-transparent rounded-lg p-3 focus:ring-2 focus:ring-primary focus:bg-white text-base dark:bg-gray-700 dark:text-gray-100 dark:focus:bg-gray-600"
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                        const input = e.target as HTMLInputElement;
-                                        if (input.value.trim()) {
-                                            setAiSaved(false);
-                                            setAiSettings(prev => ({ 
-                                                ...prev, 
-                                                keys: { 
-                                                    ...prev.keys, 
-                                                    [prev.provider]: [...(prev.keys[prev.provider] || []), input.value.trim()] 
-                                                }
-                                            }));
-                                            input.value = '';
-                                        }
-                                    }
-                                }}
-                            />
-                            <button
-                                type="button"
-                                className="btn btn-secondary whitespace-nowrap h-full"
-                                onClick={() => {
-                                    const input = document.getElementById('new-ai-api-key') as HTMLInputElement;
-                                    if (input && input.value.trim()) {
-                                        setAiSaved(false);
-                                        setAiSettings(prev => ({ 
-                                            ...prev, 
-                                            keys: { 
-                                                ...prev.keys, 
-                                                [prev.provider]: [...(prev.keys[prev.provider] || []), input.value.trim()] 
-                                            }
-                                        }));
-                                        input.value = '';
-                                    }
-                                }}
-                            >
-                                <Icon name="Plus" size={16} className="mr-1" /> Add
-                            </button>
-                        </div>
-                    </div>
-
-                    <div className="flex justify-end">
-                        <button 
-                            onClick={handleSaveAiSettings} 
-                            className={`btn ${aiSaved ? 'bg-green-600 hover:bg-green-700 text-white' : 'btn-primary'}`}
+                    <div className="flex justify-end pt-1">
+                        <button
+                            onClick={handleSaveAiSettings}
+                            className={`btn transition-all duration-300 ${aiSaved ? 'bg-green-600 hover:bg-green-700 text-white' : 'btn-primary'}`}
                         >
-                            {aiSaved ? <Icon name="Check" size={16} className="mr-2" /> : <Icon name="Save" size={16} className="mr-2" />}
-                            {aiSaved ? 'Saved' : 'Save AI Settings'}
+                            {aiSaved
+                                ? <><Icon name="Check" size={16} className="mr-2" />Saved ✓</>
+                                : <><Icon name="Save" size={16} className="mr-2" />Save AI Settings</>
+                            }
                         </button>
                     </div>
                 </div>

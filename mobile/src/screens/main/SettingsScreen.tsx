@@ -19,7 +19,7 @@ import { Category, RecurringRule } from '../../types';
 import * as DocumentPicker from 'expo-document-picker';
 import * as LegacyFS from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
-import { AiProvider, AiSettings, defaultAiSettings, getAiSettings, providerModels, saveAiSettings } from '../../services/aiSettings';
+import { AiProvider, AiSettings, defaultAiSettings, getAiSettings, saveAiSettings } from '../../services/aiSettings';
 
 export default function SettingsScreen() {
     const navigation = useNavigation();
@@ -31,8 +31,13 @@ export default function SettingsScreen() {
     const [showAiSettings, setShowAiSettings] = useState(false);
     const [aiSettings, setAiSettings] = useState<AiSettings>(defaultAiSettings);
     const [savingAiSettings, setSavingAiSettings] = useState(false);
+    const [aiSaved, setAiSaved] = useState(false);
     const [showClearAll, setShowClearAll] = useState(false);
     const [clearPhrase, setClearPhrase] = useState('');
+
+    // AI settings state
+    const [newModelInput, setNewModelInput] = useState('');
+    const [newKeyInput, setNewKeyInput] = useState('');
     const [revealedKeys, setRevealedKeys] = useState<Record<string, boolean>>({});
 
     useEffect(() => {
@@ -42,36 +47,61 @@ export default function SettingsScreen() {
     const handleAiProviderChange = (provider: AiProvider) => {
         setRevealedKeys({});
         setNewModelInput('');
+        setNewKeyInput('');
         setAiSettings(prev => ({
             ...prev,
             provider,
-            model: providerModels[provider][0] || '',
+            model: (prev.customModels[provider] || [])[0] || '',
         }));
     };
 
-    const [aiSaved, setAiSaved] = useState(false);
-    const [newModelInput, setNewModelInput] = useState('');
-
-    const addCustomModel = () => {
+    const addModel = () => {
         const val = newModelInput.trim();
         if (!val) return;
         setAiSaved(false);
         setAiSettings(prev => {
-            const updated = prev.customModels.includes(val) ? prev.customModels : [...prev.customModels, val];
-            return { ...prev, customModels: updated, model: val };
+            const existing = prev.customModels[prev.provider] || [];
+            if (existing.includes(val)) return prev;
+            return {
+                ...prev,
+                model: val,
+                customModels: { ...prev.customModels, [prev.provider]: [...existing, val] },
+            };
         });
         setNewModelInput('');
     };
 
-    const removeCustomModel = (m: string) => {
+    const removeModel = (model: string) => {
+        setAiSaved(false);
+        setAiSettings(prev => {
+            const updated = (prev.customModels[prev.provider] || []).filter(m => m !== model);
+            return {
+                ...prev,
+                model: prev.model === model ? (updated[0] || '') : prev.model,
+                customModels: { ...prev.customModels, [prev.provider]: updated },
+            };
+        });
+    };
+
+    const addKey = () => {
+        const val = newKeyInput.trim();
+        if (!val) return;
         setAiSaved(false);
         setAiSettings(prev => ({
             ...prev,
-            customModels: prev.customModels.filter(cm => cm !== m),
-            model: prev.model === m ? (providerModels[prev.provider][0] || '') : prev.model,
+            keys: { ...prev.keys, [prev.provider]: [...(prev.keys[prev.provider] || []), val] },
         }));
+        setNewKeyInput('');
     };
 
+    const removeKey = (idx: number) => {
+        setAiSaved(false);
+        setAiSettings(prev => {
+            const newKeys = [...(prev.keys[prev.provider] || [])];
+            newKeys.splice(idx, 1);
+            return { ...prev, keys: { ...prev.keys, [prev.provider]: newKeys } };
+        });
+    };
 
     const handleSaveAiSettings = async () => {
         setSavingAiSettings(true);
@@ -79,8 +109,6 @@ export default function SettingsScreen() {
             await saveAiSettings(aiSettings);
             setAiSaved(true);
             setTimeout(() => setAiSaved(false), 2500);
-            // Alert.alert('Saved', 'AI settings updated.');
-            // Let the modal stay open and button turn green
         } catch (err: any) {
             Alert.alert('Error', err.message || 'Failed to save AI settings');
         } finally {
@@ -198,6 +226,9 @@ export default function SettingsScreen() {
         </TouchableOpacity>
     );
 
+    const currentModels = aiSettings.customModels[aiSettings.provider] || [];
+    const currentKeys = aiSettings.keys[aiSettings.provider] || [];
+
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top']}>
             <ScrollView contentContainerStyle={{ padding: spacing.md }}>
@@ -214,7 +245,7 @@ export default function SettingsScreen() {
 
 
                 <Card style={{ marginBottom: spacing.md, paddingVertical: 0 }}>
-                    <Row icon="creation" label="AI transaction parsing" value={aiSettings.enabled ? aiSettings.model : 'Off'} onPress={() => setShowAiSettings(true)} />
+                    <Row icon="creation" label="AI transaction parsing" value={aiSettings.enabled ? (aiSettings.model || aiSettings.provider) : 'Off'} onPress={() => setShowAiSettings(true)} />
                 </Card>
 
                 <Card style={{ marginBottom: spacing.md, paddingVertical: 0 }}>
@@ -229,10 +260,9 @@ export default function SettingsScreen() {
                 </Text>
             </ScrollView>
 
-            {/* Currency picker */}
-
             {/* AI settings */}
             <SheetModal visible={showAiSettings} onClose={() => setShowAiSettings(false)} title="AI transaction parsing">
+                {/* 1. Enable AI toggle */}
                 <View style={[styles.aiToggleRow, { borderBottomColor: theme.colors.separator }]}>
                     <View style={{ flex: 1 }}>
                         <Text style={{ color: theme.colors.text, fontWeight: '700' }}>Enable AI parsing</Text>
@@ -242,17 +272,18 @@ export default function SettingsScreen() {
                     </View>
                     <Switch
                         value={aiSettings.enabled}
-                        onValueChange={(enabled: boolean) => setAiSettings(prev => ({ ...prev, enabled }))}
+                        onValueChange={(enabled: boolean) => { setAiSaved(false); setAiSettings(prev => ({ ...prev, enabled })); }}
                         trackColor={{ true: theme.colors.primary }}
                     />
                 </View>
 
+                {/* 2. Provider */}
                 <FieldLabel>Provider</FieldLabel>
                 <ChipSelector
                     options={[
                         { value: 'deepseek', label: 'DeepSeek' },
                         { value: 'openai', label: 'OpenAI' },
-                        { value: 'gemini', label: 'Google Gemini' },
+                        { value: 'gemini', label: 'Gemini' },
                         { value: 'openrouter', label: 'OpenRouter' },
                         { value: 'custom', label: 'Custom' },
                     ]}
@@ -260,48 +291,7 @@ export default function SettingsScreen() {
                     onChange={value => handleAiProviderChange(value as AiProvider)}
                 />
 
-                <FieldLabel>Model</FieldLabel>
-                {[...(providerModels[aiSettings.provider] || []), ...aiSettings.customModels].filter(Boolean).length > 0 ? (
-                    <ChipSelector
-                        options={[...(providerModels[aiSettings.provider] || []), ...aiSettings.customModels].filter(Boolean).map(model => ({ value: model, label: model }))}
-                        value={aiSettings.model}
-                        onChange={model => { setAiSaved(false); setAiSettings(prev => ({ ...prev, model })); }}
-                    />
-                ) : null}
-
-                {/* Add custom model row */}
-                <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-                    <Input
-                        style={{ flex: 1 }}
-                        placeholder="Add custom model..."
-                        value={newModelInput}
-                        onChangeText={setNewModelInput}
-                        autoCapitalize="none"
-                        returnKeyType="done"
-                        onSubmitEditing={addCustomModel}
-                    />
-                    <TouchableOpacity
-                        onPress={addCustomModel}
-                        style={{ paddingHorizontal: 14, paddingVertical: 10, backgroundColor: theme.colors.primary, borderRadius: 10, alignItems: 'center', justifyContent: 'center' }}
-                    >
-                        <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>+</Text>
-                    </TouchableOpacity>
-                </View>
-                {/* Custom models with delete buttons */}
-                {aiSettings.customModels.length > 0 && (
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
-                        {aiSettings.customModels.map(cm => (
-                            <View key={cm} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.card, borderRadius: 20, borderWidth: 1, borderColor: theme.colors.separator, paddingVertical: 4, paddingHorizontal: 10, gap: 4 }}>
-                                <Text style={{ color: theme.colors.text, fontSize: 13 }}>{cm}</Text>
-                                <TouchableOpacity onPress={() => removeCustomModel(cm)} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
-                                    <Text style={{ color: theme.colors.danger, fontWeight: '700', fontSize: 14 }}>✕</Text>
-                                </TouchableOpacity>
-                            </View>
-                        ))}
-                    </View>
-                )}
-
-
+                {/* 3. Base URL (custom only) */}
                 {aiSettings.provider === 'custom' ? (
                     <Input
                         label="Base URL"
@@ -312,9 +302,66 @@ export default function SettingsScreen() {
                     />
                 ) : null}
 
+                {/* 4. Models for {provider} */}
+                <FieldLabel>Models for {aiSettings.provider}</FieldLabel>
+                {currentModels.length === 0 ? (
+                    <Text style={{ color: theme.colors.textTertiary, fontSize: 13, marginBottom: spacing.sm, fontStyle: 'italic' }}>
+                        No models added yet
+                    </Text>
+                ) : (
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: spacing.sm }}>
+                        {currentModels.map(m => {
+                            const isSelected = aiSettings.model === m;
+                            return (
+                                <TouchableOpacity
+                                    key={m}
+                                    onPress={() => { setAiSaved(false); setAiSettings(prev => ({ ...prev, model: m })); }}
+                                    style={[
+                                        styles.modelChip,
+                                        {
+                                            backgroundColor: isSelected ? theme.colors.primary : theme.colors.card,
+                                            borderColor: isSelected ? theme.colors.primary : theme.colors.separator,
+                                        },
+                                    ]}
+                                >
+                                    <Text style={{ color: isSelected ? '#fff' : theme.colors.text, fontSize: 13, fontWeight: isSelected ? '700' : '400' }}>
+                                        {m}
+                                    </Text>
+                                    <TouchableOpacity
+                                        onPress={() => removeModel(m)}
+                                        hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+                                        style={{ marginLeft: 4 }}
+                                    >
+                                        <Text style={{ color: isSelected ? 'rgba(255,255,255,0.8)' : theme.colors.danger, fontWeight: '700', fontSize: 13 }}>✕</Text>
+                                    </TouchableOpacity>
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </View>
+                )}
+                {/* Add model row */}
+                <View style={styles.addRow}>
+                    <Input
+                        style={{ flex: 1 }}
+                        placeholder="Add model..."
+                        value={newModelInput}
+                        onChangeText={setNewModelInput}
+                        autoCapitalize="none"
+                        returnKeyType="done"
+                        onSubmitEditing={addModel}
+                    />
+                    <TouchableOpacity
+                        onPress={addModel}
+                        style={[styles.addButton, { backgroundColor: theme.colors.primary }]}
+                    >
+                        <Text style={{ color: '#fff', fontWeight: '700', fontSize: 18 }}>+</Text>
+                    </TouchableOpacity>
+                </View>
+
+                {/* 5. API Keys for {provider} */}
                 <FieldLabel>API Keys for {aiSettings.provider}</FieldLabel>
-                {(aiSettings.keys[aiSettings.provider] || []).map((keyStr, idx) => (
-                    <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm, gap: spacing.sm }}>
+                {currentKeys.map((keyStr, idx) => (
+                    <View key={idx} style={[styles.keyRow, { marginBottom: spacing.sm }]}>
                         <Input
                             style={{ flex: 1 }}
                             value={keyStr}
@@ -330,38 +377,47 @@ export default function SettingsScreen() {
                             placeholder="sk-..."
                             autoCapitalize="none"
                         />
-                        <TouchableOpacity onPress={() => setRevealedKeys(prev => ({ ...prev, [`${aiSettings.provider}-${idx}`]: !prev[`${aiSettings.provider}-${idx}`] }))}>
-                            <MaterialCommunityIcons name={revealedKeys[`${aiSettings.provider}-${idx}`] ? 'eye-off' : 'eye'} size={24} color={theme.colors.textSecondary} />
+                        <TouchableOpacity
+                            onPress={() => setRevealedKeys(prev => ({ ...prev, [`${aiSettings.provider}-${idx}`]: !prev[`${aiSettings.provider}-${idx}`] }))}
+                            style={styles.keyAction}
+                        >
+                            <MaterialCommunityIcons
+                                name={revealedKeys[`${aiSettings.provider}-${idx}`] ? 'eye-off' : 'eye'}
+                                size={22}
+                                color={theme.colors.textSecondary}
+                            />
                         </TouchableOpacity>
-                        <TouchableOpacity onPress={() => {
-                            setAiSaved(false);
-                            setAiSettings(prev => {
-                                const newKeys = [...(prev.keys[prev.provider] || [])];
-                                newKeys.splice(idx, 1);
-                                return { ...prev, keys: { ...prev.keys, [prev.provider]: newKeys } };
-                            });
-                        }}>
-                            <MaterialCommunityIcons name="trash-can-outline" size={24} color={theme.colors.danger} />
+                        <TouchableOpacity onPress={() => removeKey(idx)} style={styles.keyAction}>
+                            <MaterialCommunityIcons name="trash-can-outline" size={22} color={theme.colors.danger} />
                         </TouchableOpacity>
                     </View>
                 ))}
-                <Button 
-                    title="Add API Key" 
-                    onPress={() => {
-                        setAiSaved(false);
-                        setAiSettings(prev => {
-                            const newKeys = [...(prev.keys[prev.provider] || []), ''];
-                            return { ...prev, keys: { ...prev.keys, [prev.provider]: newKeys } };
-                        });
-                    }}
-                    style={{ marginBottom: spacing.md, backgroundColor: theme.colors.card, borderColor: theme.colors.primary }}
-                />
+                {/* Add key row */}
+                <View style={[styles.addRow, { marginBottom: spacing.md }]}>
+                    <Input
+                        style={{ flex: 1 }}
+                        placeholder="Add new key sk-..."
+                        value={newKeyInput}
+                        onChangeText={setNewKeyInput}
+                        autoCapitalize="none"
+                        secureTextEntry
+                        returnKeyType="done"
+                        onSubmitEditing={addKey}
+                    />
+                    <TouchableOpacity
+                        onPress={addKey}
+                        style={[styles.addButton, { backgroundColor: theme.colors.primary }]}
+                    >
+                        <Text style={{ color: '#fff', fontWeight: '700', fontSize: 18 }}>+</Text>
+                    </TouchableOpacity>
+                </View>
 
-                <Button 
-                    title={aiSaved ? "Saved ✓" : "Save AI Settings"} 
-                    onPress={handleSaveAiSettings} 
-                    loading={savingAiSettings} 
-                    style={aiSaved ? { backgroundColor: theme.colors.success, borderColor: theme.colors.success } : undefined} 
+                {/* 6. Save */}
+                <Button
+                    title={aiSaved ? 'Saved ✓' : 'Save AI Settings'}
+                    onPress={handleSaveAiSettings}
+                    loading={savingAiSettings}
+                    style={aiSaved ? { backgroundColor: theme.colors.success, borderColor: theme.colors.success } : undefined}
                 />
             </SheetModal>
 
@@ -377,10 +433,10 @@ export default function SettingsScreen() {
                     placeholder="Type DELETE"
                     autoCapitalize="none"
                 />
-                <Button 
-                    title="Delete everything" 
-                    onPress={handleClearAll} 
-                    style={{ backgroundColor: theme.colors.danger, borderColor: theme.colors.danger }} 
+                <Button
+                    title="Delete everything"
+                    onPress={handleClearAll}
+                    style={{ backgroundColor: theme.colors.danger, borderColor: theme.colors.danger }}
                 />
             </SheetModal>
         </SafeAreaView>
@@ -430,5 +486,36 @@ const styles = StyleSheet.create({
         marginBottom: spacing.md,
         borderBottomWidth: StyleSheet.hairlineWidth,
         gap: spacing.md,
+    },
+    modelChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderRadius: 20,
+        borderWidth: 1,
+        paddingVertical: 5,
+        paddingHorizontal: 12,
+        gap: 4,
+    },
+    addRow: {
+        flexDirection: 'row',
+        gap: 8,
+        marginTop: 4,
+        marginBottom: spacing.sm,
+        alignItems: 'center',
+    },
+    addButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    keyRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    keyAction: {
+        padding: 6,
     },
 });

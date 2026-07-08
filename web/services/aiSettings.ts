@@ -6,27 +6,20 @@ export interface AiSettings {
     enabled: boolean;
     provider: AiProvider;
     model: string;
-    keys: Record<string, string[]>;
-    customModels: string[];
+    keys: Record<string, string[]>;          // per-provider list of encrypted API keys
+    customModels: Record<string, string[]>;  // per-provider list of user-added model names
     baseUrl?: string;
 }
-
-export const providerModels: Record<AiProvider, string[]> = {
-    deepseek: ['deepseek-v4-flash', 'deepseek-v4-pro'],
-    openai: ['gpt-5-mini', 'gpt-5'],
-    gemini: ['gemini-2.5-flash', 'gemini-2.5-pro'],
-    openrouter: ['deepseek/deepseek-v4-flash', 'openai/gpt-5-mini'],
-    custom: ['']
-};
 
 export const defaultAiSettings: AiSettings = {
     enabled: false,
     provider: 'deepseek',
-    model: 'deepseek-v4-flash',
+    model: '',
     keys: {},
-    customModels: [],
+    customModels: {},
     baseUrl: ''
 };
+
 
 export const getAiSettings = async (): Promise<AiSettings> => {
     const res = await api.fetch('/ai-settings');

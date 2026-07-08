@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -25,12 +25,14 @@ export default function DashboardScreen() {
     const currency = user?.currency || 'INR';
     const [unreadCount, setUnreadCount] = useState(0);
 
-    useEffect(() => {
-        apiFetch('/notifications')
-            .then(res => res.ok ? res.json() : [])
-            .then((data: any[]) => setUnreadCount(Array.isArray(data) ? data.filter((n: any) => !n.read).length : 0))
-            .catch(() => {});
-    }, []);
+    useFocusEffect(
+        React.useCallback(() => {
+            apiFetch('/notifications')
+                .then(r => r.ok ? r.json() : [])
+                .then((list: any[]) => setUnreadCount(list.filter((n: any) => !n.read).length))
+                .catch(() => {});
+        }, [])
+    );
 
     const openDrawer = () => {
         (navigation as any).openDrawer?.();
