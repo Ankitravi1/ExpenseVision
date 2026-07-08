@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, StyleSheet, Text, View, DeviceEventEmitter } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SheetModal, Input, Button, ChipSelector, FieldLabel, OptionSheet, DateField, successHaptic } from './ui';
 import { useData } from '../context/DataContext';
@@ -128,6 +128,7 @@ export const TransactionForm: React.FC<Props> = ({ visible, onClose, editing }) 
                 await updateTransaction(editing.id, payload);
             } else {
                 await addTransaction(payload as Omit<Transaction, 'id'>);
+                DeviceEventEmitter.emit('transaction-created');
             }
             successHaptic();
             onClose();

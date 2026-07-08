@@ -152,6 +152,67 @@ router.put('/', async (req, res, next) => {
     }
 });
 
+router.post('/test', async (req, res, next) => {
+    try {
+        const { provider, model, apiKey, baseUrl } = req.body;
+
+        if (!provider) return res.status(400).json({ error: 'Provider is required' });
+        if (!model) return res.status(400).json({ error: 'Model is required' });
+        if (!apiKey) return res.status(400).json({ error: 'API key is required' });
+
+        // Decrypt key if it's already encrypted
+        let resolvedKey = apiKey;
+        if (apiKey.includes('.') && apiKey.split('.').length === 3) {
+            try {
+                resolvedKey = decrypt(apiKey);
+            } catch (e) {
+                // Ignore and use as-is
+            }
+        }
+
+        const getAiEndpoint = (prov: string, base?: string) => {
+            if (prov === 'deepseek') return 'https://api.deepseek.com/chat/completions';
+            if (prov === 'openai') return 'https://api.openai.com/v1/chat/completions';
+            if (prov === 'openrouter') return 'https://openrouter.ai/api/v1/chat/completions';
+            if (prov === 'gemini') return 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
+            return `${base?.replace(/\/$/, '')}/chat/completions`;
+        };
+
+        const endpoint = getAiEndpoint(provider, baseUrl);
+        if (!['deepseek', 'openai', 'openrouter', 'gemini'].includes(provider) && !baseUrl) {
+            return res.status(400).json({ error: 'Custom providers require a base URL' });
+        }
+
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${resolvedKey}`,
+                ...(provider === 'openrouter' ? { 'HTTP-Referer': 'http://localhost:3000', 'X-Title': 'ExpenseVision' } : {})
+            },
+            body: JSON.stringify({
+                model,
+                messages: [
+                    { role: 'user', content: 'Say "Connection successful!" and nothing else.' }
+                ],
+                temperature: 0.1,
+                max_tokens: 20
+            })
+        });
+
+        if (!response.ok) {
+            const errorBody = await response.text();
+            return res.status(502).json({ error: `Connection failed: ${errorBody.slice(0, 180)}` });
+        }
+
+        const responseData = await response.json() as any;
+        const reply = responseData.choices?.[0]?.message?.content || 'Connection successful!';
+        res.json({ success: true, message: reply });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message || 'Internal test error' });
+    }
+});
+
 router.delete('/', async (req, res, next) => {
     try {
         const prisma = (req as any).prisma;

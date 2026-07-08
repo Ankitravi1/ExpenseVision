@@ -33,9 +33,13 @@ export const NotificationCenter: React.FC = () => {
 
     useEffect(() => {
         fetchNotifications();
+        window.addEventListener('transaction-created', fetchNotifications);
         // Poll every 30 seconds
         const interval = setInterval(fetchNotifications, 30000);
-        return () => clearInterval(interval);
+        return () => {
+            clearInterval(interval);
+            window.removeEventListener('transaction-created', fetchNotifications);
+        };
     }, []);
 
     useEffect(() => {
@@ -144,7 +148,7 @@ export const NotificationCenter: React.FC = () => {
                                             <div className="flex gap-2 ml-auto items-center">
                                                 {!notification.read && (
                                                     <button onClick={(e) => { e.stopPropagation(); markAsRead(notification.id); }} className="p-1.5 text-gray-400 hover:text-success rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors" title="Mark Read">
-                                                        <Icon name="Check" size={16} />
+                                                        <Icon name="CheckCheck" size={16} />
                                                     </button>
                                                 )}
                                                 <button onClick={(e) => { e.stopPropagation(); deleteNotification(notification.id); }} className="p-1.5 text-gray-400 hover:text-danger rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors" title="Clear">

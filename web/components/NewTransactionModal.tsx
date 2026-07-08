@@ -177,10 +177,11 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
         if (transaction) {
             updateTransaction(transaction.id, transactionData);
         } else {
-            addTransaction(transactionData);
+            addTransaction(transactionData).then(() => {
+                window.dispatchEvent(new CustomEvent('transaction-created'));
+            });
         }
 
-        // Reset form and close
         // Reset form and close
         if (!transaction) {
             setAmount('');

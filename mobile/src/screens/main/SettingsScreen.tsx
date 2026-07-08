@@ -6,7 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useNavigation } from '@react-navigation/native';
-import { Card, SheetModal, ChipSelector, FieldLabel, Input, Button, warningHaptic } from '../../components/ui';
+import { Card, SheetModal, ChipSelector, FieldLabel, Input, Button, warningHaptic, successHaptic } from '../../components/ui';
 import { CategoryIcon } from '../../components/CategoryIcon';
 import { CategoryForm } from '../../components/CategoryForm';
 import { RecurringForm } from '../../components/RecurringForm';
@@ -23,6 +23,7 @@ import * as Sharing from 'expo-sharing';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AiProvider, AiSettings, defaultAiSettings, getAiSettings, saveAiSettings } from '../../services/aiSettings';
 
 export default function SettingsScreen() {
@@ -39,6 +40,10 @@ export default function SettingsScreen() {
     const [showClearAll, setShowClearAll] = useState(false);
     const [clearPhrase, setClearPhrase] = useState('');
     const [notificationsEnabled, setNotificationsEnabled] = useState(!!user?.expoPushToken);
+    const [budgetAlertsEnabled, setBudgetAlertsEnabled] = useState(true);
+    const [emailReportsEnabled, setEmailReportsEnabled] = useState(false);
+    const [dirty, setDirty] = useState(false);
+    const [testingConnection, setTestingConnection] = useState(false);
 
     // AI settings state
     const [newModelInput, setNewModelInput] = useState('');
@@ -48,6 +53,22 @@ export default function SettingsScreen() {
     useEffect(() => {
         getAiSettings().then(setAiSettings).catch(() => setAiSettings(defaultAiSettings));
         setNotificationsEnabled(!!user?.expoPushToken);
+
+        AsyncStorage.getItem('budget_alerts_enabled').then(val => {
+            if (val !== null) {
+                setBudgetAlertsEnabled(val === 'true');
+            } else {
+                setBudgetAlertsEnabled(true);
+            }
+        });
+
+        AsyncStorage.getItem('email_reports_enabled').then(val => {
+            if (val !== null) {
+                setEmailReportsEnabled(val === 'true');
+            } else {
+                setEmailReportsEnabled(false);
+            }
+        });
     }, [user]);
 
     const handleToggleNotifications = async (enabled: boolean) => {
@@ -93,21 +114,56 @@ export default function SettingsScreen() {
         }
     };
 
-    const handleAiProviderChange = (provider: AiProvider) => {
+    const handleToggleBudgetAlerts = async (enabled: boolean) => {
+        setBudgetAlertsEnabled(enabled);
+        try {
+            await AsyncStorage.setItem('budget_alerts_enabled', String(enabled));
+        } catch (error) {
+            console.error('Failed to save budget alerts setting:', error);
+        }
+    };
+
+    const handleToggleEmailReports = async (enabled: boolean) => {
+        setEmailReportsEnabled(enabled);
+        try {
+            await AsyncStorage.setItem('email_reports_enabled', String(enabled));
+        } catch (error) {
+            console.error('Failed to save email reports setting:', error);
+        }
+    };
+
+    const handleAiProviderChange = async (provider: AiProvider) => {
         setRevealedKeys({});
         setNewModelInput('');
         setNewKeyInput('');
-        setAiSettings(prev => ({
-            ...prev,
+        const updated = {
+            ...aiSettings,
             provider,
-            model: (prev.customModels[provider] || [])[0] || '',
-        }));
+            model: (aiSettings.customModels[provider] || [])[0] || '',
+        };
+        setAiSettings(updated);
+
+        if (provider !== 'custom') {
+            try {
+                const saved = await saveAiSettings(updated);
+                setAiSettings(saved);
+                successHaptic();
+                setAiSaved(true);
+                setDirty(false);
+            } catch (err: any) {
+                Alert.alert('Error', err.message || 'Failed to save AI settings');
+            }
+        } else {
+            setAiSaved(false);
+            setDirty(true);
+        }
     };
 
     const addModel = () => {
         const val = newModelInput.trim();
         if (!val) return;
         setAiSaved(false);
+        setDirty(true);
         setAiSettings(prev => {
             const existing = prev.customModels[prev.provider] || [];
             if (existing.includes(val)) return prev;
@@ -122,6 +178,7 @@ export default function SettingsScreen() {
 
     const removeModel = (model: string) => {
         setAiSaved(false);
+        setDirty(true);
         setAiSettings(prev => {
             const updated = (prev.customModels[prev.provider] || []).filter(m => m !== model);
             return {
@@ -136,6 +193,7 @@ export default function SettingsScreen() {
         const val = newKeyInput.trim();
         if (!val) return;
         setAiSaved(false);
+        setDirty(true);
         setAiSettings(prev => ({
             ...prev,
             keys: { ...prev.keys, [prev.provider]: [...(prev.keys[prev.provider] || []), val] },
@@ -145,6 +203,7 @@ export default function SettingsScreen() {
 
     const removeKey = (idx: number) => {
         setAiSaved(false);
+        setDirty(true);
         setAiSettings(prev => {
             const newKeys = [...(prev.keys[prev.provider] || [])];
             newKeys.splice(idx, 1);
@@ -155,13 +214,39 @@ export default function SettingsScreen() {
     const handleSaveAiSettings = async () => {
         setSavingAiSettings(true);
         try {
-            await saveAiSettings(aiSettings);
+            const saved = await saveAiSettings(aiSettings);
+            setAiSettings(saved);
+            successHaptic();
             setAiSaved(true);
-            setTimeout(() => setAiSaved(false), 2500);
+            setDirty(false);
         } catch (err: any) {
             Alert.alert('Error', err.message || 'Failed to save AI settings');
         } finally {
             setSavingAiSettings(false);
+        }
+    };
+
+    const handleTestConnection = async () => {
+        setTestingConnection(true);
+        try {
+            const res = await apiFetch('/ai-settings/test', {
+                method: 'POST',
+                body: JSON.stringify({
+                    provider: aiSettings.provider,
+                    model: aiSettings.model,
+                    apiKey: aiSettings.keys[aiSettings.provider]?.[0] || '',
+                    baseUrl: aiSettings.baseUrl,
+                }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                throw new Error(data.error || 'Connection test failed');
+            }
+            Alert.alert('Success', data.message || 'Connection test successful!');
+        } catch (err: any) {
+            Alert.alert('Connection Test Failed', err.message || 'Unknown error occurred.');
+        } finally {
+            setTestingConnection(false);
         }
     };
 
@@ -275,6 +360,38 @@ export default function SettingsScreen() {
         </TouchableOpacity>
     );
 
+    const defaults = ['deepseek', 'openai', 'gemini', 'openrouter'];
+    const extraProvidersSet = new Set<string>();
+    if (aiSettings.keys) {
+        Object.keys(aiSettings.keys).forEach(k => {
+            if (!defaults.includes(k) && k !== 'custom') {
+                extraProvidersSet.add(k);
+            }
+        });
+    }
+    if (aiSettings.customModels) {
+        Object.keys(aiSettings.customModels).forEach(k => {
+            if (!defaults.includes(k) && k !== 'custom') {
+                extraProvidersSet.add(k);
+            }
+        });
+    }
+    const extraProviders = Array.from(extraProvidersSet).sort();
+
+    const capitalize = (s: string) => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+
+    const providerOptions = [
+        { value: 'deepseek', label: 'DeepSeek' },
+        { value: 'openai', label: 'OpenAI' },
+        { value: 'gemini', label: 'Gemini' },
+        { value: 'openrouter', label: 'OpenRouter' },
+        ...extraProviders.map(p => ({ value: p, label: capitalize(p) })),
+        { value: 'custom', label: 'Custom' },
+    ];
+
+    const isCustomOrUnknown = !defaults.includes(aiSettings.provider) && !extraProviders.includes(aiSettings.provider);
+    const chipSelectorValue = isCustomOrUnknown ? 'custom' : aiSettings.provider;
+
     const currentModels = aiSettings.customModels[aiSettings.provider] || [];
     const currentKeys = aiSettings.keys[aiSettings.provider] || [];
 
@@ -294,7 +411,7 @@ export default function SettingsScreen() {
 
 
                 <Card style={{ marginBottom: spacing.md, paddingVertical: 0 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, paddingHorizontal: 16 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.colors.separator }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
                             <MaterialCommunityIcons name="bell-outline" size={22} color={theme.colors.textSecondary} style={{ marginRight: 12 }} />
                             <View>
@@ -305,6 +422,36 @@ export default function SettingsScreen() {
                         <Switch
                             value={notificationsEnabled}
                             onValueChange={handleToggleNotifications}
+                            trackColor={{ true: theme.colors.primary }}
+                        />
+                    </View>
+
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.colors.separator }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                            <MaterialCommunityIcons name="alert-circle-outline" size={22} color={theme.colors.textSecondary} style={{ marginRight: 12 }} />
+                            <View>
+                                <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 15 }}>Budget Alerts</Text>
+                                <Text style={{ color: theme.colors.textTertiary, fontSize: 11, marginTop: 2 }}>Get notified when approaching budgets</Text>
+                            </View>
+                        </View>
+                        <Switch
+                            value={budgetAlertsEnabled}
+                            onValueChange={handleToggleBudgetAlerts}
+                            trackColor={{ true: theme.colors.primary }}
+                        />
+                    </View>
+
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, paddingHorizontal: 16 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                            <MaterialCommunityIcons name="email-outline" size={22} color={theme.colors.textSecondary} style={{ marginRight: 12 }} />
+                            <View>
+                                <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 15 }}>Email Reports</Text>
+                                <Text style={{ color: theme.colors.textTertiary, fontSize: 11, marginTop: 2 }}>Receive weekly and monthly summary reports</Text>
+                            </View>
+                        </View>
+                        <Switch
+                            value={emailReportsEnabled}
+                            onValueChange={handleToggleEmailReports}
                             trackColor={{ true: theme.colors.primary }}
                         />
                     </View>
@@ -338,7 +485,7 @@ export default function SettingsScreen() {
                     </View>
                     <Switch
                         value={aiSettings.enabled}
-                        onValueChange={(enabled: boolean) => { setAiSaved(false); setAiSettings(prev => ({ ...prev, enabled })); }}
+                        onValueChange={(enabled: boolean) => { setAiSaved(false); setDirty(true); setAiSettings(prev => ({ ...prev, enabled })); }}
                         trackColor={{ true: theme.colors.primary }}
                     />
                 </View>
@@ -346,21 +493,9 @@ export default function SettingsScreen() {
                 {/* 2. Provider */}
                 <FieldLabel>Provider</FieldLabel>
                 <ChipSelector
-                    options={[
-                        { value: 'deepseek', label: 'DeepSeek' },
-                        { value: 'openai', label: 'OpenAI' },
-                        { value: 'gemini', label: 'Gemini' },
-                        { value: 'openrouter', label: 'OpenRouter' },
-                        { value: 'custom', label: 'Custom' },
-                    ]}
-                    value={['deepseek', 'openai', 'gemini', 'openrouter'].includes(aiSettings.provider) ? aiSettings.provider : 'custom'}
-                    onChange={value => {
-                        if (value === 'custom') {
-                            handleAiProviderChange('custom');
-                        } else {
-                            handleAiProviderChange(value as AiProvider);
-                        }
-                    }}
+                    options={providerOptions}
+                    value={chipSelectorValue}
+                    onChange={handleAiProviderChange}
                 />
                 <Text style={{ color: theme.colors.textTertiary, fontSize: 11, fontStyle: 'italic', marginTop: 4, marginBottom: spacing.sm }}>
                     {aiSettings.provider === 'deepseek' && "Uses DeepSeek base URL: https://api.deepseek.com"}
@@ -370,14 +505,15 @@ export default function SettingsScreen() {
                 </Text>
 
                 {/* 3. Custom provider name / details — shown when not a default provider or when custom is selected */}
-                {(!['deepseek', 'openai', 'gemini', 'openrouter'].includes(aiSettings.provider) || aiSettings.provider === 'custom') ? (
+                {!defaults.includes(aiSettings.provider) ? (
                     <View style={{ gap: spacing.sm, marginBottom: spacing.sm }}>
                         <Input
                             label="Custom Provider Name"
                             value={aiSettings.provider === 'custom' ? '' : aiSettings.provider}
                             onChangeText={val => {
-                                const providerVal = val.trim() || 'custom';
+                                const providerVal = val.trim();
                                 setAiSaved(false);
+                                setDirty(true);
                                 setAiSettings(prev => ({
                                     ...prev,
                                     provider: providerVal,
@@ -390,7 +526,11 @@ export default function SettingsScreen() {
                         <Input
                             label="Base URL"
                             value={aiSettings.baseUrl || ''}
-                            onChangeText={baseUrl => { setAiSaved(false); setAiSettings(prev => ({ ...prev, baseUrl })); }}
+                            onChangeText={baseUrl => {
+                                setAiSaved(false);
+                                setDirty(true);
+                                setAiSettings(prev => ({ ...prev, baseUrl }));
+                            }}
                             placeholder="https://api.groq.com/openai/v1"
                             autoCapitalize="none"
                         />
@@ -410,7 +550,11 @@ export default function SettingsScreen() {
                             return (
                                 <TouchableOpacity
                                     key={m}
-                                    onPress={() => { setAiSaved(false); setAiSettings(prev => ({ ...prev, model: m })); }}
+                                    onPress={() => {
+                                        setAiSaved(false);
+                                        setDirty(true);
+                                        setAiSettings(prev => ({ ...prev, model: m }));
+                                    }}
                                     style={[
                                         styles.modelChip,
                                         {
@@ -457,11 +601,33 @@ export default function SettingsScreen() {
                 <FieldLabel>API Keys for {aiSettings.provider}</FieldLabel>
                 {currentKeys.map((keyStr, idx) => (
                     <View key={idx} style={[styles.keyRow, { marginBottom: spacing.sm }]}>
+                        <TouchableOpacity
+                            onPress={() => {
+                                if (idx === 0) return;
+                                setAiSaved(false);
+                                setDirty(true);
+                                setAiSettings(prev => {
+                                    const newKeys = [...(prev.keys[prev.provider] || [])];
+                                    const temp = newKeys[idx];
+                                    newKeys[idx] = newKeys[0];
+                                    newKeys[0] = temp;
+                                    return { ...prev, keys: { ...prev.keys, [prev.provider]: newKeys } };
+                                });
+                            }}
+                            style={styles.keyAction}
+                        >
+                            <MaterialCommunityIcons
+                                name={idx === 0 ? 'radiobox-marked' : 'radiobox-blank'}
+                                size={22}
+                                color={idx === 0 ? theme.colors.primary : theme.colors.textTertiary}
+                            />
+                        </TouchableOpacity>
                         <Input
                             style={{ flex: 1 }}
                             value={keyStr}
                             onChangeText={val => {
                                 setAiSaved(false);
+                                setDirty(true);
                                 setAiSettings(prev => {
                                     const newKeys = [...(prev.keys[prev.provider] || [])];
                                     newKeys[idx] = val;
@@ -507,13 +673,25 @@ export default function SettingsScreen() {
                     </TouchableOpacity>
                 </View>
 
-                {/* 6. Save */}
-                <Button
-                    title={aiSaved ? 'Saved ✓' : 'Save AI Settings'}
-                    onPress={handleSaveAiSettings}
-                    loading={savingAiSettings}
-                    style={aiSaved ? { backgroundColor: theme.colors.success, borderColor: theme.colors.success } : undefined}
-                />
+                {/* 6. Test & Save Buttons */}
+                <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md }}>
+                    <Button
+                        title={testingConnection ? 'Testing...' : 'Test Connection'}
+                        onPress={handleTestConnection}
+                        loading={testingConnection}
+                        variant="secondary"
+                        style={{ flex: 1 }}
+                    />
+                    <Button
+                        title={aiSaved && !dirty ? 'Saved ✓' : 'Save AI Settings'}
+                        onPress={handleSaveAiSettings}
+                        loading={savingAiSettings}
+                        style={[
+                            { flex: 1 },
+                            aiSaved && !dirty ? { backgroundColor: theme.colors.success, borderColor: theme.colors.success } : undefined
+                        ]}
+                    />
+                </View>
             </SheetModal>
 
 

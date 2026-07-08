@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, DeviceEventEmitter } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -25,14 +25,23 @@ export default function DashboardScreen() {
     const currency = user?.currency || 'INR';
     const [unreadCount, setUnreadCount] = useState(0);
 
+    const fetchUnreadCount = () => {
+        apiFetch('/notifications')
+            .then(r => r.ok ? r.json() : [])
+            .then((list: any[]) => setUnreadCount(list.filter((n: any) => !n.read).length))
+            .catch(() => {});
+    };
+
     useFocusEffect(
         React.useCallback(() => {
-            apiFetch('/notifications')
-                .then(r => r.ok ? r.json() : [])
-                .then((list: any[]) => setUnreadCount(list.filter((n: any) => !n.read).length))
-                .catch(() => {});
+            fetchUnreadCount();
         }, [])
     );
+
+    useEffect(() => {
+        const sub = DeviceEventEmitter.addListener('transaction-created', fetchUnreadCount);
+        return () => sub.remove();
+    }, []);
 
     const openDrawer = () => {
         (navigation as any).openDrawer?.();

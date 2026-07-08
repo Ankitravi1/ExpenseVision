@@ -97,8 +97,11 @@ export default function NotificationsScreen({ navigation }: any) {
                         <View
                             style={[
                                 styles.notificationItem,
-                                { backgroundColor: item.read ? theme.colors.card : theme.colors.primary + '15' },
-                                { borderColor: theme.colors.separator }
+                                {
+                                    backgroundColor: item.read ? theme.colors.card : theme.colors.primary + '15',
+                                    borderColor: theme.colors.separator,
+                                    opacity: item.read ? 0.5 : 1.0,
+                                }
                             ]}
                         >
                             <View style={[styles.dot, { backgroundColor: item.read ? 'transparent' : theme.colors.primary }]} />

@@ -27,6 +27,13 @@ export const Settings: React.FC = () => {
     const [revealedKeys, setRevealedKeys] = useState<Record<string, boolean>>({});
     const [newModelInput, setNewModelInput] = useState('');
     const [newKeyInput, setNewKeyInput] = useState('');
+    const [isTestingConnection, setIsTestingConnection] = useState(false);
+
+    const defaultProviders = ['deepseek', 'openai', 'gemini', 'openrouter'];
+    const customConfiguredProviders = Array.from(new Set([
+        ...Object.keys(aiSettings.keys || {}),
+        ...Object.keys(aiSettings.customModels || {})
+    ])).filter(p => !defaultProviders.includes(p) && p !== 'custom' && p.trim() !== '');
 
     useEffect(() => {
         // Check if push is supported and subscribed
@@ -130,16 +137,30 @@ export const Settings: React.FC = () => {
         }
     };
 
-    const handleAiProviderChange = (provider: AiProvider) => {
+    const handleSaveAiSettings = async (settingsToSave?: AiSettings) => {
+        const targetSettings = settingsToSave || aiSettings;
+        setAiError('');
+        try {
+            const updated = await saveAiSettings(targetSettings);
+            setAiSettings(updated);
+            setAiSaved(true);
+        } catch (err: any) {
+            setAiError(err.message || 'Failed to save AI settings');
+        }
+    };
+
+    const handleAiProviderChange = async (provider: AiProvider) => {
         setAiSaved(false);
         setRevealedKeys({});
         setNewModelInput('');
         setNewKeyInput('');
-        setAiSettings(prev => ({
-            ...prev,
+        const updated: AiSettings = {
+            ...aiSettings,
             provider,
-            model: (prev.customModels[provider] || [])[0] || ''
-        }));
+            model: (aiSettings.customModels[provider] || [])[0] || ''
+        };
+        setAiSettings(updated);
+        await handleSaveAiSettings(updated);
     };
 
     const addModel = () => {
@@ -190,14 +211,48 @@ export const Settings: React.FC = () => {
         }));
     };
 
-    const handleSaveAiSettings = async () => {
-        setAiError('');
+    const handleSetActiveKey = (index: number) => {
+        if (index === 0) return;
+        setAiSaved(false);
+        setAiSettings(prev => {
+            const providerKeys = [...(prev.keys[prev.provider] || [])];
+            if (index > 0 && index < providerKeys.length) {
+                const [selectedKey] = providerKeys.splice(index, 1);
+                providerKeys.unshift(selectedKey);
+            }
+            return {
+                ...prev,
+                keys: {
+                    ...prev.keys,
+                    [prev.provider]: providerKeys
+                }
+            };
+        });
+    };
+
+    const handleTestConnection = async () => {
+        setIsTestingConnection(true);
         try {
-            setAiSettings(await saveAiSettings(aiSettings));
-            setAiSaved(true);
-            window.setTimeout(() => setAiSaved(false), 2500);
-        } catch (err: any) {
-            setAiError(err.message || 'Failed to save AI settings');
+            const apiKey = aiSettings.keys[aiSettings.provider]?.[0] || '';
+            const res = await api.fetch('/ai-settings/test', {
+                method: 'POST',
+                body: JSON.stringify({
+                    provider: aiSettings.provider,
+                    model: aiSettings.model,
+                    apiKey,
+                    baseUrl: aiSettings.baseUrl
+                })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data.success) {
+                alert(`Connection successful! Model replied: ${data.message || ''}`);
+            } else {
+                alert(`Connection failed: ${data.error || 'Unknown error'}`);
+            }
+        } catch (error: any) {
+            alert(`Connection failed: ${error.message || 'Network error'}`);
+        } finally {
+            setIsTestingConnection(false);
         }
     };
 
@@ -325,14 +380,10 @@ export const Settings: React.FC = () => {
                         <label htmlFor="ai-provider" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Provider</label>
                         <select
                             id="ai-provider"
-                            value={['deepseek', 'openai', 'gemini', 'openrouter'].includes(aiSettings.provider) ? aiSettings.provider : 'custom'}
+                            value={defaultProviders.includes(aiSettings.provider) || customConfiguredProviders.includes(aiSettings.provider) ? aiSettings.provider : 'custom'}
                             onChange={(e) => {
                                 const val = e.target.value;
-                                if (val === 'custom') {
-                                    handleAiProviderChange('custom');
-                                } else {
-                                    handleAiProviderChange(val);
-                                }
+                                handleAiProviderChange(val);
                             }}
                             className="block w-full bg-gray-100 border-transparent rounded-lg p-3 focus:ring-2 focus:ring-primary focus:bg-white text-base dark:bg-gray-700 dark:text-gray-100 dark:focus:bg-gray-600"
                         >
@@ -340,6 +391,9 @@ export const Settings: React.FC = () => {
                             <option value="openai">OpenAI</option>
                             <option value="gemini">Gemini</option>
                             <option value="openrouter">OpenRouter</option>
+                            {customConfiguredProviders.map(p => (
+                                <option key={p} value={p}>{p}</option>
+                            ))}
                             <option value="custom">Custom OpenAI-compatible model provider</option>
                         </select>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 italic">
@@ -351,7 +405,7 @@ export const Settings: React.FC = () => {
                     </div>
 
                     {/* Custom provider name / details — shown when not a default provider or when custom is selected */}
-                    {(!['deepseek', 'openai', 'gemini', 'openrouter'].includes(aiSettings.provider) || aiSettings.provider === 'custom') && (
+                    {(!defaultProviders.includes(aiSettings.provider) || aiSettings.provider === 'custom') && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label htmlFor="ai-custom-provider" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Custom Provider Name</label>
@@ -449,6 +503,14 @@ export const Settings: React.FC = () => {
                             {(aiSettings.keys[aiSettings.provider] || []).map((key, index) => (
                                 <div key={index} className="flex items-center gap-2">
                                     <input
+                                        type="radio"
+                                        name={`active-key-${aiSettings.provider}`}
+                                        checked={index === 0}
+                                        onChange={() => handleSetActiveKey(index)}
+                                        className="h-4 w-4 text-primary focus:ring-primary border-gray-300 dark:border-gray-600 dark:bg-gray-700 cursor-pointer"
+                                        title="Set as active key"
+                                    />
+                                    <input
                                         type={revealedKeys[`${aiSettings.provider}-${index}`] ? 'text' : 'password'}
                                         value={key}
                                         readOnly
@@ -489,9 +551,25 @@ export const Settings: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="flex justify-end pt-1">
+                    <div className="flex justify-end pt-1 gap-3">
                         <button
-                            onClick={handleSaveAiSettings}
+                            type="button"
+                            onClick={handleTestConnection}
+                            disabled={isTestingConnection}
+                            className="btn btn-secondary flex items-center justify-center min-w-[140px]"
+                        >
+                            {isTestingConnection ? (
+                                <>
+                                    <Icon name="Loader2" size={16} className="animate-spin mr-2" />
+                                    Testing...
+                                </>
+                            ) : (
+                                <>🧪 Test Connection</>
+                            )}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => handleSaveAiSettings()}
                             className={`btn transition-all duration-300 ${aiSaved ? 'bg-green-600 hover:bg-green-700 text-white' : 'btn-primary'}`}
                         >
                             {aiSaved

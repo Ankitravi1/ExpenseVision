@@ -68,7 +68,9 @@ import {
   AlertCircle,
   Info,
   StickyNote,
-  Gauge
+  Gauge,
+  CheckCheck,
+  Loader2
 } from 'lucide-react';
 
 export type IconName = string;
@@ -147,7 +149,9 @@ const iconComponents: { [key: string]: React.ComponentType<any> } = {
   AlertCircle,
   Info,
   StickyNote,
-  Gauge
+  Gauge,
+  CheckCheck,
+  Loader2
 };
 
 export const iconList = Object.keys(iconComponents);
