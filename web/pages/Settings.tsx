@@ -9,16 +9,153 @@ import { AiProvider, AiSettings, defaultAiSettings, getAiSettings, saveAiSetting
 import { ImportTransactionsModal } from '../components/ImportTransactionsModal';
 import { api } from '../services/api';
 
+interface ClearDataModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onConfirm: (options: { transactions: boolean; budgets: boolean; accounts: boolean }) => Promise<void>;
+}
+
+const ClearDataModal: React.FC<ClearDataModalProps> = ({ isOpen, onClose, onConfirm }) => {
+    const [delTransactions, setDelTransactions] = useState(false);
+    const [delBudgets, setDelBudgets] = useState(false);
+    const [delAccounts, setDelAccounts] = useState(false);
+    const [phrase, setPhrase] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    if (!isOpen) return null;
+
+    const isValid = phrase === 'delete my data' && (delTransactions || delBudgets || delAccounts);
+
+    const handleConfirm = async () => {
+        if (!isValid) return;
+        setIsSubmitting(true);
+        try {
+            await onConfirm({
+                transactions: delTransactions,
+                budgets: delBudgets,
+                accounts: delAccounts,
+            });
+            onClose();
+        } catch (error: any) {
+            alert(error.message || 'Failed to clear data');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    return (
+        <>
+            <div
+                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 transition-opacity duration-300"
+                onClick={onClose}
+            />
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+                <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md pointer-events-auto transform transition-all flex flex-col overflow-hidden border border-gray-150 dark:border-gray-700">
+                    <div className="p-6 border-b border-gray-150 dark:border-gray-700 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/50">
+                        <h3 className="text-xl font-bold text-gray-darkest dark:text-gray-50 flex items-center gap-2">
+                            <Icon name="AlertTriangle" className="text-danger" size={22} />
+                            Clear / Reset Data
+                        </h3>
+                        <button onClick={onClose} className="p-1.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
+                            <Icon name="X" size={20} />
+                        </button>
+                    </div>
+
+                    <div className="p-6 space-y-4">
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                            Select the types of data you wish to permanently delete. This action cannot be undone.
+                        </p>
+
+                        <div className="space-y-3">
+                            <label className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700/35 border border-gray-100 dark:border-gray-700/50 rounded-lg cursor-pointer hover:border-gray-200 dark:hover:border-gray-600 select-none">
+                                <input
+                                    type="checkbox"
+                                    checked={delTransactions}
+                                    onChange={(e) => setDelTransactions(e.target.checked)}
+                                    className="w-4 h-4 rounded text-primary focus:ring-primary border-gray-300 dark:border-gray-600 dark:bg-gray-700"
+                                />
+                                <div>
+                                    <p className="text-sm font-semibold text-gray-755 dark:text-gray-200">Transactions</p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">Permanently clears all transactions.</p>
+                                </div>
+                            </label>
+
+                            <label className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700/35 border border-gray-100 dark:border-gray-700/50 rounded-lg cursor-pointer hover:border-gray-200 dark:hover:border-gray-600 select-none">
+                                <input
+                                    type="checkbox"
+                                    checked={delBudgets}
+                                    onChange={(e) => setDelBudgets(e.target.checked)}
+                                    className="w-4 h-4 rounded text-primary focus:ring-primary border-gray-300 dark:border-gray-600 dark:bg-gray-700"
+                                />
+                                <div>
+                                    <p className="text-sm font-semibold text-gray-755 dark:text-gray-200">Budgets</p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">Permanently clears all budgets.</p>
+                                </div>
+                            </label>
+
+                            <label className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700/35 border border-gray-100 dark:border-gray-700/50 rounded-lg cursor-pointer hover:border-gray-200 dark:hover:border-gray-600 select-none">
+                                <input
+                                    type="checkbox"
+                                    checked={delAccounts}
+                                    onChange={(e) => setDelAccounts(e.target.checked)}
+                                    className="w-4 h-4 rounded text-primary focus:ring-primary border-gray-300 dark:border-gray-600 dark:bg-gray-700"
+                                />
+                                <div>
+                                    <p className="text-sm font-semibold text-gray-755 dark:text-gray-200">Accounts</p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">Permanently clears all accounts (and dependent transactions).</p>
+                                </div>
+                            </label>
+                        </div>
+
+                        <div className="pt-2">
+                            <label htmlFor="confirm-phrase" className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+                                To confirm, type <span className="font-mono text-danger lowercase font-bold">"delete my data"</span> below:
+                            </label>
+                            <input
+                                id="confirm-phrase"
+                                type="text"
+                                value={phrase}
+                                onChange={(e) => setPhrase(e.target.value)}
+                                placeholder="delete my data"
+                                className="block w-full bg-gray-100 border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-primary dark:bg-gray-700 dark:text-gray-100 outline-none"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="p-6 bg-gray-50/50 dark:bg-gray-800/50 border-t border-gray-150 dark:border-gray-700 flex justify-end gap-3">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="btn btn-secondary py-2 px-4 text-sm"
+                            disabled={isSubmitting}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleConfirm}
+                            disabled={!isValid || isSubmitting}
+                            className="btn btn-danger py-2 px-4 text-sm flex items-center gap-2"
+                        >
+                            {isSubmitting && <Icon name="Loader2" size={16} className="animate-spin" />}
+                            Confirm Data Deletion
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </>
+    );
+};
+
 export const Settings: React.FC = () => {
     const context = useContext(AppContext);
     if (!context) return null;
-    const { theme, setTheme, transactions, clearAllTransactions } = context;
+    const { theme, setTheme, transactions, refreshData } = context;
 
     const [notifications, setNotifications] = useState(false); // Default to false until checked
     const [budgetAlerts, setBudgetAlerts] = useState(false);
     const [emailReports, setEmailReports] = useState(false);
-    const [clearConfirm, setClearConfirm] = useState(false);
-    const [clearPhrase, setClearPhrase] = useState('');
+    const [isClearDataOpen, setIsClearDataOpen] = useState(false);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [aiSettings, setAiSettings] = useState<AiSettings>(defaultAiSettings);
     const [aiSaved, setAiSaved] = useState(false);
@@ -104,10 +241,14 @@ export const Settings: React.FC = () => {
         }
     };
 
-    const handleClearAllTransactions = async () => {
-        await clearAllTransactions('DELETE');
-        setClearPhrase('');
-        setClearConfirm(false);
+    const handleClearData = async (options: { transactions: boolean; budgets: boolean; accounts: boolean }) => {
+        try {
+            await api.clearData(options);
+            await refreshData();
+        } catch (error: any) {
+            console.error('Clear data failed:', error);
+            alert(error.message || 'Failed to clear data');
+        }
     };
 
     const handleExportData = async () => {
@@ -644,21 +785,18 @@ export const Settings: React.FC = () => {
                         <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2">
                                 <Icon name="AlertTriangle" size={20} className="text-danger" />
-                                <h4 className="font-semibold text-gray-darkest dark:text-gray-50">Clear All Transactions</h4>
+                                <h4 className="font-semibold text-gray-darkest dark:text-gray-50">Clear / Reset Data</h4>
                             </div>
                             <p className="text-sm text-gray-600 dark:text-gray-400">
-                                This will permanently delete all your transactions. This action cannot be undone.
-                            </p>
-                            <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-2">
-                                Total transactions: <span className="text-danger">{transactions.length}</span>
+                                Delete selected components of your account data (transactions, budgets, and/or accounts). This action cannot be undone.
                             </p>
                         </div>
                         <button
-                            onClick={() => setClearConfirm(true)}
+                            onClick={() => setIsClearDataOpen(true)}
                             className="btn btn-danger ml-4"
                         >
                             <Icon name="Trash2" size={16} className="mr-2" />
-                            Clear All
+                            Clear / Reset Data
                         </button>
                     </div>
 
@@ -733,16 +871,10 @@ export const Settings: React.FC = () => {
                 </div>
             </Card>
 
-            <ConfirmDialog
-                isOpen={clearConfirm}
-                onClose={() => setClearConfirm(false)}
-                onConfirm={handleClearAllTransactions}
-                title="Clear All Transactions"
-                message={`Are you absolutely sure you want to delete all ${transactions.length} transactions and reset account balances?`}
-                confirmText="Yes, Clear All"
-                cancelText="Cancel"
-                variant="danger"
-                requirePhrase="DELETE"
+            <ClearDataModal
+                isOpen={isClearDataOpen}
+                onClose={() => setIsClearDataOpen(false)}
+                onConfirm={handleClearData}
             />
             <ImportTransactionsModal
                 isOpen={isImportModalOpen}

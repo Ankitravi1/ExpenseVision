@@ -223,17 +223,17 @@ export const Accounts: React.FC = () => {
 
     const totalBalance = useMemo(() => accounts.reduce((sum, acc) => sum + acc.balance, 0), [accounts]);
 
-    const currentMonthExpenses = useMemo(() => {
+    const allTimeExpenses = useMemo(() => {
         return transactions
-            .filter(t => t.type === 'expense' && t.date.startsWith(currentMonthStr))
+            .filter(t => t.type === 'expense')
             .reduce((sum, t) => sum + t.amount, 0);
-    }, [transactions, currentMonthStr]);
+    }, [transactions]);
 
-    const currentMonthIncome = useMemo(() => {
+    const allTimeIncome = useMemo(() => {
         return transactions
-            .filter(t => t.type === 'income' && t.date.startsWith(currentMonthStr))
+            .filter(t => t.type === 'income')
             .reduce((sum, t) => sum + t.amount, 0);
-    }, [transactions, currentMonthStr]);
+    }, [transactions]);
 
     const handleEdit = (account: Account) => {
         setEditAccount(account);
@@ -271,9 +271,9 @@ export const Accounts: React.FC = () => {
                             <Icon name="TrendingUp" className="text-success dark:text-emerald-400" size={24} />
                         </div>
                         <div>
-                            <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Income (This Month)</h4>
+                            <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Income so far</h4>
                             <p className="text-2xl font-bold mt-1 text-success dark:text-emerald-400">
-                                {formatCurrency(currentMonthIncome, currency)}
+                                {formatCurrency(allTimeIncome, currency)}
                             </p>
                         </div>
                     </Card>
@@ -283,9 +283,9 @@ export const Accounts: React.FC = () => {
                             <Icon name="TrendingDown" className="text-danger dark:text-rose-400" size={24} />
                         </div>
                         <div>
-                            <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Expenses (This Month)</h4>
+                            <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Expense so far</h4>
                             <p className="text-2xl font-bold mt-1 text-danger dark:text-rose-400">
-                                {formatCurrency(currentMonthExpenses, currency)}
+                                {formatCurrency(allTimeExpenses, currency)}
                             </p>
                         </div>
                     </Card>

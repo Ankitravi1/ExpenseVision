@@ -35,13 +35,10 @@ export default function AccountsScreen() {
 
     const total = accounts.reduce((sum, a) => sum + a.balance, 0);
 
-    const now = new Date();
-    const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const thisMonthTransactions = transactions.filter(t => t.date.startsWith(currentMonthStr));
-    const expensesThisMonth = thisMonthTransactions
+    const totalExpensesAllTime = transactions
         .filter(t => t.type === 'expense')
         .reduce((sum, t) => sum + t.amount, 0);
-    const incomeThisMonth = thisMonthTransactions
+    const totalIncomeAllTime = transactions
         .filter(t => t.type === 'income')
         .reduce((sum, t) => sum + t.amount, 0);
 
@@ -251,19 +248,19 @@ export default function AccountsScreen() {
                         <View style={{ flex: 1 }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                                 <MaterialCommunityIcons name="arrow-down-bold-circle-outline" size={16} color={theme.colors.success} />
-                                <Text style={{ color: theme.colors.textSecondary, fontSize: 11, fontWeight: '600' }}>Income this month</Text>
+                                <Text style={{ color: theme.colors.textSecondary, fontSize: 11, fontWeight: '600' }}>Income so far</Text>
                             </View>
                             <Text style={{ color: theme.colors.success, fontSize: 16, fontWeight: '700', marginTop: 2 }}>
-                                {formatCurrency(incomeThisMonth, currency)}
+                                {formatCurrency(totalIncomeAllTime, currency)}
                             </Text>
                         </View>
                         <View style={{ flex: 1, borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: theme.colors.separator, paddingLeft: spacing.md }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                                 <MaterialCommunityIcons name="arrow-up-bold-circle-outline" size={16} color={theme.colors.danger} />
-                                <Text style={{ color: theme.colors.textSecondary, fontSize: 11, fontWeight: '600' }}>Expenses this month</Text>
+                                <Text style={{ color: theme.colors.textSecondary, fontSize: 11, fontWeight: '600' }}>Expense so far</Text>
                             </View>
                             <Text style={{ color: theme.colors.danger, fontSize: 16, fontWeight: '700', marginTop: 2 }}>
-                                {formatCurrency(expensesThisMonth, currency)}
+                                {formatCurrency(totalExpensesAllTime, currency)}
                             </Text>
                         </View>
                     </View>

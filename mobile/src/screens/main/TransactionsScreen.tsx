@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, RefreshControl, TextInput, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, RefreshControl, TextInput, LayoutAnimation, Platform, UIManager, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Swipeable } from 'react-native-gesture-handler';
@@ -7,7 +7,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { EmptyState, ChipSelector, lightHaptic, warningHaptic } from '../../components/ui';
+import { EmptyState, ChipSelector, Card, lightHaptic, warningHaptic } from '../../components/ui';
 import { CategoryIcon } from '../../components/CategoryIcon';
 import { TransactionForm } from '../../components/TransactionForm';
 import { formatCurrency } from '../../utils/currency';
@@ -19,17 +19,13 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
     UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-
-const monthLabel = (key: string) => {
-    const [y, m] = key.split('-').map(Number);
-    return new Date(y, m - 1, 1).toLocaleString('default', { month: 'long', year: 'numeric' });
-};
-
-const shiftMonth = (key: string, delta: number) => {
-    const [y, m] = key.split('-').map(Number);
-    return monthKey(new Date(y, m - 1 + delta, 1));
-};
+const VIEW_MODE_OPTIONS = [
+    { value: 'DAILY', label: 'Daily' },
+    { value: 'Weekly', label: 'Weekly' },
+    { value: 'monthly', label: 'Monthly' },
+    { value: '3 month', label: '3 Months' },
+    { value: 'Yearly', label: 'Yearly' },
+];
 
 export default function TransactionsScreen() {
     const navigation = useNavigation();
@@ -39,8 +35,8 @@ export default function TransactionsScreen() {
     const route = useRoute();
     const [search, setSearch] = useState('');
     const [typeFilter, setTypeFilter] = useState('all');
-    const currentMonth = monthKey(new Date());
-    const [month, setMonth] = useState<string | null>(currentMonth); // default to current month
+    const [viewMode, setViewMode] = useState<'DAILY' | 'Weekly' | 'monthly' | '3 month' | 'Yearly'>('monthly');
+    const [carryOver, setCarryOver] = useState(false);
     const [showForm, setShowForm] = useState(false);
     const [editing, setEditing] = useState<Transaction | null>(null);
     const currency = user?.currency || 'INR';
@@ -54,11 +50,86 @@ export default function TransactionsScreen() {
         }
     }, [route.params, navigation]);
 
+    const range = useMemo(() => {
+        const today = new Date();
+        const formatDate = (d: Date) => {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        };
+
+        let start: Date;
+        let end: Date;
+
+        switch (viewMode) {
+            case 'DAILY':
+                start = today;
+                end = today;
+                break;
+            case 'Weekly':
+                start = new Date(today);
+                start.setDate(today.getDate() - today.getDay());
+                end = new Date(start);
+                end.setDate(start.getDate() + 6);
+                break;
+            case 'monthly':
+                start = new Date(today.getFullYear(), today.getMonth(), 1);
+                end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+                break;
+            case '3 month':
+                start = new Date(today.getFullYear(), today.getMonth() - 2, 1);
+                end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+                break;
+            case 'Yearly':
+                start = new Date(today.getFullYear(), 0, 1);
+                end = new Date(today.getFullYear(), 11, 31);
+                break;
+            default:
+                start = new Date(today.getFullYear(), today.getMonth(), 1);
+                end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        }
+
+        return {
+            start: formatDate(start),
+            end: formatDate(end),
+        };
+    }, [viewMode]);
+
+    const preRangeBalance = useMemo(() => {
+        const accountsInitialBalanceSum = accounts.reduce((sum, acc) => sum + (acc.initialBalance ?? acc.balance ?? 0), 0);
+        const preTxs = transactions.filter(t => t.date < range.start);
+        let incomeAndTransfersIn = 0;
+        let expenseAndTransfersOut = 0;
+        for (const t of preTxs) {
+            if (t.type === 'income') {
+                incomeAndTransfersIn += t.amount;
+            } else if (t.type === 'expense') {
+                expenseAndTransfersOut += t.amount;
+            } else if (t.type === 'transfer') {
+                incomeAndTransfersIn += t.amount;
+                expenseAndTransfersOut += t.amount;
+            }
+        }
+        return incomeAndTransfersIn - expenseAndTransfersOut + accountsInitialBalanceSum;
+    }, [transactions, accounts, range.start]);
+
+    const rangeStats = useMemo(() => {
+        const rangeTxs = transactions.filter(t => t.date >= range.start && t.date <= range.end);
+        const income = rangeTxs.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+        const expense = rangeTxs.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+        return { income, expense };
+    }, [transactions, range]);
+
+    const displayBalance = carryOver
+        ? preRangeBalance + rangeStats.income - rangeStats.expense
+        : rangeStats.income - rangeStats.expense;
+
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
         return transactions.filter(t => {
             if (typeFilter !== 'all' && t.type !== typeFilter) return false;
-            if (month && !t.date.startsWith(month)) return false;
+            if (t.date < range.start || t.date > range.end) return false;
             if (!q) return true;
             const cat = categories.find(c => c.id === t.categoryId);
             const acc = accounts.find(a => a.id === t.accountId);
@@ -68,7 +139,7 @@ export default function TransactionsScreen() {
                 (acc?.name.toLowerCase().includes(q) ?? false)
             );
         });
-    }, [transactions, categories, accounts, search, typeFilter, month]);
+    }, [transactions, categories, accounts, search, typeFilter, range]);
 
     const doDelete = (t: Transaction) => {
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -161,38 +232,26 @@ export default function TransactionsScreen() {
                         </TouchableOpacity>
                     ) : null}
                 </View>
-                <View style={styles.monthRow}>
-                    <TouchableOpacity
-                        onPress={() => {
-                            lightHaptic();
-                            setMonth(prev => shiftMonth(prev || currentMonth, -1));
-                        }}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    >
-                        <MaterialCommunityIcons name="chevron-left" size={22} color={theme.colors.textSecondary} />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        onPress={() => {
-                            lightHaptic();
-                            setMonth(prev => (prev ? null : currentMonth));
-                        }}
-                    >
-                        <Text style={{ color: month ? theme.colors.primary : theme.colors.textSecondary, fontWeight: '600', fontSize: 13 }}>
-                            {month ? monthLabel(month) : 'All time · tap for this month'}
-                        </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        onPress={() => {
-                            if (!month || month >= currentMonth) return;
-                            lightHaptic();
-                            setMonth(shiftMonth(month, 1));
-                        }}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                        style={{ opacity: month && month < currentMonth ? 1 : 0.3 }}
-                    >
-                        <MaterialCommunityIcons name="chevron-right" size={22} color={theme.colors.textSecondary} />
-                    </TouchableOpacity>
+                <View style={{ marginBottom: spacing.xs }}>
+                    <ChipSelector
+                        options={VIEW_MODE_OPTIONS}
+                        value={viewMode}
+                        onChange={(val) => setViewMode(val as any)}
+                    />
                 </View>
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm, paddingVertical: 4 }}>
+                    <View style={{ flex: 1, marginRight: spacing.sm }}>
+                        <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 14 }}>Carry Over Balance</Text>
+                        <Text style={{ color: theme.colors.textTertiary, fontSize: 11 }}>Factor in previous transactions and initial balances</Text>
+                    </View>
+                    <Switch
+                        value={carryOver}
+                        onValueChange={setCarryOver}
+                        trackColor={{ true: theme.colors.primary }}
+                    />
+                </View>
+
                 <ChipSelector
                     options={[
                         { value: 'all', label: 'All' },
@@ -205,6 +264,32 @@ export default function TransactionsScreen() {
                 />
             </View>
 
+            {/* Summary Banner */}
+            <View style={{ paddingHorizontal: spacing.md, marginBottom: spacing.sm }}>
+                <Card style={{ padding: spacing.md }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <View style={{ flex: 1 }}>
+                            <Text style={{ color: theme.colors.textSecondary, fontSize: 11, fontWeight: '600' }}>Income</Text>
+                            <Text style={{ color: theme.colors.success, fontSize: 15, fontWeight: '700', marginTop: 2 }} numberOfLines={1}>
+                                {formatCurrency(rangeStats.income, currency)}
+                            </Text>
+                        </View>
+                        <View style={{ flex: 1, borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: theme.colors.separator, paddingLeft: spacing.md }}>
+                            <Text style={{ color: theme.colors.textSecondary, fontSize: 11, fontWeight: '600' }}>Expense</Text>
+                            <Text style={{ color: theme.colors.danger, fontSize: 15, fontWeight: '700', marginTop: 2 }} numberOfLines={1}>
+                                {formatCurrency(rangeStats.expense, currency)}
+                            </Text>
+                        </View>
+                        <View style={{ flex: 1, borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: theme.colors.separator, paddingLeft: spacing.md }}>
+                            <Text style={{ color: theme.colors.textSecondary, fontSize: 11, fontWeight: '600' }}>Balance</Text>
+                            <Text style={{ color: displayBalance < 0 ? theme.colors.danger : theme.colors.text, fontSize: 15, fontWeight: '700', marginTop: 2 }} numberOfLines={1}>
+                                {formatCurrency(displayBalance, currency)}
+                            </Text>
+                        </View>
+                    </View>
+                </Card>
+            </View>
+
             <FlatList
                 data={filtered}
                 keyExtractor={t => t.id}
@@ -214,8 +299,8 @@ export default function TransactionsScreen() {
                 ListEmptyComponent={
                     <EmptyState
                         icon="swap-horizontal"
-                        title={search || typeFilter !== 'all' || month ? 'No matching transactions' : 'No transactions yet'}
-                        subtitle={search || typeFilter !== 'all' || month ? 'Try changing the search or filters' : 'Tap the + button at the bottom to add your first transaction. Tap to edit, swipe left to delete.'}
+                        title={search || typeFilter !== 'all' ? 'No matching transactions' : 'No transactions yet'}
+                        subtitle={search || typeFilter !== 'all' ? 'Try changing the search or filters' : 'Tap the + button at the bottom to add your first transaction. Tap to edit, swipe left to delete.'}
                     />
                 }
             />

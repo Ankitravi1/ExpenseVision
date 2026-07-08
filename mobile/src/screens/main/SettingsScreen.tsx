@@ -29,7 +29,7 @@ import { AiProvider, AiSettings, defaultAiSettings, getAiSettings, saveAiSetting
 export default function SettingsScreen() {
     const navigation = useNavigation();
     const { user } = useAuth();
-    const { categories, recurring, deleteCategory, deleteRecurring, clearAllTransactions, transactions, refresh } = useData();
+    const { categories, recurring, deleteCategory, deleteRecurring, transactions, refresh } = useData();
     const { theme } = useTheme();
     const [exporting, setExporting] = useState(false);
     const [importing, setImporting] = useState(false);
@@ -37,8 +37,11 @@ export default function SettingsScreen() {
     const [aiSettings, setAiSettings] = useState<AiSettings>(defaultAiSettings);
     const [savingAiSettings, setSavingAiSettings] = useState(false);
     const [aiSaved, setAiSaved] = useState(false);
-    const [showClearAll, setShowClearAll] = useState(false);
-    const [clearPhrase, setClearPhrase] = useState('');
+    const [showClearData, setShowClearData] = useState(false);
+    const [confirmText, setConfirmText] = useState('');
+    const [clearTransactions, setClearTransactions] = useState(false);
+    const [clearBudgets, setClearBudgets] = useState(false);
+    const [clearAccounts, setClearAccounts] = useState(false);
     const [notificationsEnabled, setNotificationsEnabled] = useState(!!user?.expoPushToken);
     const [budgetAlertsEnabled, setBudgetAlertsEnabled] = useState(true);
     const [emailReportsEnabled, setEmailReportsEnabled] = useState(false);
@@ -354,20 +357,41 @@ export default function SettingsScreen() {
         }
     };
 
-    const confirmClearAll = () => {
+    const confirmClearData = () => {
         warningHaptic();
-        setShowClearAll(true);
-        setClearPhrase('');
+        setShowClearData(true);
+        setConfirmText('');
+        setClearTransactions(false);
+        setClearBudgets(false);
+        setClearAccounts(false);
     };
 
-    const handleClearAll = async () => {
-        if (clearPhrase !== 'DELETE') {
-            Alert.alert('Error', 'You must type DELETE to confirm.');
+    const handleClearData = async () => {
+        if (confirmText !== 'delete my data') {
+            Alert.alert('Error', 'You must type "delete my data" to confirm.');
+            return;
+        }
+        if (!clearTransactions && !clearBudgets && !clearAccounts) {
+            Alert.alert('Error', 'Please select at least one data type to clear.');
             return;
         }
         try {
-            await clearAllTransactions(clearPhrase);
-            setShowClearAll(false);
+            const res = await apiFetch('/profile/clear-data', {
+                method: 'POST',
+                body: JSON.stringify({
+                    transactions: clearTransactions,
+                    budgets: clearBudgets,
+                    accounts: clearAccounts,
+                }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                throw new Error(data.error || 'Failed to clear data');
+            }
+            setShowClearData(false);
+            await refresh();
+            successHaptic();
+            Alert.alert('Success', 'Selected data has been cleared.');
         } catch (err: any) {
             Alert.alert('Error', err.message);
         }
@@ -521,7 +545,7 @@ export default function SettingsScreen() {
                     <Row icon="file-download-outline" label="Download CSV template" onPress={handleDownloadTemplate} />
                     <Row icon="file-import-outline" label={importing ? 'Importing…' : 'Import transactions (CSV)'} onPress={importing ? undefined : handleImport} />
                     <Row icon="export-variant" label={exporting ? 'Exporting…' : 'Export transactions (CSV)'} onPress={exporting ? undefined : handleExport} />
-                    <Row icon="delete-sweep" label="Clear all transactions" onPress={confirmClearAll} danger />
+                    <Row icon="delete-sweep" label="Clear / Reset Data" onPress={confirmClearData} danger />
                 </Card>
 
                 <Text style={{ color: theme.colors.textTertiary, textAlign: 'center', marginTop: spacing.lg, fontSize: 12 }}>
@@ -751,21 +775,64 @@ export default function SettingsScreen() {
             </SheetModal>
 
 
-            {/* Clear All */}
-            <SheetModal visible={showClearAll} onClose={() => setShowClearAll(false)} title="Clear all transactions">
+            {/* Clear / Reset Data */}
+            <SheetModal visible={showClearData} onClose={() => setShowClearData(false)} title="Clear / Reset Data">
                 <Text style={{ color: theme.colors.textTertiary, marginBottom: spacing.md, fontSize: 14 }}>
-                    This deletes all {transactions.length} transactions and resets account balances. This cannot be undone. Type DELETE to confirm.
+                    Select which data you want to delete. This action is permanent and cannot be undone.
+                </Text>
+
+                <View style={{ gap: spacing.md, marginBottom: spacing.md }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 }}>
+                        <View style={{ flex: 1, marginRight: spacing.sm }}>
+                            <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 15 }}>Transactions</Text>
+                            <Text style={{ color: theme.colors.textTertiary, fontSize: 11 }}>Delete all transactions and reset balances</Text>
+                        </View>
+                        <Switch
+                            value={clearTransactions}
+                            onValueChange={setClearTransactions}
+                            trackColor={{ true: theme.colors.primary }}
+                        />
+                    </View>
+
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 }}>
+                        <View style={{ flex: 1, marginRight: spacing.sm }}>
+                            <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 15 }}>Budgets</Text>
+                            <Text style={{ color: theme.colors.textTertiary, fontSize: 11 }}>Delete all budget guidelines</Text>
+                        </View>
+                        <Switch
+                            value={clearBudgets}
+                            onValueChange={setClearBudgets}
+                            trackColor={{ true: theme.colors.primary }}
+                        />
+                    </View>
+
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 }}>
+                        <View style={{ flex: 1, marginRight: spacing.sm }}>
+                            <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 15 }}>Accounts</Text>
+                            <Text style={{ color: theme.colors.textTertiary, fontSize: 11 }}>Delete all accounts, recurring rules, and transactions</Text>
+                        </View>
+                        <Switch
+                            value={clearAccounts}
+                            onValueChange={setClearAccounts}
+                            trackColor={{ true: theme.colors.primary }}
+                        />
+                    </View>
+                </View>
+
+                <Text style={{ color: theme.colors.textTertiary, marginBottom: spacing.sm, fontSize: 14 }}>
+                    Type <Text style={{ fontWeight: '700', color: theme.colors.danger }}>delete my data</Text> to confirm:
                 </Text>
                 <Input
-                    value={clearPhrase}
-                    onChangeText={setClearPhrase}
-                    placeholder="Type DELETE"
+                    value={confirmText}
+                    onChangeText={setConfirmText}
+                    placeholder="delete my data"
                     autoCapitalize="none"
                 />
                 <Button
-                    title="Delete everything"
-                    onPress={handleClearAll}
-                    style={{ backgroundColor: theme.colors.danger, borderColor: theme.colors.danger }}
+                    title="Confirm Clear / Reset"
+                    onPress={handleClearData}
+                    variant="danger"
+                    style={{ marginTop: spacing.sm }}
                 />
             </SheetModal>
         </SafeAreaView>

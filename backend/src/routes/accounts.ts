@@ -13,11 +13,49 @@ const accountSchema = z.object({
     logo: z.string().optional()
 });
 
+export const syncAccountBalances = async (prisma: any, userId: string) => {
+    const accounts = await prisma.account.findMany({ where: { userId } });
+    for (const account of accounts) {
+        const incomeSum = await prisma.transaction.aggregate({
+            where: { accountId: account.id, type: 'income', userId },
+            _sum: { amount: true }
+        });
+        const expenseSum = await prisma.transaction.aggregate({
+            where: { accountId: account.id, type: 'expense', userId },
+            _sum: { amount: true }
+        });
+        const transferOutSum = await prisma.transaction.aggregate({
+            where: { accountId: account.id, type: 'transfer', userId },
+            _sum: { amount: true }
+        });
+        const transferInSum = await prisma.transaction.aggregate({
+            where: { transferToAccountId: account.id, type: 'transfer', userId },
+            _sum: { amount: true }
+        });
+
+        const income = incomeSum._sum.amount || 0;
+        const expense = expenseSum._sum.amount || 0;
+        const transferOut = transferOutSum._sum.amount || 0;
+        const transferIn = transferInSum._sum.amount || 0;
+
+        const computedBalance = account.initialBalance + income - expense - transferOut + transferIn;
+
+        if (account.balance !== computedBalance) {
+            await prisma.account.update({
+                where: { id: account.id },
+                data: { balance: computedBalance }
+            });
+        }
+    }
+};
+
 // GET /api/accounts - List all accounts
 router.get('/', async (req, res, next) => {
     try {
         const prisma = (req as any).prisma;
         const userId = (req as any).userId;
+
+        await syncAccountBalances(prisma, userId);
 
         const accounts = await prisma.account.findMany({
             where: { userId },

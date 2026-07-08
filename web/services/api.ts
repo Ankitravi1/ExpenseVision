@@ -130,6 +130,17 @@ export const api = {
         if (res.status === 204) return null;
         return res.json();
     },
+    clearData: async (data: { transactions: boolean; budgets: boolean; accounts: boolean }) => {
+        const res = await api.fetch('/profile/clear-data', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({}));
+            throw new Error(error.error || 'Failed to clear data');
+        }
+        return res.json();
+    },
 
     // Accounts
     getAccounts: async () => {

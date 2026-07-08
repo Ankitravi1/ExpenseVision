@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { decrypt } from './aiSettings.js';
+import { syncAccountBalances } from './accounts.js';
 
 const router = Router();
 
@@ -711,6 +712,9 @@ router.delete('/all', async (req, res, next) => {
             });
         });
 
+        const prisma = (req as any).prisma;
+        await syncAccountBalances(prisma, userId);
+
         res.status(204).send();
     } catch (error) {
         next(error);
@@ -772,6 +776,8 @@ router.delete('/:id', async (req, res, next) => {
                 where: { id }
             });
         });
+
+        await syncAccountBalances(prisma, userId);
 
         res.status(204).send();
     } catch (error) {
