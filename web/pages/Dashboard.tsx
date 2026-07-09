@@ -104,19 +104,35 @@ const TransactionRow: React.FC<{ transaction: Transaction }> = ({ transaction })
   }
 
   return (
-    <div className="flex items-center py-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-lg px-2 transition-colors -mx-2">
-      <div className={`w-10 h-10 rounded-full flex items-center justify-center mr-4 flex-shrink-0 ${iconBgClass}`}>
-        <Icon name={iconName} className={iconColorClass} size={18} />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="font-medium text-gray-900 dark:text-gray-100 truncate">{displayNote}</p>
-        <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-          <span>{account?.name}</span>
-          <span className="mx-1">•</span>
-          <span>{formatTransactionDate(transaction.date)}</span>
+    <div className="flex items-center justify-between py-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-lg px-2 transition-colors -mx-2">
+      <div className="flex items-center min-w-0 flex-1">
+        <div className={`w-10 h-10 rounded-full flex items-center justify-center mr-4 flex-shrink-0 ${iconBgClass}`}>
+          <Icon name={iconName} className={iconColorClass} size={18} />
+        </div>
+        <div className="min-w-0 flex-1 pr-4">
+          <p className="font-medium text-gray-900 dark:text-gray-100 truncate">{displayNote}</p>
+          <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+            <span className="sm:hidden">{account?.name} • </span>
+            <span>{formatTransactionDate(transaction.date)}</span>
+          </div>
         </div>
       </div>
-      <p className={`font-semibold whitespace-nowrap ${amountClass}`}>
+
+      {/* Badges in the middle to utilize the empty space beautifully */}
+      <div className="hidden sm:flex items-center gap-2 mr-8 flex-shrink-0">
+        {category && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-gray-100 dark:bg-gray-700/60 text-gray-600 dark:text-gray-300">
+            {category.name}
+          </span>
+        )}
+        {account && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-primary-light/50 text-primary dark:bg-primary/20 dark:text-indigo-300">
+            {account.name}
+          </span>
+        )}
+      </div>
+
+      <p className={`font-semibold whitespace-nowrap text-right ${amountClass}`}>
         {amountPrefix}{formatCurrency(transaction.amount, currency)}
       </p>
     </div>
@@ -267,18 +283,21 @@ export const Dashboard: React.FC = () => {
 
       {/* Merged Expense Distribution Layout (spans full 3 columns) */}
       <Card className="lg:col-span-3">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+        <div className="flex justify-between items-center gap-4 mb-6">
           <div className="flex flex-wrap items-center gap-3">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Expense Distribution</h3>
             <button
               onClick={() => setActivePage('Reports')}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-primary bg-primary-light hover:bg-primary hover:text-white dark:bg-primary/20 dark:text-indigo-300 dark:hover:bg-primary dark:hover:text-white rounded-full transition-all"
+              title="View Detailed Report"
             >
               <Icon name="PieChart" size={14} />
               <span>Detailed Report</span>
             </button>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-baseline flex-wrap">
+              <span>Expense Distribution</span>
+              <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 ml-1.5">(Monthly Category Breakdown)</span>
+            </h3>
           </div>
-          <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Monthly Category Breakdown</span>
         </div>
 
         {expenseByCategory.length === 0 ? (
@@ -336,7 +355,7 @@ export const Dashboard: React.FC = () => {
             </div>
 
             {/* Detailed Category List Column */}
-            <div className="lg:col-span-7 space-y-3 max-h-[320px] overflow-y-auto pr-1">
+            <div className="lg:col-span-7 space-y-3 max-h-[320px] overflow-y-auto pr-1 w-full max-w-xl mx-auto lg:ml-auto lg:mr-0">
               {expenseByCategory.map((cat, index) => {
                 const color = COLORS[cat.name as keyof typeof COLORS] || DEFAULT_COLORS[index % DEFAULT_COLORS.length];
                 const category = categories.find(c => c.name === cat.name);

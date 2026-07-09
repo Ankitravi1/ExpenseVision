@@ -36,7 +36,8 @@ export default function BudgetsScreen() {
             return { ...b, spent, carryover: 0, effectiveAmount: b.amount };
         });
     const monthlyBudgets = budgets.filter(b => b.month === activeMonth);
-    const filteredBudgets = [...monthlyBudgets, ...repeatingBudgets];
+    const filteredRepeating = repeatingBudgets.filter(rb => !monthlyBudgets.some(mb => mb.categoryId === rb.categoryId));
+    const filteredBudgets = [...monthlyBudgets, ...filteredRepeating];
 
     const budgetedCategoryIds = new Set(filteredBudgets.map(b => b.categoryId));
     const unbudgetedCategories = categories.filter(

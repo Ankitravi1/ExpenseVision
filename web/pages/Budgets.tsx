@@ -114,7 +114,9 @@ export const Budgets: React.FC = () => {
                 .reduce((sum, t) => sum + t.amount, 0);
             return { ...b, spent, carryover: 0, effectiveAmount: b.amount };
         });
-    const filteredBudgets = [...budgets.filter(b => b.month === currentMonthStr), ...repeatingBudgets];
+    const monthlyBudgets = budgets.filter(b => b.month === currentMonthStr);
+    const filteredRepeating = repeatingBudgets.filter(rb => !monthlyBudgets.some(mb => mb.categoryId === rb.categoryId));
+    const filteredBudgets = [...monthlyBudgets, ...filteredRepeating];
 
     const unbudgetedCategories = categories.filter(
         c => c.type === 'expense' && !filteredBudgets.some(b => b.categoryId === c.id)
