@@ -234,29 +234,9 @@ export const Dashboard: React.FC = () => {
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto">
-      {/* Header & Month Selector */}
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-        <div className="flex items-center gap-6">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
-            <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Overview of your financial health</p>
-          </div>
-          {/* Net Worth Card */}
-          <div className="hidden sm:block px-4 py-2 bg-gray-900 dark:bg-white rounded-xl shadow-lg transform hover:scale-105 transition-transform">
-            <p className="text-xs font-medium text-gray-400 dark:text-gray-600 uppercase tracking-wider">Net Worth</p>
-            <p className="text-lg font-bold text-white dark:text-gray-900">{formatCurrency(netWorth, currency)}</p>
-          </div>
-        </div>
-
-        {/* Mobile Net Worth (visible only on small screens) */}
-        <div className="sm:hidden w-full px-4 py-3 bg-gray-900 dark:bg-white rounded-xl shadow-lg mb-2">
-          <div className="flex justify-between items-center">
-            <p className="text-sm font-medium text-gray-400 dark:text-gray-600 uppercase tracking-wider">Net Worth</p>
-            <p className="text-xl font-bold text-white dark:text-gray-900">{formatCurrency(netWorth, currency)}</p>
-          </div>
-        </div>
-
-        <div className="flex items-center bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-1">
+      {/* Month Navigator Header (Minimalist) */}
+      <div className="flex justify-end items-center">
+        <div className="flex items-center bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-250 dark:border-gray-700 p-1">
           <button
             onClick={() => changeMonth(-1)}
             className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors"
@@ -278,118 +258,183 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats Cards (Total Expenses card swapped to first column) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <StatCard title="Total Income" amount={totalIncome} change={incomeChange} type="income" currency={currency} />
         <StatCard title="Total Expenses" amount={totalExpenses} change={expenseChange} type="expense" currency={currency} />
-        <StatCard title="Net Flow" amount={netFlow} change={netFlowChange} type="net" currency={currency} />
+        <StatCard title="Total Income" amount={totalIncome} change={incomeChange} type="income" currency={currency} />
+        <StatCard title="Balance (net flow)" amount={netFlow} change={netFlowChange} type="net" currency={currency} />
       </div>
 
-      {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Expense Distribution */}
-        <Card className="lg:col-span-1 flex flex-col">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Expense Distribution</h3>
-          <div className="flex-1 min-h-[300px] relative">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={expenseByCategory}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
-                  paddingAngle={5}
-                  dataKey="value"
-                  stroke="none"
-                >
-                  {expenseByCategory.map((entry, index) => (
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={COLORS[entry.name as keyof typeof COLORS] || DEFAULT_COLORS[index % DEFAULT_COLORS.length]}
-                    />
-                  ))}
-                </Pie>
-                <Tooltip
-                  formatter={(value: number) => formatCurrency(value, currency)}
-                  contentStyle={{
-                    backgroundColor: 'rgba(31, 41, 55, 0.95)',
-                    border: 'none',
-                    borderRadius: '12px',
-                    color: '#fff',
-                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                  }}
-                  itemStyle={{ color: '#fff' }}
-                />
-                <Legend
-                  verticalAlign="bottom"
-                  height={36}
-                  iconType="circle"
-                  iconSize={8}
-                  wrapperStyle={{ fontSize: '12px', paddingTop: '20px' }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-12">
-              <span className="text-2xl font-bold text-gray-900 dark:text-white">
-                {formatCurrency(totalExpenses, currency)}
-              </span>
-              <span className="text-xs text-gray-500 dark:text-gray-400">Total</span>
+      {/* Merged Expense Distribution Layout (spans full 3 columns) */}
+      <Card className="lg:col-span-3">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+          <div className="flex flex-wrap items-center gap-3">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Expense Distribution</h3>
+            <button
+              onClick={() => setActivePage('Reports')}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-primary bg-primary-light hover:bg-primary hover:text-white dark:bg-primary/20 dark:text-indigo-300 dark:hover:bg-primary dark:hover:text-white rounded-full transition-all"
+            >
+              <Icon name="PieChart" size={14} />
+              <span>Detailed Report</span>
+            </button>
+          </div>
+          <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Monthly Category Breakdown</span>
+        </div>
+
+        {expenseByCategory.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-400 dark:text-gray-500 mb-3">
+              <Icon name="Tags" size={24} />
+            </div>
+            <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">No expenses recorded for this month.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+            {/* Pie Chart Column */}
+            <div className="lg:col-span-5 h-[320px] relative">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={expenseByCategory}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={70}
+                    outerRadius={105}
+                    paddingAngle={3}
+                    dataKey="value"
+                    stroke="none"
+                  >
+                    {expenseByCategory.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={COLORS[entry.name as keyof typeof COLORS] || DEFAULT_COLORS[index % DEFAULT_COLORS.length]}
+                      />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(value: number) => {
+                      const percentage = totalExpenses > 0 ? ((value / totalExpenses) * 100).toFixed(1) : '0';
+                      return [`${formatCurrency(value, currency)} (${percentage}%)`, 'Spent'];
+                    }}
+                    contentStyle={{
+                      backgroundColor: 'rgba(31, 41, 55, 0.95)',
+                      border: 'none',
+                      borderRadius: '12px',
+                      color: '#fff',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                    }}
+                    itemStyle={{ color: '#fff' }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-2xl font-black text-gray-900 dark:text-white leading-none">
+                  {formatCurrency(totalExpenses, currency)}
+                </span>
+                <span className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mt-1.5">Total Spent</span>
+              </div>
+            </div>
+
+            {/* Detailed Category List Column */}
+            <div className="lg:col-span-7 space-y-3 max-h-[320px] overflow-y-auto pr-1">
+              {expenseByCategory.map((cat, index) => {
+                const color = COLORS[cat.name as keyof typeof COLORS] || DEFAULT_COLORS[index % DEFAULT_COLORS.length];
+                const category = categories.find(c => c.name === cat.name);
+                const icon = category?.icon || 'Tags';
+                const percentage = totalExpenses > 0 ? ((cat.value / totalExpenses) * 100).toFixed(1) : '0';
+
+                return (
+                  <div key={cat.name} className="flex items-center justify-between p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold" style={{ color: color, backgroundColor: `${color}15` }}>
+                        <Icon name={icon} size={18} />
+                      </div>
+                      <span className="font-semibold text-sm text-gray-800 dark:text-gray-200">{cat.name}</span>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-150 dark:bg-gray-800 px-2 py-1 rounded-md">
+                        {percentage}%
+                      </span>
+                      <span className="font-bold text-sm text-gray-900 dark:text-white">
+                        {formatCurrency(cat.value, currency)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
+        )}
+      </Card>
+
+      {/* Bottom Grid layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Recent Transactions */}
+        <Card className="lg:col-span-2 flex flex-col">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Recent Transactions</h3>
+            <button
+              onClick={() => setActivePage('Transactions')}
+              className="text-sm font-semibold text-primary hover:text-primary-600 transition-colors"
+            >
+              View All
+            </button>
+          </div>
+          <div className="divide-y divide-gray-100 dark:divide-gray-800 flex-1">
+            {recentTransactions.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full py-8 text-center">
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">No transactions recorded yet.</p>
+              </div>
+            ) : (
+              recentTransactions.map(t => <TransactionRow key={t.id} transaction={t} />)
+            )}
+          </div>
         </Card>
 
-        {/* Top Spending Categories */}
-        <Card className="lg:col-span-2">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Top Spending Categories</h3>
-          <div className="space-y-6">
-            {topSpendingCategories.map((cat, index) => {
-              const color = COLORS[cat.name as keyof typeof COLORS] || DEFAULT_COLORS[index % DEFAULT_COLORS.length];
-              const category = categories.find(c => c.name === cat.name);
-              const icon = category?.icon || 'Tags';
-
-              return (
-                <div key={cat.name} className="group">
-                  <div className="flex items-center justify-between mb-2">
+        {/* Accounts Overview Summary */}
+        <Card className="flex flex-col">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Accounts Summary</h3>
+            <button
+              onClick={() => setActivePage('Accounts')}
+              className="text-sm font-semibold text-primary hover:underline transition-colors"
+            >
+              Manage
+            </button>
+          </div>
+          <div className="space-y-4 flex-1">
+            {accounts.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full py-8 text-center">
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">No accounts created yet.</p>
+              </div>
+            ) : (
+              accounts.map(acc => {
+                let accIcon = 'Wallet';
+                if (acc.type.toLowerCase().includes('savings') || acc.type.toLowerCase().includes('piggy')) accIcon = 'PiggyBank';
+                else if (acc.type.toLowerCase().includes('credit')) accIcon = 'CreditCard';
+                else if (acc.type.toLowerCase().includes('bank') || acc.type.toLowerCase().includes('checking')) accIcon = 'Landmark';
+                
+                return (
+                  <div key={acc.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50/50 dark:bg-gray-800/20 border border-gray-100 dark:border-gray-850/40">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 group-hover:bg-opacity-80 transition-colors" style={{ color: color, backgroundColor: `${color}20` }}>
-                        <Icon name={icon} size={16} />
+                      <div className="w-8 h-8 rounded-lg bg-primary-light dark:bg-primary/10 flex items-center justify-center text-primary dark:text-indigo-300">
+                        <Icon name={acc.icon || accIcon} size={16} />
                       </div>
-                      <span className="font-medium text-gray-700 dark:text-gray-200">{cat.name}</span>
+                      <div>
+                        <p className="font-semibold text-xs text-gray-800 dark:text-gray-200">{acc.name}</p>
+                        <p className="text-[10px] text-gray-500 dark:text-gray-400">{acc.type}</p>
+                      </div>
                     </div>
-                    <span className="font-semibold text-gray-900 dark:text-white">{formatCurrency(cat.value, currency)}</span>
+                    <span className={`font-bold text-xs ${acc.balance < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-gray-900 dark:text-white'}`}>
+                      {formatCurrency(acc.balance, currency)}
+                    </span>
                   </div>
-                  <div className="w-full bg-gray-100 rounded-full h-2 dark:bg-gray-700 overflow-hidden">
-                    <div
-                      className="h-2 rounded-full transition-all duration-500 ease-out"
-                      style={{
-                        width: `${totalExpenses > 0 ? (cat.value / totalExpenses) * 100 : 0}%`,
-                        backgroundColor: color
-                      }}>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
+                );
+              })
+            )}
           </div>
         </Card>
       </div>
-
-      {/* Recent Transactions */}
-      <Card>
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Recent Transactions</h3>
-          <button
-            onClick={() => setActivePage('Transactions')}
-            className="text-sm font-medium text-primary hover:text-primary-600 transition-colors"
-          >
-            View All
-          </button>
-        </div>
-        <div className="divide-y divide-gray-100 dark:divide-gray-800">
-          {recentTransactions.map(t => <TransactionRow key={t.id} transaction={t} />)}
-        </div>
-      </Card>
     </div>
   );
 };
