@@ -1,18 +1,18 @@
-import React, { useMemo, useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, DeviceEventEmitter } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { Card, EmptyState } from '../../components/ui';
 import { CategoryIcon } from '../../components/CategoryIcon';
 import { TransactionForm } from '../../components/TransactionForm';
+import { ScreenHeader } from '../../components/ScreenHeader';
 import { formatCurrency } from '../../utils/currency';
 import { isoDateToDisplay } from '../../utils/date';
 import { spacing, radius } from '../../theme';
-import { apiFetch } from '../../services/api';
 
 const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 
@@ -23,29 +23,6 @@ export default function DashboardScreen() {
     const navigation = useNavigation();
     const [showForm, setShowForm] = useState(false);
     const currency = user?.currency || 'INR';
-    const [unreadCount, setUnreadCount] = useState(0);
-
-    const fetchUnreadCount = () => {
-        apiFetch('/notifications')
-            .then(r => r.ok ? r.json() : [])
-            .then((list: any[]) => setUnreadCount(list.filter((n: any) => !n.read).length))
-            .catch(() => {});
-    };
-
-    useFocusEffect(
-        React.useCallback(() => {
-            fetchUnreadCount();
-        }, [])
-    );
-
-    useEffect(() => {
-        const sub = DeviceEventEmitter.addListener('transaction-created', fetchUnreadCount);
-        return () => sub.remove();
-    }, []);
-
-    const openDrawer = () => {
-        (navigation as any).openDrawer?.();
-    };
 
     const { netWorth, monthIncome, monthExpense, recent, sixMonths } = useMemo(() => {
         const netWorth = accounts.reduce((sum, a) => sum + a.balance, 0);
@@ -84,42 +61,11 @@ export default function DashboardScreen() {
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top']}>
+            <ScreenHeader title="Dashboard" />
             <ScrollView
                 contentContainerStyle={styles.container}
                 refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refresh} tintColor={theme.colors.primary} />}
             >
-                <View style={styles.headerRow}>
-                    <TouchableOpacity
-                        onPress={openDrawer}
-                        style={styles.drawerToggle}
-                        hitSlop={{ top: 12, bottom: 12, left: 8, right: 12 }}
-                    >
-                        <MaterialCommunityIcons name="menu" size={26} color={theme.colors.text} />
-                    </TouchableOpacity>
-                    <View style={styles.headerCenter}>
-                        <Text style={[styles.greeting, { color: theme.colors.textSecondary }]}>Hi {user?.name?.split(' ')[0] || 'there'} 👋</Text>
-                        <Text style={[styles.title, { color: theme.colors.text }]}>Dashboard</Text>
-                    </View>
-                    <View style={styles.headerRight}>
-                        <TouchableOpacity
-                            onPress={() => (navigation as any).navigate('Notifications')}
-                            style={[styles.iconButton, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder, borderWidth: 1, marginRight: spacing.sm }]}
-                        >
-                            <MaterialCommunityIcons name="bell-outline" size={22} color={theme.colors.textSecondary} />
-                            {unreadCount > 0 && (
-                                <View style={styles.badge}>
-                                    <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
-                                </View>
-                            )}
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            onPress={() => (navigation as any).navigate('Reports')}
-                            style={[styles.iconButton, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder, borderWidth: 1 }]}
-                        >
-                            <MaterialCommunityIcons name="chart-pie" size={22} color={theme.colors.textSecondary} />
-                        </TouchableOpacity>
-                    </View>
-                </View>
 
                 {/* Net worth */}
                 <Card style={{ marginBottom: spacing.md }}>

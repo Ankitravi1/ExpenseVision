@@ -124,7 +124,7 @@ app.use(errorHandler);
 
 app.listen(PORT, () => {
     console.log(`✅ ExpenseVision API server running on http://localhost:${PORT}`);
-    console.log(`📊 Database: SQLite (${process.env.DATABASE_URL})`);
+    console.log(`📊 Database: PostgreSQL (${process.env.DATABASE_URL})`);
 });
 
 // Graceful shutdown

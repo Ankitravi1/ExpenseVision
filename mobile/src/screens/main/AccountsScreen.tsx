@@ -8,6 +8,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useNavigation } from '@react-navigation/native';
 import { EmptyState, Card, SheetModal } from '../../components/ui';
 import { AccountForm } from '../../components/AccountForm';
+import { ScreenHeader } from '../../components/ScreenHeader';
 import { formatCurrency } from '../../utils/currency';
 import { spacing, radius } from '../../theme';
 import { Account } from '../../types';
@@ -215,27 +216,7 @@ export default function AccountsScreen() {
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top']}>
-            <View style={styles.header}>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <TouchableOpacity
-                        onPress={() => (navigation as any).openDrawer?.()}
-                        style={{ marginRight: 12, padding: 4 }}
-                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                    >
-                        <MaterialCommunityIcons name="menu" size={26} color={theme.colors.text} />
-                    </TouchableOpacity>
-                    <Text style={[styles.title, { color: theme.colors.text }]}>Accounts</Text>
-                </View>
-                <TouchableOpacity
-                    onPress={() => {
-                        setEditing(null);
-                        setShowForm(true);
-                    }}
-                    style={[styles.addButton, { backgroundColor: theme.colors.primary }]}
-                >
-                    <MaterialCommunityIcons name="plus" size={24} color="#fff" />
-                </TouchableOpacity>
-            </View>
+            <ScreenHeader title="Accounts" />
 
             {/* Combined Stats Card */}
             <View style={{ paddingHorizontal: spacing.md, marginBottom: spacing.md }}>
@@ -317,6 +298,31 @@ export default function AccountsScreen() {
             >
                 {renderAccountDetails()}
             </SheetModal>
+
+            <TouchableOpacity
+                onPress={() => {
+                    setEditing(null);
+                    setShowForm(true);
+                }}
+                style={{
+                    backgroundColor: theme.colors.primary,
+                    position: 'absolute',
+                    bottom: spacing.lg,
+                    right: spacing.lg,
+                    width: 56,
+                    height: 56,
+                    borderRadius: 28,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    elevation: 5,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.25,
+                    shadowRadius: 3.84,
+                }}
+            >
+                <MaterialCommunityIcons name="plus" size={28} color="#fff" />
+            </TouchableOpacity>
         </SafeAreaView>
     );
 }

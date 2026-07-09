@@ -367,6 +367,65 @@ export const DateField: React.FC<{
     );
 };
 
+export const TimeField: React.FC<{
+    label?: string;
+    value: string; // HH:mm
+    onChange: (time: string) => void;
+    disabled?: boolean;
+}> = ({ label, value, onChange, disabled }) => {
+    const { theme } = useTheme();
+    const [open, setOpen] = useState(false);
+
+    const parsed = (() => {
+        const [h, m] = value.split(':').map(Number);
+        const date = new Date();
+        date.setHours(h || 0);
+        date.setMinutes(m || 0);
+        return date;
+    })();
+
+    return (
+        <View style={{ marginBottom: spacing.md }}>
+            {label ? <FieldLabel>{label}</FieldLabel> : null}
+            <TouchableOpacity
+                onPress={() => {
+                    if (disabled) return;
+                    Keyboard.dismiss();
+                    lightHaptic();
+                    setOpen(true);
+                }}
+                activeOpacity={0.7}
+                style={[
+                    styles.pickerField,
+                    {
+                        backgroundColor: theme.colors.inputBg,
+                        borderColor: theme.colors.inputBorder,
+                        opacity: disabled ? 0.6 : 1,
+                    },
+                ]}
+            >
+                <Text style={{ color: theme.colors.text, fontSize: 16 }}>{value}</Text>
+                <MaterialCommunityIcons name="clock-outline" size={20} color={theme.colors.textTertiary} />
+            </TouchableOpacity>
+            {open ? (
+                <DateTimePicker
+                    value={parsed}
+                    mode="time"
+                    display="default"
+                    is24Hour={true}
+                    onChange={(event, date) => {
+                        setOpen(false);
+                        if (event.type === 'set' && date) {
+                            const timeStr = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+                            onChange(timeStr);
+                        }
+                    }}
+                />
+            ) : null}
+        </View>
+    );
+};
+
 const styles = StyleSheet.create({
     button: {
         paddingVertical: 14,

@@ -35,9 +35,8 @@ export default function RecurringScreen() {
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top']}>
+            <ScreenHeader title="Recurring" />
             <ScrollView contentContainerStyle={{ padding: spacing.md }}>
-                <ScreenHeader title="Recurring" subtitle={`${recurring.length} rules`} />
-
                 <Button
                     title="+ New Recurring"
                     variant="secondary"

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Alert, Switch, Text, View } from 'react-native';
-import { SheetModal, Input, Button, FieldLabel, OptionSheet, successHaptic } from './ui';
+import { SheetModal, Input, Button, FieldLabel, OptionSheet, ChipSelector, successHaptic } from './ui';
 import { useData } from '../context/DataContext';
 import { useTheme } from '../context/ThemeContext';
 import { spacing } from '../theme';
@@ -11,15 +11,17 @@ interface Props {
     onClose: () => void;
     editing?: Budget | null;
     preSelectedCategoryId?: string | null;
+    month?: string | null;
 }
 
-export const BudgetForm: React.FC<Props> = ({ visible, onClose, editing, preSelectedCategoryId }) => {
+export const BudgetForm: React.FC<Props> = ({ visible, onClose, editing, preSelectedCategoryId, month }) => {
     const { categories, setBudget, budgets } = useData();
     const { theme } = useTheme();
     const [categoryId, setCategoryId] = useState<string | null>(null);
     const [amount, setAmount] = useState('');
     const [rollover, setRollover] = useState(false);
-    const [threshold, setThreshold] = useState('90');
+    const [threshold, setThreshold] = useState('80');
+    const [isRecurring, setIsRecurring] = useState(true);
     const [saving, setSaving] = useState(false);
 
     const budgetedCategoryIds = new Set(budgets.map(b => b.categoryId));
@@ -30,7 +32,8 @@ export const BudgetForm: React.FC<Props> = ({ visible, onClose, editing, preSele
             setCategoryId(editing?.categoryId || preSelectedCategoryId || null);
             setAmount(editing ? String(editing.amount) : '');
             setRollover(editing?.rollover ?? false);
-            setThreshold(String(editing?.alertThreshold ?? 90));
+            setThreshold(String(editing?.alertThreshold ?? 80));
+            setIsRecurring(editing ? !editing.month : true);
         }
     }, [visible, editing, preSelectedCategoryId]);
 
@@ -46,11 +49,13 @@ export const BudgetForm: React.FC<Props> = ({ visible, onClose, editing, preSele
         setSaving(true);
         try {
             await setBudget({
+                id: editing?.id || '',
                 categoryId,
                 amount: value,
-                month: editing?.month ?? null,
+                month: isRecurring ? null : (editing?.month || month || new Date().toISOString().substring(0, 7)),
                 rollover,
                 alertThreshold: thresholdValue,
+                spent: editing?.spent ?? 0,
             });
             successHaptic();
             onClose();
@@ -75,6 +80,17 @@ export const BudgetForm: React.FC<Props> = ({ visible, onClose, editing, preSele
                 />
             )}
             <Input label="Monthly limit" value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="0.00" />
+            
+            <FieldLabel>Apply to</FieldLabel>
+            <ChipSelector
+                options={[
+                    { value: 'recurring', label: 'All months (Recurring)' },
+                    { value: 'this-month', label: 'This month only' },
+                ]}
+                value={isRecurring ? 'recurring' : 'this-month'}
+                onChange={(v: string) => setIsRecurring(v === 'recurring')}
+            />
+
             <Input
                 label="Alert at % of budget"
                 value={threshold}

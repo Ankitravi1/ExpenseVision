@@ -72,9 +72,19 @@ const AccountDetailsModal: React.FC<AccountDetailsModalProps> = ({
                                 </div>
                                 {account.name}
                             </h3>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                {account.type} • Balance: <span className="font-semibold">{formatCurrency(account.balance, currency)}</span>
-                            </p>
+                            <div className="flex items-baseline gap-4 mt-2">
+                                <span className="text-xs text-gray-500 dark:text-gray-400 font-medium capitalize">
+                                    {account.type}
+                                </span>
+                                <div className="flex items-baseline gap-2">
+                                    <span className="text-xs text-gray-400 dark:text-gray-500">Current:</span>
+                                    <span className="text-xl font-extrabold text-primary dark:text-indigo-400">{formatCurrency(account.balance, currency)}</span>
+                                </div>
+                                <div className="flex items-baseline gap-2 border-l border-gray-200 dark:border-gray-700 pl-3">
+                                    <span className="text-xs text-gray-400 dark:text-gray-500">Initial:</span>
+                                    <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">{formatCurrency(account.initialBalance ?? 0, currency)}</span>
+                                </div>
+                            </div>
                         </div>
                         <button onClick={onClose} className="p-1.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
                             <Icon name="X" size={20} />

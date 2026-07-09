@@ -91,8 +91,9 @@ export const TransactionsPage: React.FC = () => {
 
     const [startDate, setStartDate] = useState(isoDateToDisplay(getLocalDateString(firstDayOfMonth)));
     const [endDate, setEndDate] = useState(isoDateToDisplay(getLocalDateString(today)));
-    const [viewMode, setViewMode] = useState<string>('monthly');
-    const [carryOver, setCarryOver] = useState<boolean>(false);
+    const [viewMode, setViewMode] = useState<string>('Monthly');
+    const [carryOver, setCarryOver] = useState<boolean>(true);
+    const [isFilterCollapsed, setIsFilterCollapsed] = useState(true);
     const [sortConfig, setSortConfig] = useState<{ key: keyof Transaction | 'accountName'; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
 
     const updateDatesForViewMode = (mode: string) => {
@@ -101,7 +102,7 @@ export const TransactionsPage: React.FC = () => {
         let end: Date;
 
         switch (mode) {
-            case 'DAILY':
+            case 'Daily':
                 start = now;
                 end = now;
                 break;
@@ -112,11 +113,11 @@ export const TransactionsPage: React.FC = () => {
                 end = new Date(now.getFullYear(), now.getMonth(), diffToMonday + 6);
                 break;
             }
-            case 'monthly':
+            case 'Monthly':
                 start = new Date(now.getFullYear(), now.getMonth(), 1);
                 end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
                 break;
-            case '3 month':
+            case '3 Month':
                 start = new Date(now.getFullYear(), now.getMonth() - 3, 1);
                 end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
                 break;
@@ -244,7 +245,7 @@ export const TransactionsPage: React.FC = () => {
                 <div className="flex flex-wrap justify-between items-center mb-4 gap-4">
                     <h2 className="text-2xl font-bold text-gray-darkest dark:text-gray-50">All Transactions</h2>
                     <div className="flex items-center gap-3 flex-wrap">
-                        <div className="flex items-center gap-2 flex-wrap">
+                        <div className="flex items-center gap-2">
                             <label htmlFor="view-mode" className="text-sm font-medium text-gray-medium dark:text-gray-400">View</label>
                             <select
                                 id="view-mode"
@@ -254,49 +255,73 @@ export const TransactionsPage: React.FC = () => {
                                     setViewMode(mode);
                                     updateDatesForViewMode(mode);
                                 }}
-                                className="input text-sm py-1 px-2.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-200 cursor-pointer"
+                                className="input text-sm py-1 px-2.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-200 cursor-pointer outline-none focus:ring-1 focus:ring-primary"
                             >
-                                <option value="DAILY">DAILY</option>
+                                <option value="Daily">Daily</option>
                                 <option value="Weekly">Weekly</option>
-                                <option value="monthly">monthly</option>
-                                <option value="3 month">3 month</option>
+                                <option value="Monthly">Monthly</option>
+                                <option value="3 Month">3 Month</option>
                                 <option value="Yearly">Yearly</option>
                             </select>
+                        </div>
 
-                            <label htmlFor="start-date" className="text-sm font-medium text-gray-medium dark:text-gray-400">From</label>
-                            <input
-                                type="text"
-                                id="start-date"
-                                value={startDate}
-                                onChange={e => setStartDate(e.target.value)}
-                                placeholder="DD-MM-YYYY"
-                                inputMode="numeric"
-                                className="input text-sm w-28"
-                            />
-                            <label htmlFor="end-date" className="text-sm font-medium text-gray-medium dark:text-gray-400">To</label>
-                            <input
-                                type="text"
-                                id="end-date"
-                                value={endDate}
-                                onChange={e => setEndDate(e.target.value)}
-                                placeholder="DD-MM-YYYY"
-                                inputMode="numeric"
-                                className="input text-sm w-28"
-                            />
+                        <button
+                            onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
+                            className="btn btn-secondary flex items-center gap-1.5 py-1.5 px-3.5 text-sm"
+                        >
+                            <Icon name="SlidersHorizontal" size={16} />
+                            <span>{isFilterCollapsed ? 'Show Filters' : 'Hide Filters'}</span>
+                        </button>
 
-                            <label className="flex items-center gap-1.5 cursor-pointer text-sm font-medium text-gray-medium dark:text-gray-400 ml-1 select-none">
+                        <ExportButton />
+                    </div>
+                </div>
+
+                {!isFilterCollapsed && (
+                    <div className="p-4 mb-6 bg-gray-50 dark:bg-gray-800/40 rounded-xl border border-gray-150 dark:border-gray-700 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div className="flex items-center gap-3 flex-wrap">
+                            <div className="flex items-center gap-2">
+                                <label htmlFor="start-date" className="text-sm font-medium text-gray-medium dark:text-gray-400">From</label>
+                                <input
+                                    type="text"
+                                    id="start-date"
+                                    value={startDate}
+                                    onChange={e => setStartDate(e.target.value)}
+                                    placeholder="DD-MM-YYYY"
+                                    inputMode="numeric"
+                                    className="input text-sm w-28 bg-white dark:bg-gray-700"
+                                />
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <label htmlFor="end-date" className="text-sm font-medium text-gray-medium dark:text-gray-400">To</label>
+                                <input
+                                    type="text"
+                                    id="end-date"
+                                    value={endDate}
+                                    onChange={e => setEndDate(e.target.value)}
+                                    placeholder="DD-MM-YYYY"
+                                    inputMode="numeric"
+                                    className="input text-sm w-28 bg-white dark:bg-gray-700"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col gap-1 max-w-md">
+                            <label className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-gray-700 dark:text-gray-200 select-none">
                                 <input
                                     type="checkbox"
                                     checked={carryOver}
                                     onChange={e => setCarryOver(e.target.checked)}
                                     className="w-4 h-4 rounded text-primary focus:ring-primary border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 cursor-pointer"
                                 />
-                                <span>Carry Over</span>
+                                <span>Carry Over Balance</span>
                             </label>
+                            <span className="text-[11px] text-gray-400 dark:text-gray-500">
+                                Factors in the cumulative net balance prior to the start date plus initial balances of all accounts.
+                            </span>
                         </div>
-                        <ExportButton />
                     </div>
-                </div>
+                )}
 
                 {/* Stylized summary bar */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 p-4 bg-gray-50 dark:bg-gray-800/50 border border-gray-150 dark:border-gray-700 rounded-xl">

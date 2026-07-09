@@ -6,6 +6,7 @@ const router = Router();
 
 // Validation schema
 const budgetSchema = z.object({
+    id: z.string().optional(),
     categoryId: z.string(),
     amount: z.number().positive(),
     month: z.string().nullish(),
@@ -33,6 +34,18 @@ router.post('/', async (req, res, next) => {
         const data = budgetSchema.parse(req.body);
 
         const month = data.month || "";
+
+        if (data.id) {
+            const existing = await prisma.budget.findFirst({
+                where: { id: data.id, userId }
+            });
+            if (existing && existing.month !== month) {
+                // Delete old budget since the month has changed, to avoid duplicate category rows
+                await prisma.budget.delete({
+                    where: { id: data.id }
+                });
+            }
+        }
 
         const fields = {
             amount: data.amount,

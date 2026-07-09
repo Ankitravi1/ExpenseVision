@@ -31,9 +31,8 @@ export default function CategoriesScreen() {
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top']}>
+            <ScreenHeader title="Categories" />
             <ScrollView contentContainerStyle={{ padding: spacing.md }}>
-                <ScreenHeader title="Categories" subtitle={`${categories.length} total`} />
-
                 <Button
                     title="+ New Category"
                     variant="secondary"

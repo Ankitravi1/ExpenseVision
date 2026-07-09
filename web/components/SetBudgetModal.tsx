@@ -17,12 +17,14 @@ export const SetBudgetModal: React.FC<SetBudgetModalProps> = ({ isOpen, onClose,
     const [amount, setAmount] = useState('');
     const [categoryId, setCategoryId] = useState('');
     const [rollover, setRollover] = useState(false);
-    const [alertThreshold, setAlertThreshold] = useState('90');
+    const [alertThreshold, setAlertThreshold] = useState('80');
+    const [isRecurring, setIsRecurring] = useState(true);
 
-    const applyBudgetFields = (budget?: { amount: number; rollover?: boolean; alertThreshold?: number }) => {
+    const applyBudgetFields = (budget?: { amount: number; rollover?: boolean; alertThreshold?: number; month?: string | null }) => {
         setAmount(budget ? budget.amount.toString() : '');
         setRollover(budget?.rollover ?? false);
-        setAlertThreshold(String(budget?.alertThreshold ?? 90));
+        setAlertThreshold(String(budget?.alertThreshold ?? 80));
+        setIsRecurring(budget ? !budget.month : true);
     };
 
     useEffect(() => {
@@ -94,9 +96,9 @@ export const SetBudgetModal: React.FC<SetBudgetModalProps> = ({ isOpen, onClose,
         const budgetPayload = {
             categoryId: effectiveCategoryId,
             amount: parseFloat(amount),
-            month: existingBudget?.month === "" ? "" : (month || undefined), // If existing budget is recurring, keep it recurring
+            month: isRecurring ? "" : (month || ""),
             rollover,
-            alertThreshold: threshold >= 1 && threshold <= 500 ? threshold : 90,
+            alertThreshold: threshold >= 1 && threshold <= 500 ? threshold : 80,
         };
 
         setBudget({
@@ -170,6 +172,32 @@ export const SetBudgetModal: React.FC<SetBudgetModalProps> = ({ isOpen, onClose,
                                     className={`${inputStyles} pl-8`}
                                     required
                                 />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className={labelStyles}>Apply to</label>
+                            <div className="flex gap-4 mt-2">
+                                <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    <input
+                                        type="radio"
+                                        name="budget_period"
+                                        checked={isRecurring}
+                                        onChange={() => setIsRecurring(true)}
+                                        className="h-4 w-4 text-primary focus:ring-primary"
+                                    />
+                                    <span>All months (Recurring)</span>
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    <input
+                                        type="radio"
+                                        name="budget_period"
+                                        checked={!isRecurring}
+                                        onChange={() => setIsRecurring(false)}
+                                        className="h-4 w-4 text-primary focus:ring-primary"
+                                    />
+                                    <span>This month only</span>
+                                </label>
                             </div>
                         </div>
 

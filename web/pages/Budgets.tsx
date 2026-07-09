@@ -37,7 +37,8 @@ const BudgetCard: React.FC<{ budget: Budget; onEdit: () => void }> = ({ budget, 
 
     const limit = budget.effectiveAmount ?? budget.amount;
     const percentage = limit > 0 ? (budget.spent / limit) * 100 : 100;
-    const progressBarColor = percentage > 100 ? 'bg-danger' : percentage > 75 ? 'bg-warning' : 'bg-success';
+    const threshold = budget.alertThreshold ?? 80;
+    const progressBarColor = percentage > 100 ? 'bg-danger' : percentage >= threshold ? 'bg-warning' : 'bg-success';
     const remaining = limit - budget.spent;
     const carryover = budget.rollover ? (budget.carryover ?? 0) : 0;
 

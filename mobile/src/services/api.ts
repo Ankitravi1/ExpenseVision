@@ -77,6 +77,7 @@ export const api = {
         amount: number;
         note: string;
         date: string;
+        time?: string;
         accountId: string;
         categoryId: string;
         transferToAccountId: string;
@@ -142,7 +143,7 @@ export const api = {
 
     // Budgets
     getBudgets: async (): Promise<Budget[]> => json(await apiFetch('/budgets'), 'Failed to load budgets'),
-    setBudget: async (data: { categoryId: string; amount: number; month?: string | null; rollover?: boolean; alertThreshold?: number }): Promise<Budget> =>
+    setBudget: async (data: { id?: string; categoryId: string; amount: number; month?: string | null; rollover?: boolean; alertThreshold?: number; spent?: number }): Promise<Budget> =>
         json(await apiFetch('/budgets', { method: 'POST', body: JSON.stringify(data) }), 'Failed to set budget'),
     deleteBudget: async (id: string): Promise<void> =>
         json(await apiFetch(`/budgets/${id}`, { method: 'DELETE' }), 'Failed to delete budget'),

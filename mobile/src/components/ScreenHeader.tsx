@@ -1,69 +1,156 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { DrawerActions, useNavigation } from '@react-navigation/native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, DeviceEventEmitter } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useData } from '../context/DataContext';
+import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { formatCurrency } from '../utils/currency';
+import { apiFetch } from '../services/api';
 import { spacing } from '../theme';
 
-interface Props {
+interface ScreenHeaderProps {
     title: string;
-    subtitle?: string;
-    right?: React.ReactNode;
 }
 
-export const ScreenHeader: React.FC<Props> = ({ title, subtitle, right }) => {
+export const ScreenHeader: React.FC<ScreenHeaderProps> = ({ title }) => {
     const navigation = useNavigation();
     const { theme } = useTheme();
+    const { accounts } = useData();
+    const { user } = useAuth();
+    const [unreadCount, setUnreadCount] = useState(0);
 
-    const openDrawer = () => {
-        navigation.dispatch(DrawerActions.openDrawer());
+    const currency = user?.currency || 'INR';
+    const netWorth = accounts.reduce((sum, a) => sum + a.balance, 0);
+
+    const fetchUnreadCount = () => {
+        apiFetch('/notifications')
+            .then(r => r.ok ? r.json() : [])
+            .then((list: any[]) => setUnreadCount(list.filter((n: any) => !n.read).length))
+            .catch(() => {});
     };
 
+    useFocusEffect(
+        React.useCallback(() => {
+            fetchUnreadCount();
+        }, [])
+    );
+
+    useEffect(() => {
+        const sub = DeviceEventEmitter.addListener('transaction-created', fetchUnreadCount);
+        return () => sub.remove();
+    }, []);
+
     return (
-        <View style={styles.row}>
-            <TouchableOpacity
-                onPress={openDrawer}
-                style={styles.drawerToggle}
-                hitSlop={{ top: 12, bottom: 12, left: 8, right: 12 }}
-            >
-                <MaterialCommunityIcons name="menu" size={26} color={theme.colors.text} />
-            </TouchableOpacity>
-            <View style={styles.center}>
-                {subtitle ? (
-                    <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>{subtitle}</Text>
-                ) : null}
-                <Text style={[styles.title, { color: theme.colors.text }]}>{title}</Text>
+        <View style={[styles.container, { backgroundColor: theme.colors.card, borderBottomColor: theme.colors.cardBorder }]}>
+            <View style={styles.left}>
+                <TouchableOpacity
+                    onPress={() => (navigation as any).openDrawer?.()}
+                    style={styles.iconButton}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                >
+                    <MaterialCommunityIcons name="menu" size={24} color={theme.colors.text} />
+                </TouchableOpacity>
+                <Text style={[styles.title, { color: theme.colors.text }]} numberOfLines={1}>{title}</Text>
             </View>
-            <View style={styles.right}>{right ?? <View style={styles.rightPlaceholder} />}</View>
+
+            <View style={styles.right}>
+                <View style={styles.netWorthContainer}>
+                    <Text style={[styles.netWorthLabel, { color: theme.colors.textTertiary }]}>NET WORTH</Text>
+                    <Text style={[styles.netWorthValue, { color: theme.colors.primary }]} numberOfLines={1}>
+                        {formatCurrency(netWorth, currency)}
+                    </Text>
+                </View>
+
+                {/* Reports Icon */}
+                <TouchableOpacity
+                    onPress={() => navigation.navigate('Reports' as never)}
+                    style={styles.iconButton}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                >
+                    <MaterialCommunityIcons name="chart-pie" size={22} color={theme.colors.textSecondary} />
+                </TouchableOpacity>
+
+                {/* Notifications Bell */}
+                <TouchableOpacity
+                    onPress={() => navigation.navigate('Notifications' as never)}
+                    style={styles.bellButton}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                >
+                    <MaterialCommunityIcons name="bell-outline" size={22} color={theme.colors.textSecondary} />
+                    {unreadCount > 0 && (
+                        <View style={styles.badge}>
+                            <Text style={styles.badgeText}>{unreadCount}</Text>
+                        </View>
+                    )}
+                </TouchableOpacity>
+            </View>
         </View>
     );
 };
 
 const styles = StyleSheet.create({
-    row: {
+    container: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: spacing.md,
+        justifyContent: 'space-between',
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+        borderBottomWidth: 1,
+        height: 60,
     },
-    drawerToggle: {
-        padding: spacing.xs,
-    },
-    center: {
+    left: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.sm,
         flex: 1,
-        paddingHorizontal: spacing.sm,
-    },
-    subtitle: {
-        fontSize: 14,
     },
     title: {
-        fontSize: 26,
+        fontSize: 18,
         fontWeight: '800',
     },
     right: {
         flexDirection: 'row',
         alignItems: 'center',
+        gap: spacing.md,
     },
-    rightPlaceholder: {
-        width: 34,
+    netWorthContainer: {
+        alignItems: 'flex-end',
+        justifyContent: 'center',
+        marginRight: spacing.xs,
+    },
+    netWorthLabel: {
+        fontSize: 9,
+        fontWeight: '700',
+        letterSpacing: 0.5,
+    },
+    netWorthValue: {
+        fontSize: 14,
+        fontWeight: '900',
+        marginTop: 1,
+    },
+    iconButton: {
+        padding: 4,
+    },
+    bellButton: {
+        padding: 4,
+        position: 'relative',
+    },
+    badge: {
+        position: 'absolute',
+        top: -2,
+        right: -2,
+        backgroundColor: 'red',
+        minWidth: 16,
+        height: 16,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 2,
+    },
+    badgeText: {
+        color: '#fff',
+        fontSize: 10,
+        fontWeight: '800',
     },
 });

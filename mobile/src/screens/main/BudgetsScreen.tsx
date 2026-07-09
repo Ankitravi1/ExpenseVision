@@ -9,27 +9,36 @@ import { useNavigation } from '@react-navigation/native';
 import { EmptyState } from '../../components/ui';
 import { CategoryIcon } from '../../components/CategoryIcon';
 import { BudgetForm } from '../../components/BudgetForm';
+import { ScreenHeader } from '../../components/ScreenHeader';
 import { formatCurrency } from '../../utils/currency';
 import { spacing, radius } from '../../theme';
 import { Budget } from '../../types';
 
 export default function BudgetsScreen() {
     const navigation = useNavigation();
-    const { budgets, categories, deleteBudget, isLoading, refresh } = useData();
+    const { budgets, categories, transactions, deleteBudget, isLoading, refresh } = useData();
     const { user } = useAuth();
     const { theme } = useTheme();
+    const [currentDate, setCurrentDate] = useState(new Date());
     const [showForm, setShowForm] = useState(false);
     const [editing, setEditing] = useState<Budget | null>(null);
     const [preSelectedCategoryId, setPreSelectedCategoryId] = useState<string | null>(null);
     const currency = user?.currency || 'INR';
 
-    const now = new Date();
-    const activeMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const budgetedCategoryIds = new Set(
-        budgets
-            .filter(b => b.month === activeMonth || !b.month || b.month === '')
-            .map(b => b.categoryId)
-    );
+    const activeMonth = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+
+    const repeatingBudgets = budgets
+        .filter(b => !b.month)
+        .map(b => {
+            const spent = transactions
+                .filter(t => t.type === 'expense' && t.categoryId === b.categoryId && t.date.startsWith(activeMonth))
+                .reduce((sum, t) => sum + t.amount, 0);
+            return { ...b, spent, carryover: 0, effectiveAmount: b.amount };
+        });
+    const monthlyBudgets = budgets.filter(b => b.month === activeMonth);
+    const filteredBudgets = [...monthlyBudgets, ...repeatingBudgets];
+
+    const budgetedCategoryIds = new Set(filteredBudgets.map(b => b.categoryId));
     const unbudgetedCategories = categories.filter(
         c => c.type === 'expense' && !budgetedCategoryIds.has(c.id)
     );
@@ -79,42 +88,48 @@ export default function BudgetsScreen() {
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top']}>
-            <View style={styles.header}>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <TouchableOpacity
-                        onPress={() => (navigation as any).openDrawer?.()}
-                        style={{ marginRight: 12, padding: 4 }}
-                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                    >
-                        <MaterialCommunityIcons name="menu" size={26} color={theme.colors.text} />
-                    </TouchableOpacity>
-                    <Text style={[styles.title, { color: theme.colors.text }]}>Budgets</Text>
-                </View>
+            <ScreenHeader title="Budgets" />
+
+            {/* Month Swiper Navigator */}
+            <View style={[styles.periodNavigator, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder }]}>
                 <TouchableOpacity
                     onPress={() => {
-                        setEditing(null);
-                        setPreSelectedCategoryId(null);
-                        setShowForm(true);
+                        const prev = new Date(currentDate);
+                        prev.setMonth(prev.getMonth() - 1);
+                        setCurrentDate(prev);
                     }}
-                    style={[styles.addButton, { backgroundColor: theme.colors.primary }]}
+                    style={styles.navButton}
                 >
-                    <MaterialCommunityIcons name="plus" size={24} color="#fff" />
+                    <MaterialCommunityIcons name="chevron-left" size={24} color={theme.colors.text} />
+                </TouchableOpacity>
+                <Text style={[styles.periodText, { color: theme.colors.text }]}>
+                    {currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
+                </Text>
+                <TouchableOpacity
+                    onPress={() => {
+                        const next = new Date(currentDate);
+                        next.setMonth(next.getMonth() + 1);
+                        setCurrentDate(next);
+                    }}
+                    style={styles.navButton}
+                >
+                    <MaterialCommunityIcons name="chevron-right" size={24} color={theme.colors.text} />
                 </TouchableOpacity>
             </View>
 
             <FlatList
-                data={budgets}
+                data={filteredBudgets}
                 keyExtractor={b => b.id}
                 contentContainerStyle={{ padding: spacing.md, paddingTop: 0, gap: spacing.sm }}
                 refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refresh} tintColor={theme.colors.primary} />}
-                extraData={{ budgets, categories }}
+                extraData={{ filteredBudgets, categories }}
                 renderItem={({ item: b }) => {
                     const cat = categories.find(c => c.id === b.categoryId);
                     const limit = b.effectiveAmount ?? b.amount;
                     const ratio = limit > 0 ? Math.min(1, b.spent / limit) : 1;
                     const over = b.spent > limit;
                     const warnRatio = (b.alertThreshold ?? 100) / 100;
-                    const barColor = over ? theme.colors.danger : ratio >= Math.min(warnRatio, 0.8) ? theme.colors.warning : theme.colors.success;
+                    const barColor = over ? theme.colors.danger : ratio >= warnRatio ? theme.colors.warning : theme.colors.success;
                     return (
                         <TouchableOpacity
                             onPress={() => {
@@ -174,12 +189,58 @@ export default function BudgetsScreen() {
                 }}
                 editing={editing}
                 preSelectedCategoryId={preSelectedCategoryId}
+                month={activeMonth}
             />
+
+            <TouchableOpacity
+                onPress={() => {
+                    setEditing(null);
+                    setPreSelectedCategoryId(null);
+                    setShowForm(true);
+                }}
+                style={{
+                    backgroundColor: theme.colors.primary,
+                    position: 'absolute',
+                    bottom: spacing.lg,
+                    right: spacing.lg,
+                    width: 56,
+                    height: 56,
+                    borderRadius: 28,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    elevation: 5,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.25,
+                    shadowRadius: 3.84,
+                }}
+            >
+                <MaterialCommunityIcons name="plus" size={28} color="#fff" />
+            </TouchableOpacity>
         </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
+    periodNavigator: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginHorizontal: spacing.md,
+        marginBottom: spacing.md,
+        borderRadius: radius.md,
+        borderWidth: 1,
+        paddingVertical: 10,
+    },
+    periodText: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        width: 160,
+        textAlign: 'center',
+    },
+    navButton: {
+        padding: 4,
+    },
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',

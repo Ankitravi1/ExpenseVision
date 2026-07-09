@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Alert, StyleSheet, Text, View, DeviceEventEmitter } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { SheetModal, Input, Button, ChipSelector, FieldLabel, OptionSheet, DateField, successHaptic } from './ui';
+import { SheetModal, Input, Button, ChipSelector, FieldLabel, OptionSheet, DateField, TimeField, successHaptic } from './ui';
 import { useData } from '../context/DataContext';
 import { useTheme } from '../context/ThemeContext';
 import { Transaction, TransactionType } from '../types';
@@ -23,6 +23,7 @@ export const TransactionForm: React.FC<Props> = ({ visible, onClose, editing }) 
     const [amount, setAmount] = useState('');
     const [note, setNote] = useState('');
     const [date, setDate] = useState(todayIsoDate());
+    const [time, setTime] = useState(new Date().toTimeString().slice(0, 5));
     const [accountId, setAccountId] = useState<string | null>(null);
     const [transferToAccountId, setTransferToAccountId] = useState<string | null>(null);
     const [categoryId, setCategoryId] = useState<string | null>(null);
@@ -42,7 +43,9 @@ export const TransactionForm: React.FC<Props> = ({ visible, onClose, editing }) 
                 setType(editing.type);
                 setAmount(String(editing.amount));
                 setNote(editing.note);
-                setDate(editing.date.split('T')[0]);
+                const [datePart, timePart] = editing.date.split('T');
+                setDate(datePart);
+                setTime(timePart?.slice(0, 5) || new Date().toTimeString().slice(0, 5));
                 setAccountId(editing.accountId);
                 setTransferToAccountId(editing.transferToAccountId || null);
                 setCategoryId(editing.categoryId || null);
@@ -52,7 +55,9 @@ export const TransactionForm: React.FC<Props> = ({ visible, onClose, editing }) 
                 setNote('');
                 setQuickEntry('');
                 setParseMessage('');
+                const now = new Date();
                 setDate(todayIsoDate());
+                setTime(now.toTimeString().slice(0, 5));
                 setAccountId(accounts[0]?.id || null);
                 setTransferToAccountId(null);
                 setCategoryId(null);
@@ -87,6 +92,7 @@ export const TransactionForm: React.FC<Props> = ({ visible, onClose, editing }) 
             setAmount(draft.amount ? String(draft.amount) : '');
             setNote(draft.note || quickEntry);
             setDate((draft.date || todayIsoDate()).split('T')[0]);
+            if (draft.time) setTime(draft.time);
             setAccountId(draft.accountId || accounts[0]?.id || null);
             setCategoryId(draft.categoryId || null);
             setTransferToAccountId(draft.transferToAccountId || null);
@@ -115,11 +121,12 @@ export const TransactionForm: React.FC<Props> = ({ visible, onClose, editing }) 
 
         setSaving(true);
         try {
+            const dateTimeString = `${isoDate}T${time}`;
             const payload = {
                 type,
                 amount: value,
                 note: note.trim(),
-                date: isoDate,
+                date: dateTimeString,
                 accountId,
                 categoryId: type === 'transfer' ? null : categoryId,
                 transferToAccountId: type === 'transfer' ? transferToAccountId : null,
@@ -219,6 +226,23 @@ export const TransactionForm: React.FC<Props> = ({ visible, onClose, editing }) 
                     onChange={setCategoryId}
                 />
             )}
+
+            <View style={{ flexDirection: 'row', gap: spacing.md }}>
+                <View style={{ flex: 2 }}>
+                    <DateField
+                        label="Date"
+                        value={date}
+                        onChange={setDate}
+                    />
+                </View>
+                <View style={{ flex: 1 }}>
+                    <TimeField
+                        label="Time"
+                        value={time}
+                        onChange={setTime}
+                    />
+                </View>
+            </View>
 
             <Button title={editing ? 'Save Changes' : 'Add Transaction'} onPress={handleSave} loading={saving} disabled={parsing} />
         </SheetModal>
