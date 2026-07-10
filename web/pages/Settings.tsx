@@ -518,24 +518,67 @@ export const Settings: React.FC = () => {
                 <h3 className="text-xl font-semibold mb-1 text-gray-darkest dark:text-gray-50">AI Settings</h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">Configure providers, models, and API keys for AI transaction parsing.</p>
                 <div className="space-y-5">
-                    {/* Enable toggle */}
-                    <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-200 dark:border-gray-700">
+                    <div className="flex items-start justify-between p-4 bg-gray-50 dark:bg-gray-700/10 rounded-lg border border-gray-150 dark:border-gray-700/50">
                         <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1">
                                 <Icon name="Sparkles" size={18} className="text-primary" />
-                                <h4 className="font-medium text-gray-darkest dark:text-gray-50">AI Transaction Parsing</h4>
+                                <h4 className="font-medium text-gray-darkest dark:text-gray-50">AI Statement Imports</h4>
                             </div>
                             <p className="text-sm text-gray-500 dark:text-gray-400">
-                                Convert typed or dictated notes into draft transactions automatically.
+                                Automatically extract, map, and import transaction details from statements (CSV, Excel, PDF, Receipt Images).
                             </p>
                         </div>
                         <label className="relative inline-flex items-center cursor-pointer ml-4">
                             <input
                                 type="checkbox"
-                                checked={aiSettings.enabled}
+                                checked={aiSettings.enabled && aiSettings.baseUrl?.importEnabled !== 'false'}
                                 onChange={(e) => {
                                     setAiSaved(false);
-                                    setAiSettings(prev => ({ ...prev, enabled: e.target.checked }));
+                                    const nextImportEnabled = e.target.checked;
+                                    const nextAutoParseEnabled = aiSettings.enabled && aiSettings.baseUrl?.autoParseEnabled !== 'false';
+                                    setAiSettings(prev => {
+                                        const nextBaseUrl = { ...prev.baseUrl };
+                                        nextBaseUrl.importEnabled = nextImportEnabled ? 'true' : 'false';
+                                        return {
+                                            ...prev,
+                                            enabled: nextImportEnabled || nextAutoParseEnabled,
+                                            baseUrl: nextBaseUrl
+                                        };
+                                    });
+                                }}
+                                className="sr-only peer"
+                            />
+                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 dark:peer-focus:ring-primary/40 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
+                        </label>
+                    </div>
+
+                    <div className="flex items-start justify-between p-4 bg-gray-50 dark:bg-gray-700/10 rounded-lg border border-gray-150 dark:border-gray-700/50">
+                        <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                                <Icon name="Zap" size={18} className="text-primary" />
+                                <h4 className="font-medium text-gray-darkest dark:text-gray-50">AI Transaction Auto-Parsing</h4>
+                            </div>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                                Parse quick entry transaction descriptions in natural language automatically.
+                            </p>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer ml-4">
+                            <input
+                                type="checkbox"
+                                checked={aiSettings.enabled && aiSettings.baseUrl?.autoParseEnabled !== 'false'}
+                                onChange={(e) => {
+                                    setAiSaved(false);
+                                    const nextAutoParseEnabled = e.target.checked;
+                                    const nextImportEnabled = aiSettings.enabled && aiSettings.baseUrl?.importEnabled !== 'false';
+                                    setAiSettings(prev => {
+                                        const nextBaseUrl = { ...prev.baseUrl };
+                                        nextBaseUrl.autoParseEnabled = nextAutoParseEnabled ? 'true' : 'false';
+                                        return {
+                                            ...prev,
+                                            enabled: nextImportEnabled || nextAutoParseEnabled,
+                                            baseUrl: nextBaseUrl
+                                        };
+                                    });
                                 }}
                                 className="sr-only peer"
                             />

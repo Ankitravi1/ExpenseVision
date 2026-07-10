@@ -26,6 +26,7 @@ router.get('/users', requireSuperAdmin, async (req, res, next) => {
                 email: true,
                 name: true,
                 role: true,
+                googleId: true,
                 createdAt: true
             },
             orderBy: { createdAt: 'desc' }

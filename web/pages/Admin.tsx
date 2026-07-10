@@ -8,6 +8,7 @@ interface UserItem {
     email: string;
     name: string;
     role: string;
+    googleId?: string | null;
     createdAt: string;
 }
 
@@ -159,7 +160,16 @@ export const Admin: React.FC = () => {
                                                     {user.name.charAt(0)}
                                                 </div>
                                                 <div>
-                                                    <div className="text-sm font-semibold text-gray-950 dark:text-white">{user.name}</div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-sm font-semibold text-gray-950 dark:text-white">{user.name}</span>
+                                                        <span className={`px-1.5 py-0.5 text-[9px] font-bold rounded uppercase tracking-wider ${
+                                                            user.googleId 
+                                                                ? 'bg-rose-50 text-rose-600 border border-rose-250 dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-900/30' 
+                                                                : 'bg-blue-50 text-blue-600 border border-blue-250 dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-900/30'
+                                                        }`}>
+                                                            {user.googleId ? 'Google' : 'Manual'}
+                                                        </span>
+                                                    </div>
                                                     <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{user.email}</div>
                                                 </div>
                                             </div>
