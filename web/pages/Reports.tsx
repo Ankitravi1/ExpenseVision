@@ -431,18 +431,18 @@ export const Reports: React.FC = () => {
                     </div>
 
                     <button
-                        onClick={exportToCSV}
-                        className="btn flex items-center gap-1.5 py-2 px-3.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-600 rounded-lg transition-colors shadow-sm"
-                    >
-                        <Icon name="Download" size={14} />
-                        Export CSV
-                    </button>
-                    <button
                         onClick={() => setIsImportModalOpen(true)}
                         className="btn flex items-center gap-1.5 py-2 px-3.5 text-xs font-bold bg-primary hover:bg-primary-hover text-white border border-primary rounded-lg transition-colors shadow-sm"
                     >
                         <Icon name="Upload" size={14} />
                         Import Data
+                    </button>
+                    <button
+                        onClick={exportToCSV}
+                        className="btn flex items-center gap-1.5 py-2 px-3.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-600 rounded-lg transition-colors shadow-sm"
+                    >
+                        <Icon name="Download" size={14} />
+                        Export CSV
                     </button>
                 </div>
             </div>

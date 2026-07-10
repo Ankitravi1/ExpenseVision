@@ -810,9 +810,12 @@ export const Settings: React.FC = () => {
                                 Import transactions from a CSV file
                             </p>
                         </div>
-                        <button onClick={() => setIsImportModalOpen(true)} className="btn btn-secondary ml-4">
-                            <Icon name="Upload" size={16} className="mr-2" />
-                            Import CSV
+                        <button 
+                            onClick={() => setIsImportModalOpen(true)} 
+                            className="btn flex items-center gap-1.5 py-2 px-3.5 text-xs font-bold bg-primary hover:bg-primary-hover text-white border border-primary rounded-lg transition-colors shadow-sm ml-4"
+                        >
+                            <Icon name="Upload" size={14} />
+                            Import Data
                         </button>
                     </div>
 

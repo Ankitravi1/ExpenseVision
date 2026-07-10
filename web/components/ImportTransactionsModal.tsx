@@ -13,7 +13,9 @@ interface ImportTransactionsModalProps {
 
 export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = ({ isOpen, onClose, onImportSuccess }) => {
     const context = useContext(AppContext);
-    const [activeTab, setActiveTab] = useState<'csv' | 'ai'>('csv');
+    const [mode, setMode] = useState<'none' | 'standard' | 'ai'>('none');
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [processStatus, setProcessStatus] = useState('');
     const [file, setFile] = useState<File | null>(null);
     const [previewData, setPreviewData] = useState<any[]>([]);
     const [validationErrors, setValidationErrors] = useState<string[]>([]);
@@ -22,10 +24,8 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
 
     // AI Statement States
     const [aiText, setAiText] = useState('');
-    const [isAiParsing, setIsAiParsing] = useState(false);
     const [aiDrafts, setAiDrafts] = useState<any[]>([]);
     const [selectedAiDraftIndexes, setSelectedAiDraftIndexes] = useState<number[]>([]);
-    const aiFileInputRef = useRef<HTMLInputElement>(null);
 
     if (!isOpen || !context) return null;
 
@@ -95,50 +95,36 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
         return fullText;
     };
 
-    const handleAiFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            const selectedFile = e.target.files[0];
-            setIsAiParsing(true);
-            try {
-                let text = '';
-                if (selectedFile.type === 'application/pdf' || selectedFile.name.endsWith('.pdf')) {
-                    text = await extractTextFromPdf(selectedFile);
-                } else {
-                    text = await selectedFile.text();
-                }
-                setAiText(text);
-            } catch (err: any) {
-                alert('Failed to extract text from file: ' + err.message);
-            } finally {
-                setIsAiParsing(false);
+    const loadXlsx = () => {
+        return new Promise<any>((resolve, reject) => {
+            if ((window as any).XLSX) {
+                resolve((window as any).XLSX);
+                return;
             }
-        }
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+            script.onload = () => {
+                resolve((window as any).XLSX);
+            };
+            script.onerror = reject;
+            document.head.appendChild(script);
+        });
     };
 
-    const handleAiParse = async () => {
-        if (!aiText.trim()) {
-            alert('Please paste some text or upload a statement file.');
-            return;
-        }
-        setIsAiParsing(true);
-        try {
-            const result = await api.parseStatement(aiText);
-            const drafts = result.drafts || [];
-            setAiDrafts(drafts);
-
-            // Select only non-duplicate drafts by default
-            const autoSelectIndices: number[] = [];
-            drafts.forEach((draft: any, index: number) => {
-                if (!checkIsDuplicate(draft)) {
-                    autoSelectIndices.push(index);
-                }
-            });
-            setSelectedAiDraftIndexes(autoSelectIndices);
-        } catch (err: any) {
-            alert('AI Extraction failed: ' + err.message);
-        } finally {
-            setIsAiParsing(false);
-        }
+    const loadTesseract = () => {
+        return new Promise<any>((resolve, reject) => {
+            if ((window as any).Tesseract) {
+                resolve((window as any).Tesseract);
+                return;
+            }
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+            script.onload = () => {
+                resolve((window as any).Tesseract);
+            };
+            script.onerror = reject;
+            document.head.appendChild(script);
+        });
     };
 
     const checkIsDuplicate = (row: any) => {
@@ -149,6 +135,165 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
             t.type === row.type &&
             t.note.toLowerCase().includes(row.note.toLowerCase())
         );
+    };
+
+    const processUploadedFile = async (selectedFile: File) => {
+        setFile(selectedFile);
+        setIsProcessing(true);
+        setMode('none');
+        setPreviewData([]);
+        setAiDrafts([]);
+        setValidationErrors([]);
+        
+        const fileName = selectedFile.name.toLowerCase();
+        
+        try {
+            if (fileName.endsWith('.csv') || fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+                setProcessStatus('Reading sheet data...');
+                let csvText = '';
+                
+                if (fileName.endsWith('.csv')) {
+                    csvText = await selectedFile.text();
+                } else {
+                    setProcessStatus('Loading spreadsheet engine...');
+                    const XLSX = await loadXlsx();
+                    const arrayBuffer = await selectedFile.arrayBuffer();
+                    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    csvText = XLSX.utils.sheet_to_csv(worksheet);
+                }
+                
+                // Let's inspect headers to see if it matches standard template
+                const lines = csvText.split('\n').map(l => l.trim()).filter(Boolean);
+                if (lines.length > 0) {
+                    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+                    const getIndex = (name: string) => headers.findIndex(h => h.includes(name));
+                    
+                    const typeIdx = getIndex('type');
+                    const dateIdx = getIndex('date');
+                    const amountIdx = getIndex('amount');
+                    const accIdx = getIndex('account');
+                    
+                    if (typeIdx !== -1 && dateIdx !== -1 && amountIdx !== -1 && accIdx !== -1) {
+                        setProcessStatus('Parsing standard template...');
+                        parseCSVText(csvText);
+                        setMode('standard');
+                    } else {
+                        setProcessStatus('Shuffled columns detected. Invoking AI to rearrange...');
+                        const result = await api.parseStatement(csvText);
+                        const drafts = result.drafts || [];
+                        setAiDrafts(drafts);
+                        const autoSelectIndices: number[] = [];
+                        drafts.forEach((draft: any, idx: number) => {
+                            if (!checkIsDuplicate(draft)) {
+                                autoSelectIndices.push(idx);
+                            }
+                        });
+                        setSelectedAiDraftIndexes(autoSelectIndices);
+                        setMode('ai');
+                    }
+                } else {
+                    throw new Error('File is empty.');
+                }
+            } else if (fileName.endsWith('.pdf')) {
+                setProcessStatus('Extracting text from PDF...');
+                const extractedText = await extractTextFromPdf(selectedFile);
+                
+                setProcessStatus('Analyzing statement text with AI...');
+                const result = await api.parseStatement(extractedText);
+                const drafts = result.drafts || [];
+                setAiDrafts(drafts);
+                const autoSelectIndices: number[] = [];
+                drafts.forEach((draft: any, idx: number) => {
+                    if (!checkIsDuplicate(draft)) {
+                        autoSelectIndices.push(idx);
+                    }
+                });
+                setSelectedAiDraftIndexes(autoSelectIndices);
+                setMode('ai');
+            } else if (/\.(png|jpe?g|webp)$/i.test(fileName)) {
+                setProcessStatus('Loading OCR engine...');
+                const Tesseract = await loadTesseract();
+                
+                setProcessStatus('Running OCR scan on image...');
+                const resultOcr = await Tesseract.recognize(selectedFile, 'eng');
+                const extractedText = resultOcr.data.text;
+                
+                if (!extractedText || extractedText.trim().length < 10) {
+                    throw new Error('Could not read legible text from image. Please ensure image has high contrast.');
+                }
+                
+                setProcessStatus('Extracting transactions from image text with AI...');
+                const result = await api.parseStatement(extractedText);
+                const drafts = result.drafts || [];
+                setAiDrafts(drafts);
+                const autoSelectIndices: number[] = [];
+                drafts.forEach((draft: any, idx: number) => {
+                    if (!checkIsDuplicate(draft)) {
+                        autoSelectIndices.push(idx);
+                    }
+                });
+                setSelectedAiDraftIndexes(autoSelectIndices);
+                setMode('ai');
+            } else {
+                // Treat as text
+                setProcessStatus('Reading text file...');
+                const text = await selectedFile.text();
+                
+                setProcessStatus('Analyzing text with AI...');
+                const result = await api.parseStatement(text);
+                const drafts = result.drafts || [];
+                setAiDrafts(drafts);
+                const autoSelectIndices: number[] = [];
+                drafts.forEach((draft: any, idx: number) => {
+                    if (!checkIsDuplicate(draft)) {
+                        autoSelectIndices.push(idx);
+                    }
+                });
+                setSelectedAiDraftIndexes(autoSelectIndices);
+                setMode('ai');
+            }
+        } catch (err: any) {
+            setValidationErrors([err.message || 'Failed to process file']);
+            setMode('none');
+        } finally {
+            setIsProcessing(false);
+            setProcessStatus('');
+        }
+    };
+
+    const handleAiParse = async () => {
+        if (!aiText.trim()) {
+            alert('Please paste some text first.');
+            return;
+        }
+        setIsProcessing(true);
+        setProcessStatus('Analyzing text with AI...');
+        setMode('none');
+        setPreviewData([]);
+        setAiDrafts([]);
+        setValidationErrors([]);
+        
+        try {
+            const result = await api.parseStatement(aiText);
+            const drafts = result.drafts || [];
+            setAiDrafts(drafts);
+            const autoSelectIndices: number[] = [];
+            drafts.forEach((draft: any, idx: number) => {
+                if (!checkIsDuplicate(draft)) {
+                    autoSelectIndices.push(idx);
+                }
+            });
+            setSelectedAiDraftIndexes(autoSelectIndices);
+            setMode('ai');
+        } catch (err: any) {
+            setValidationErrors([err.message || 'AI Statement parsing failed']);
+            setMode('none');
+        } finally {
+            setIsProcessing(false);
+            setProcessStatus('');
+        }
     };
 
     const downloadTemplate = () => {
@@ -171,140 +316,128 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
-            const selectedFile = e.target.files[0];
-            setFile(selectedFile);
-            parseCSV(selectedFile);
+            processUploadedFile(e.target.files[0]);
         }
     };
 
-    const parseCSV = (file: File) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const text = e.target?.result as string;
-            if (!text) return;
+    const parseCSVText = (text: string) => {
+        if (!text) return;
 
-            const lines = text.split('\n');
-            const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+        const lines = text.split('\n');
+        const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
 
-            const parsed: any[] = [];
-            const errors: string[] = [];
+        const parsed: any[] = [];
+        const errors: string[] = [];
 
-            const getIndex = (name: string) => headers.findIndex(h => h.includes(name.toLowerCase()));
+        const getIndex = (name: string) => headers.findIndex(h => h.includes(name.toLowerCase()));
 
-            const typeIdx = getIndex('type');
-            const dateIdx = getIndex('date');
-            const timeIdx = getIndex('time');
-            const amountIdx = getIndex('amount');
-            const noteIdx = getIndex('note');
-            const accIdx = getIndex('account');
-            const catIdx = getIndex('category');
-            const transferIdx = getIndex('transfer to');
+        const typeIdx = getIndex('type');
+        const dateIdx = getIndex('date');
+        const timeIdx = getIndex('time');
+        const amountIdx = getIndex('amount');
+        const noteIdx = getIndex('note');
+        const accIdx = getIndex('account');
+        const catIdx = getIndex('category');
+        const transferIdx = getIndex('transfer to');
 
-            if (typeIdx === -1 || dateIdx === -1 || amountIdx === -1 || accIdx === -1) {
-                setValidationErrors(['Invalid CSV format. Missing required columns: Type, Date, Amount, Account']);
-                return;
-            }
-
-            const formatDateToISO = (dateStr: string) => {
-                if (!dateStr) return null;
-                return displayDateToIso(dateStr);
-            };
-
-            const parseTime = (timeStr: string) => {
-                if (!timeStr) return '00:00';
-                const cleanStr = String(timeStr).trim();
-                if (/^\d{3,4}$/.test(cleanStr)) {
-                    const padded = cleanStr.padStart(4, '0');
-                    return `${padded.slice(0, 2)}:${padded.slice(2)}`;
-                }
-                if (cleanStr.toLowerCase().includes('pm') || cleanStr.toLowerCase().includes('am')) {
-                    const d = new Date(`2000-01-01 ${cleanStr}`);
-                    if (!isNaN(d.getTime())) {
-                        return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-                    }
-                }
-                if (cleanStr.includes(':')) {
-                    return cleanStr;
-                }
-                return '00:00';
-            };
-
-            for (let i = 1; i < lines.length; i++) {
-                const line = lines[i].trim();
-                if (!line) continue;
-
-                const cols = line.split(',').map(c => c.trim());
-
-                if (cols.length < headers.length) continue;
-
-                const type = cols[typeIdx]?.toLowerCase();
-                const rawDate = cols[dateIdx];
-                const rawTime = cols[timeIdx];
-                const amount = parseFloat(cols[amountIdx]);
-                const note = cols[noteIdx] || '';
-                const accountName = cols[accIdx];
-                const categoryName = cols[catIdx];
-                const transferToName = cols[transferIdx];
-
-                if (!['expense', 'income', 'transfer'].includes(type)) {
-                    errors.push(`Row ${i + 1}: Invalid type '${type}'`);
-                    continue;
-                }
-
-                if (isNaN(amount) || amount <= 0) {
-                    errors.push(`Row ${i + 1}: Invalid amount`);
-                    continue;
-                }
-
-                const formattedDate = formatDateToISO(rawDate);
-                if (!formattedDate) {
-                    errors.push(`Row ${i + 1}: Invalid date format '${rawDate}'`);
-                    continue;
-                }
-
-                const time = parseTime(rawTime);
-
-                const account = accounts.find(a => a.name.toLowerCase() === accountName?.toLowerCase());
-                if (!account) {
-                    errors.push(`Row ${i + 1}: Account '${accountName}' not found`);
-                    continue;
-                }
-
-                let categoryId = undefined;
-                if (type !== 'transfer') {
-                    const category = categories.find(c => c.name.toLowerCase() === categoryName?.toLowerCase() && c.type === type);
-                    if (!category) {
-                        errors.push(`Row ${i + 1}: Category '${categoryName}' not found for type '${type}'`);
-                        continue;
-                    }
-                    categoryId = category.id;
-                }
-
-                let transferToAccountId = undefined;
-                if (type === 'transfer') {
-                    const destAccount = accounts.find(a => a.name.toLowerCase() === transferToName?.toLowerCase());
-                    if (!destAccount) {
-                        errors.push(`Row ${i + 1}: Destination Account '${transferToName}' not found`);
-                        continue;
-                    }
-                    transferToAccountId = destAccount.id;
-                }
-
-                parsed.push({
-                    type,
-                    date: `${formattedDate}T${time}`,
-                    amount,
-                    note,
-                    accountId: account.id,
-                    categoryId,
-                    transferToAccountId
-                });
-            }
-
-            setValidationErrors(errors);
-            setPreviewData(parsed);
+        const formatDateToISO = (dateStr: string) => {
+            if (!dateStr) return null;
+            return displayDateToIso(dateStr);
         };
-        reader.readAsText(file);
+
+        const parseTime = (timeStr: string) => {
+            if (!timeStr) return '00:00';
+            const cleanStr = String(timeStr).trim();
+            if (/^\d{3,4}$/.test(cleanStr)) {
+                const padded = cleanStr.padStart(4, '0');
+                return `${padded.slice(0, 2)}:${padded.slice(2)}`;
+            }
+            if (cleanStr.toLowerCase().includes('pm') || cleanStr.toLowerCase().includes('am')) {
+                const d = new Date(`2000-01-01 ${cleanStr}`);
+                if (!isNaN(d.getTime())) {
+                    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+                }
+            }
+            if (cleanStr.includes(':')) {
+                return cleanStr;
+            }
+            return '00:00';
+        };
+
+        for (let i = 1; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
+
+            const cols = line.split(',').map(c => c.trim());
+
+            if (cols.length < headers.length) continue;
+
+            const type = cols[typeIdx]?.toLowerCase();
+            const rawDate = cols[dateIdx];
+            const rawTime = cols[timeIdx];
+            const amount = parseFloat(cols[amountIdx]);
+            const note = cols[noteIdx] || '';
+            const accountName = cols[accIdx];
+            const categoryName = cols[catIdx];
+            const transferToName = cols[transferIdx];
+
+            if (!['expense', 'income', 'transfer'].includes(type)) {
+                errors.push(`Row ${i + 1}: Invalid type '${type}'`);
+                continue;
+            }
+
+            if (isNaN(amount) || amount <= 0) {
+                errors.push(`Row ${i + 1}: Invalid amount`);
+                continue;
+            }
+
+            const formattedDate = formatDateToISO(rawDate);
+            if (!formattedDate) {
+                errors.push(`Row ${i + 1}: Invalid date format '${rawDate}'`);
+                continue;
+            }
+
+            const time = parseTime(rawTime);
+
+            const account = accounts.find(a => a.name.toLowerCase() === accountName?.toLowerCase());
+            if (!account) {
+                errors.push(`Row ${i + 1}: Account '${accountName}' not found`);
+                continue;
+            }
+
+            let categoryId = undefined;
+            if (type !== 'transfer') {
+                const category = categories.find(c => c.name.toLowerCase() === categoryName?.toLowerCase() && c.type === type);
+                if (!category) {
+                    errors.push(`Row ${i + 1}: Category '${categoryName}' not found for type '${type}'`);
+                    continue;
+                }
+                categoryId = category.id;
+            }
+
+            let transferToAccountId = undefined;
+            if (type === 'transfer') {
+                const destAccount = accounts.find(a => a.name.toLowerCase() === transferToName?.toLowerCase());
+                if (!destAccount) {
+                    errors.push(`Row ${i + 1}: Destination Account '${transferToName}' not found`);
+                    continue;
+                }
+                transferToAccountId = destAccount.id;
+            }
+
+            parsed.push({
+                type,
+                date: `${formattedDate}T${time}`,
+                amount,
+                note,
+                accountId: account.id,
+                categoryId,
+                transferToAccountId
+            });
+        }
+
+        setValidationErrors(errors);
+        setPreviewData(parsed);
     };
 
     const handleImportCSV = async () => {
@@ -384,288 +517,279 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
                 <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col pointer-events-auto transform transition-all border border-gray-150 dark:border-gray-700">
                     
-                    {/* Header with tabs */}
-                    <div className="p-6 border-b border-gray-150 dark:border-gray-700 flex flex-col gap-4 shrink-0 bg-gray-50/50 dark:bg-gray-800/50">
-                        <div className="flex justify-between items-center">
-                            <h3 className="text-xl font-bold dark:text-white flex items-center gap-2">
-                                <Icon name="Upload" className="text-primary dark:text-indigo-400" />
-                                <span>Import Transactions</span>
-                            </h3>
-                            <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-205 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 transition-colors">
-                                <Icon name="X" size={20} />
-                            </button>
-                        </div>
-
-                        <div className="flex border-b border-gray-200 dark:border-gray-700">
-                            <button
-                                onClick={() => setActiveTab('csv')}
-                                className={`px-4 py-2 text-sm font-bold border-b-2 transition-all -mb-px ${
-                                    activeTab === 'csv'
-                                        ? 'border-primary text-primary dark:border-indigo-400 dark:text-indigo-400'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-                                }`}
-                            >
-                                Standard CSV Import
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('ai')}
-                                className={`px-4 py-2 text-sm font-bold border-b-2 transition-all -mb-px flex items-center gap-1.5 ${
-                                    activeTab === 'ai'
-                                        ? 'border-primary text-primary dark:border-indigo-400 dark:text-indigo-400'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-                                }`}
-                            >
-                                <Icon name="Sparkles" size={14} className="text-amber-500 animate-pulse" />
-                                AI Bank Statement PDF/Text
-                            </button>
-                        </div>
+                    {/* Header */}
+                    <div className="p-6 border-b border-gray-150 dark:border-gray-700 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/50 shrink-0">
+                        <h3 className="text-xl font-bold dark:text-white flex items-center gap-2">
+                            <Icon name="Upload" className="text-primary dark:text-indigo-400" />
+                            <span>Import Transactions</span>
+                        </h3>
+                        <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-205 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 transition-colors">
+                            <Icon name="X" size={20} />
+                        </button>
                     </div>
 
                     <div className="p-6 flex-1 overflow-y-auto space-y-6 scrollbar-thin">
-                        {activeTab === 'csv' ? (
+                        
+                        {/* File Selector & Paste Zone when no file is processed yet */}
+                        {mode === 'none' && !isProcessing && (
                             <>
-                                {/* CSV Template Download */}
-                                <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg flex items-start justify-between">
+                                {/* Template Download Box */}
+                                <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl flex items-start justify-between border border-blue-100 dark:border-blue-900/40">
                                     <div>
-                                        <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-1 text-sm">Need a CSV template?</h4>
-                                        <p className="text-xs text-blue-700 dark:text-blue-300">Download our CSV template to match the required columns: Date, Time, Note, Amount, Type, Category, Account, Transfer To.</p>
+                                        <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-1 text-sm">Standard CSV / Excel Import</h4>
+                                        <p className="text-xs text-blue-700 dark:text-blue-300 leading-normal">
+                                            Download our standard template. If your spreadsheet doesn't match this exact format or is from a bank statements PDF/image, our AI parser will automatically rearrange and map the columns.
+                                        </p>
                                     </div>
-                                    <button onClick={downloadTemplate} className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-all text-xs font-bold border border-gray-100 dark:border-gray-700">
+                                    <button onClick={downloadTemplate} className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-gray-850 text-blue-600 dark:text-blue-400 rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-all text-xs font-bold border border-gray-100 dark:border-gray-700 shrink-0">
                                         <Icon name="Download" size={14} />
                                         Template
                                     </button>
                                 </div>
 
-                                {/* CSV Drag and Drop */}
-                                <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-8 text-center hover:border-primary transition-all cursor-pointer bg-gray-50/20 dark:bg-gray-800/10" onClick={() => fileInputRef.current?.click()}>
+                                {/* Drag-and-drop / selector Zone */}
+                                <div 
+                                    className="border-2 border-dashed border-gray-300 dark:border-gray-650 rounded-xl p-8 text-center hover:border-primary dark:hover:border-indigo-400 transition-all cursor-pointer bg-gray-50/20 dark:bg-gray-800/10 flex flex-col items-center justify-center min-h-[160px]" 
+                                    onClick={() => fileInputRef.current?.click()}
+                                >
                                     <input
                                         type="file"
                                         ref={fileInputRef}
                                         onChange={handleFileChange}
-                                        accept=".csv"
+                                        accept=".csv,.xlsx,.xls,.pdf,.png,.jpg,.jpeg,.webp,.txt"
                                         className="hidden"
                                     />
-                                    <div className="w-12 h-12 bg-primary/10 text-primary rounded-full flex items-center justify-center mx-auto mb-3">
+                                    <div className="w-12 h-12 bg-primary/10 text-primary dark:text-indigo-400 rounded-full flex items-center justify-center mx-auto mb-3">
                                         <Icon name="FileSpreadsheet" size={24} />
                                     </div>
                                     <p className="text-gray-900 dark:text-white font-bold mb-1 text-sm">
-                                        {file ? file.name : 'Click to select CSV File'}
+                                        Select CSV, Excel, PDF, Receipt Image, or Text file
                                     </p>
-                                    <p className="text-xs text-gray-400 dark:text-gray-500">Comma-separated files only</p>
+                                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Automatic columns rearrange & OCR text extraction</p>
                                 </div>
 
-                                {/* CSV Preview Table & Errors */}
-                                {file && (
-                                    <div className="space-y-4">
-                                        <div className="flex items-center justify-between">
-                                            <h4 className="font-bold text-sm dark:text-white">CSV Preview</h4>
-                                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${validationErrors.length > 0 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-                                                {validationErrors.length > 0 ? `${validationErrors.length} Errors Found` : `${previewData.length} Valid Rows`}
-                                            </span>
-                                        </div>
-
-                                        {validationErrors.length > 0 ? (
-                                            <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg space-y-2 max-h-40 overflow-y-auto">
-                                                {validationErrors.map((err, i) => (
-                                                    <div key={i} className="flex items-start gap-2 text-xs text-red-700 dark:text-red-300">
-                                                        <Icon name="AlertCircle" size={14} className="mt-0.5 flex-shrink-0" />
-                                                        <span>{err}</span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <div className="bg-gray-50 dark:bg-gray-800/40 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
-                                                <table className="w-full text-xs text-left">
-                                                    <thead className="bg-gray-100 dark:bg-gray-700 text-gray-550 dark:text-gray-300 font-bold">
-                                                        <tr>
-                                                            <th className="px-4 py-2">Date</th>
-                                                            <th className="px-4 py-2">Note</th>
-                                                            <th className="px-4 py-2">Amount</th>
-                                                            <th className="px-4 py-2">Account</th>
-                                                            <th className="px-4 py-2">Category</th>
-                                                            <th className="px-4 py-2">Duplicates</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody className="divide-y divide-gray-200 dark:divide-gray-750">
-                                                        {previewData.map((row, i) => {
-                                                            const isDup = checkIsDuplicate(row);
-                                                            return (
-                                                                <tr key={i} className="text-gray-700 dark:text-gray-300">
-                                                                    <td className="px-4 py-2">{formatTransactionDate(row.date)}</td>
-                                                                    <td className="px-4 py-2 font-medium truncate max-w-[120px]">{row.note}</td>
-                                                                    <td className="px-4 py-2 font-bold">{formatCurrency(row.amount, currency)}</td>
-                                                                    <td className="px-4 py-2">{accounts.find(a => a.id === row.accountId)?.name}</td>
-                                                                    <td className="px-4 py-2">{categories.find(c => c.id === row.categoryId)?.name || 'Transfer'}</td>
-                                                                    <td className="px-4 py-2">
-                                                                        {isDup && (
-                                                                            <span className="text-[10px] bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 px-2 py-0.5 rounded font-extrabold flex items-center gap-1 w-max">
-                                                                                ⚠️ Duplicate
-                                                                            </span>
-                                                                        )}
-                                                                    </td>
-                                                                </tr>
-                                                            );
-                                                        })}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                            </>
-                        ) : (
-                            <>
-                                {/* AI Bank Statement upload instructions */}
-                                <div className="space-y-4">
-                                    <div className="bg-amber-50/50 dark:bg-amber-950/10 p-4 border border-amber-200 dark:border-amber-900/40 rounded-xl">
-                                        <h4 className="font-extrabold text-amber-850 dark:text-amber-400 mb-1 text-sm flex items-center gap-1.5">
-                                            <Icon name="Sparkles" size={16} />
-                                            AI Bank Statement Extraction
-                                        </h4>
-                                        <p className="text-xs text-amber-700 dark:text-amber-300/80 leading-normal">
-                                            Upload a statement file (.pdf, .txt, .csv) or paste the statement text directly. 
-                                            We will automatically parse all transactions, match categories, detect existing accounts, and highlight duplicates.
-                                        </p>
-                                    </div>
-
-                                    {/* Document upload for AI */}
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="border border-dashed border-gray-300 dark:border-gray-650 rounded-xl p-6 text-center hover:border-amber-400 transition-all cursor-pointer bg-gray-50/10 dark:bg-gray-800/10 flex flex-col items-center justify-center min-h-[160px]" onClick={() => aiFileInputRef.current?.click()}>
-                                            <input
-                                                type="file"
-                                                ref={aiFileInputRef}
-                                                onChange={handleAiFileChange}
-                                                accept=".pdf,.txt,.csv"
-                                                className="hidden"
-                                            />
-                                            <div className="w-10 h-10 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-full flex items-center justify-center mb-3">
-                                                <Icon name="FileText" size={20} />
-                                            </div>
-                                            <p className="text-xs font-bold text-gray-700 dark:text-gray-250">
-                                                Upload PDF / Text Statement
-                                            </p>
-                                            <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1">PDF & text files accepted</p>
-                                        </div>
-
-                                        <div className="flex flex-col">
-                                            <label htmlFor="ai-pasted-text" className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-1.5 uppercase">Or Paste Statement Text</label>
-                                            <textarea
-                                                id="ai-pasted-text"
-                                                value={aiText}
-                                                onChange={e => setAiText(e.target.value)}
-                                                placeholder="Paste text copied from PDF statement here..."
-                                                className="input text-xs font-medium w-full flex-1 min-h-[130px] rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-3 leading-normal outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 scrollbar-thin resize-none"
-                                            />
+                                {/* Paste Statement text block */}
+                                <div className="flex flex-col border-t border-gray-150 dark:border-gray-700 pt-4">
+                                    <label htmlFor="ai-pasted-text" className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-1.5 uppercase">Or Paste Statement Text</label>
+                                    <div className="flex flex-col gap-3">
+                                        <textarea
+                                            id="ai-pasted-text"
+                                            value={aiText}
+                                            onChange={e => setAiText(e.target.value)}
+                                            placeholder="Paste raw bank statement texts or receipt transcripts here..."
+                                            className="input text-xs font-medium w-full min-h-[110px] rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-3 leading-normal outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 resize-none scrollbar-thin"
+                                        />
+                                        <div className="flex justify-end">
+                                            <button
+                                                type="button"
+                                                onClick={handleAiParse}
+                                                disabled={!aiText.trim()}
+                                                className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-white text-xs font-extrabold flex items-center gap-1.5 shadow-sm"
+                                            >
+                                                <Icon name="Sparkles" size={14} />
+                                                <span>Extract Pasted Text</span>
+                                            </button>
                                         </div>
                                     </div>
-
-                                    <div className="flex justify-end pt-2">
-                                        <button
-                                            type="button"
-                                            onClick={handleAiParse}
-                                            disabled={isAiParsing || !aiText.trim()}
-                                            className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-white text-xs font-extrabold flex items-center gap-1.5 shadow-sm"
-                                        >
-                                            {isAiParsing ? (
-                                                <>
-                                                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                                    <span>Analyzing statement...</span>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Icon name="Sparkles" size={14} />
-                                                    <span>Extract Transactions</span>
-                                                </>
-                                            )}
-                                        </button>
-                                    </div>
-
-                                    {/* AI Preview Drafts List */}
-                                    {aiDrafts.length > 0 && (
-                                        <div className="space-y-3 pt-4 border-t border-gray-150 dark:border-gray-700">
-                                            <div className="flex items-center justify-between">
-                                                <h4 className="font-extrabold text-sm text-gray-700 dark:text-gray-200">Extracted drafts ({aiDrafts.length})</h4>
-                                                <span className="text-xs font-bold text-gray-400 dark:text-gray-500">Uncheck duplicates before import</span>
-                                            </div>
-
-                                            <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden bg-gray-50/30 dark:bg-gray-800/40">
-                                                <table className="w-full text-xs text-left">
-                                                    <thead className="bg-gray-100 dark:bg-gray-700 text-gray-550 dark:text-gray-300 font-bold">
-                                                        <tr>
-                                                            <th className="px-4 py-2 w-[5%] text-center">
-                                                                <input
-                                                                    type="checkbox"
-                                                                    checked={selectedAiDraftIndexes.length === aiDrafts.length}
-                                                                    onChange={() => {
-                                                                        if (selectedAiDraftIndexes.length === aiDrafts.length) {
-                                                                            setSelectedAiDraftIndexes([]);
-                                                                        } else {
-                                                                            setSelectedAiDraftIndexes(aiDrafts.map((_, i) => i));
-                                                                        }
-                                                                    }}
-                                                                    className="w-4 h-4 rounded text-primary focus:ring-primary border-gray-300 dark:border-gray-650 focus:ring-2 cursor-pointer"
-                                                                />
-                                                            </th>
-                                                            <th className="px-4 py-2">Date</th>
-                                                            <th className="px-4 py-2">Description</th>
-                                                            <th className="px-4 py-2">Amount</th>
-                                                            <th className="px-4 py-2">Category</th>
-                                                            <th className="px-4 py-2">Account</th>
-                                                            <th className="px-4 py-2 text-right">Duplicate?</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody className="divide-y divide-gray-200 dark:divide-gray-750">
-                                                        {aiDrafts.map((row, i) => {
-                                                            const isSelected = selectedAiDraftIndexes.includes(i);
-                                                            const isDup = checkIsDuplicate(row);
-                                                            return (
-                                                                <tr key={i} className={`text-gray-700 dark:text-gray-300 ${isDup ? 'opacity-65' : ''}`}>
-                                                                    <td className="px-4 py-2 text-center">
-                                                                        <input
-                                                                            type="checkbox"
-                                                                            checked={isSelected}
-                                                                            onChange={() => toggleSelectAiDraft(i)}
-                                                                            className="w-4 h-4 rounded text-primary focus:ring-primary border-gray-300 dark:border-gray-650 focus:ring-2 cursor-pointer"
-                                                                        />
-                                                                    </td>
-                                                                    <td className="px-4 py-2">{row.date}</td>
-                                                                    <td className="px-4 py-2 truncate max-w-[150px] font-medium" title={row.note}>{row.note}</td>
-                                                                    <td className="px-4 py-2 font-bold">{formatCurrency(row.amount, currency)}</td>
-                                                                    <td className="px-4 py-2">
-                                                                        {row.type === 'transfer' ? (
-                                                                            <span className="text-[10px] px-2 py-0.5 rounded bg-blue-50 text-blue-700 dark:bg-blue-950/20 dark:text-blue-400 font-bold uppercase">
-                                                                                Transfer
-                                                                            </span>
-                                                                        ) : (
-                                                                            row.categoryName || 'Uncategorized'
-                                                                        )}
-                                                                    </td>
-                                                                    <td className="px-4 py-2">{row.accountName || 'Unknown Account'}</td>
-                                                                    <td className="px-4 py-2 text-right">
-                                                                        {isDup && (
-                                                                            <span className="inline-flex text-[10px] bg-rose-50 text-rose-600 dark:bg-rose-950/20 dark:text-rose-400 px-2 py-0.5 rounded font-extrabold align-middle">
-                                                                                ⚠️ Duplicate
-                                                                            </span>
-                                                                        )}
-                                                                    </td>
-                                                                </tr>
-                                                            );
-                                                        })}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                    )}
                                 </div>
                             </>
                         )}
+
+                        {/* File Processing Spinner */}
+                        {isProcessing && (
+                            <div className="py-16 flex flex-col items-center justify-center gap-4 text-center">
+                                <div className="w-10 h-10 border-4 border-primary/20 border-t-primary dark:border-indigo-400/20 dark:border-t-indigo-400 rounded-full animate-spin" />
+                                <p className="text-sm font-bold text-gray-700 dark:text-gray-300">{processStatus}</p>
+                            </div>
+                        )}
+
+                        {/* Error log box */}
+                        {validationErrors.length > 0 && mode === 'none' && (
+                            <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-xl space-y-2 border border-red-200 dark:border-red-900/40">
+                                <h4 className="font-bold text-red-800 dark:text-red-300 text-sm flex items-center gap-1.5">
+                                    <Icon name="AlertCircle" size={16} />
+                                    <span>Failed to parse document:</span>
+                                </h4>
+                                {validationErrors.map((err, i) => (
+                                    <div key={i} className="text-xs text-red-700 dark:text-red-300 flex items-start gap-1.5 leading-normal">
+                                        <span>• {err}</span>
+                                    </div>
+                                ))}
+                                <button 
+                                    onClick={() => { setFile(null); setValidationErrors([]); }}
+                                    className="text-xs text-primary dark:text-indigo-400 font-bold hover:underline pt-2 block"
+                                >
+                                    Try uploading another file
+                                </button>
+                            </div>
+                        )}
+
+                        {/* MODE: STANDARD PREVIEW GRID */}
+                        {mode === 'standard' && previewData.length > 0 && (
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between border-b border-gray-150 dark:border-gray-750 pb-2">
+                                    <div>
+                                        <h4 className="font-bold text-sm dark:text-white flex items-center gap-1.5">
+                                            <Icon name="FileSpreadsheet" size={16} className="text-primary dark:text-indigo-400" />
+                                            <span>Template File Preview</span>
+                                        </h4>
+                                        <p className="text-xs text-gray-400 mt-0.5">{file?.name}</p>
+                                    </div>
+                                    <button 
+                                        onClick={() => { setFile(null); setMode('none'); setPreviewData([]); }}
+                                        className="text-xs text-rose-500 hover:text-rose-700 font-bold hover:underline flex items-center gap-1"
+                                    >
+                                        <Icon name="X" size={12} />
+                                        Clear File
+                                    </button>
+                                </div>
+
+                                {validationErrors.length > 0 ? (
+                                    <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg space-y-2 max-h-40 overflow-y-auto border border-red-200 dark:border-red-900/40">
+                                        {validationErrors.map((err, i) => (
+                                            <div key={i} className="flex items-start gap-2 text-xs text-red-700 dark:text-red-300">
+                                                <Icon name="AlertCircle" size={14} className="mt-0.5 flex-shrink-0" />
+                                                <span>{err}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="bg-gray-50 dark:bg-gray-800/40 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+                                        <table className="w-full text-xs text-left">
+                                            <thead className="bg-gray-100 dark:bg-gray-700 text-gray-550 dark:text-gray-305 font-bold border-b border-gray-200 dark:border-gray-700">
+                                                <tr>
+                                                    <th className="px-4 py-2">Date</th>
+                                                    <th className="px-4 py-2">Note</th>
+                                                    <th className="px-4 py-2">Amount</th>
+                                                    <th className="px-4 py-2">Account</th>
+                                                    <th className="px-4 py-2">Category</th>
+                                                    <th className="px-4 py-2">Duplicates</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-200 dark:divide-gray-750">
+                                                {previewData.map((row, i) => {
+                                                    const isDup = checkIsDuplicate(row);
+                                                    return (
+                                                        <tr key={i} className="text-gray-700 dark:text-gray-300 hover:bg-gray-50/50 dark:hover:bg-gray-800/20">
+                                                            <td className="px-4 py-2">{formatTransactionDate(row.date)}</td>
+                                                            <td className="px-4 py-2 font-medium truncate max-w-[120px]">{row.note}</td>
+                                                            <td className="px-4 py-2 font-bold">{formatCurrency(row.amount, currency)}</td>
+                                                            <td className="px-4 py-2">{accounts.find(a => a.id === row.accountId)?.name}</td>
+                                                            <td className="px-4 py-2">{categories.find(c => c.id === row.categoryId)?.name || 'Transfer'}</td>
+                                                            <td className="px-4 py-2">
+                                                                {isDup && (
+                                                                    <span className="text-[10px] bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 px-2 py-0.5 rounded font-extrabold flex items-center gap-1 w-max">
+                                                                        ⚠️ Duplicate
+                                                                    </span>
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* MODE: AI PREVIEW DRAFTS GRID */}
+                        {mode === 'ai' && aiDrafts.length > 0 && (
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between border-b border-gray-150 dark:border-gray-750 pb-2">
+                                    <div>
+                                        <h4 className="font-bold text-sm dark:text-white flex items-center gap-1.5">
+                                            <Icon name="Sparkles" size={16} className="text-amber-500 animate-pulse" />
+                                            <span>AI Extracted Statements Drafts ({aiDrafts.length})</span>
+                                        </h4>
+                                        <p className="text-xs text-gray-400 mt-0.5">{file ? file.name : 'Pasted text'}</p>
+                                    </div>
+                                    <button 
+                                        onClick={() => { setFile(null); setMode('none'); setAiDrafts([]); }}
+                                        className="text-xs text-rose-500 hover:text-rose-700 font-bold hover:underline flex items-center gap-1"
+                                    >
+                                        <Icon name="X" size={12} />
+                                        Clear Drafts
+                                    </button>
+                                </div>
+
+                                <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-gray-50/30 dark:bg-gray-800/40">
+                                    <table className="w-full text-xs text-left">
+                                        <thead className="bg-gray-100 dark:bg-gray-700 text-gray-550 dark:text-gray-305 font-bold border-b border-gray-200 dark:border-gray-700">
+                                            <tr>
+                                                <th className="px-4 py-2 w-[5%] text-center">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedAiDraftIndexes.length === aiDrafts.length}
+                                                        onChange={() => {
+                                                            if (selectedAiDraftIndexes.length === aiDrafts.length) {
+                                                                setSelectedAiDraftIndexes([]);
+                                                            } else {
+                                                                setSelectedAiDraftIndexes(aiDrafts.map((_, i) => i));
+                                                            }
+                                                        }}
+                                                        className="w-4 h-4 rounded text-primary focus:ring-primary border-gray-300 dark:border-gray-650 focus:ring-2 cursor-pointer"
+                                                    />
+                                                </th>
+                                                <th className="px-4 py-2">Date</th>
+                                                <th className="px-4 py-2">Description</th>
+                                                <th className="px-4 py-2">Amount</th>
+                                                <th className="px-4 py-2">Category</th>
+                                                <th className="px-4 py-2">Account</th>
+                                                <th className="px-4 py-2 text-right">Duplicate?</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-200 dark:divide-gray-750">
+                                            {aiDrafts.map((row, i) => {
+                                                const isSelected = selectedAiDraftIndexes.includes(i);
+                                                const isDup = checkIsDuplicate(row);
+                                                return (
+                                                    <tr key={i} className={`text-gray-700 dark:text-gray-350 hover:bg-gray-50/50 dark:hover:bg-gray-800/20 ${isDup ? 'opacity-65 bg-amber-50/10' : ''}`}>
+                                                        <td className="px-4 py-2 text-center">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={isSelected}
+                                                                onChange={() => toggleSelectAiDraft(i)}
+                                                                className="w-4 h-4 rounded text-primary focus:ring-primary border-gray-300 dark:border-gray-650 focus:ring-2 cursor-pointer"
+                                                            />
+                                                        </td>
+                                                        <td className="px-4 py-2">{row.date}</td>
+                                                        <td className="px-4 py-2 truncate max-w-[150px] font-medium" title={row.note}>{row.note}</td>
+                                                        <td className="px-4 py-2 font-bold">{formatCurrency(row.amount, currency)}</td>
+                                                        <td className="px-4 py-2">
+                                                            {row.type === 'transfer' ? (
+                                                                <span className="text-[10px] px-2 py-0.5 rounded bg-blue-50 text-blue-700 dark:bg-blue-950/20 dark:text-blue-400 font-bold uppercase">
+                                                                    Transfer
+                                                                </span>
+                                                            ) : (
+                                                                row.categoryName || 'Uncategorized'
+                                                            )}
+                                                        </td>
+                                                        <td className="px-4 py-2">{row.accountName || 'Unknown Account'}</td>
+                                                        <td className="px-4 py-2 text-right">
+                                                            {isDup && (
+                                                                <span className="inline-flex text-[10px] bg-rose-50 text-rose-600 dark:bg-rose-950/20 dark:text-rose-455 px-2 py-0.5 rounded font-extrabold align-middle">
+                                                                    ⚠️ Duplicate
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
-                    <div className="p-6 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3 shrink-0">
-                        <button onClick={onClose} className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 font-bold hover:bg-gray-105 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-205 dark:border-gray-700">
+                    {/* Footer buttons */}
+                    <div className="p-6 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3 bg-gray-50/30 dark:bg-gray-800/20 shrink-0">
+                        <button onClick={onClose} className="px-4 py-2 text-sm text-gray-750 dark:text-gray-300 font-bold hover:bg-gray-105 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-205 dark:border-gray-700">
                             Cancel
                         </button>
-                        {activeTab === 'csv' ? (
+                        
+                        {mode === 'standard' && (
                             <button
                                 onClick={handleImportCSV}
                                 disabled={!file || validationErrors.length > 0 || isImporting || previewData.length === 0}
@@ -683,7 +807,9 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
                                     </>
                                 )}
                             </button>
-                        ) : (
+                        )}
+
+                        {mode === 'ai' && (
                             <button
                                 onClick={handleImportAiDrafts}
                                 disabled={selectedAiDraftIndexes.length === 0 || isImporting}
