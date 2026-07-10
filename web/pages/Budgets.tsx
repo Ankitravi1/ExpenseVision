@@ -19,7 +19,7 @@ const PeriodNavigator: React.FC<{ date: Date; setDate: (date: Date) => void }> =
             <button onClick={() => changeMonth(-1)} className="p-2 rounded-lg hover:bg-gray-150 dark:hover:bg-gray-700 transition-colors" aria-label="Previous month">
                 <Icon name="ChevronLeft" size={18} />
             </button>
-            <h3 className="text-sm font-bold text-gray-900 dark:text-gray-550 w-36 text-center tabular-nums">
+            <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100 w-36 text-center tabular-nums">
                 {date.toLocaleString('default', { month: 'long', year: 'numeric' })}
             </h3>
             <button onClick={() => changeMonth(1)} className="p-2 rounded-lg hover:bg-gray-150 dark:hover:bg-gray-700 transition-colors" aria-label="Next month">

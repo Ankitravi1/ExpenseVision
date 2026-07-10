@@ -372,7 +372,8 @@ export const Reports: React.FC = () => {
                                     setStartDate(e.target.value);
                                     setViewMode('Custom');
                                 }}
-                                className="bg-transparent border-none text-xs text-gray-800 dark:text-gray-150 outline-none w-28 py-0.5 font-semibold"
+                                className="bg-transparent border-none text-xs text-gray-800 dark:text-gray-100 outline-none w-28 py-0.5 font-semibold dark:[color-scheme:dark]"
+                                style={{ colorScheme: 'dark' }}
                             />
                             <button
                                 type="button"
@@ -394,7 +395,8 @@ export const Reports: React.FC = () => {
                                     setEndDate(e.target.value);
                                     setViewMode('Custom');
                                 }}
-                                className="bg-transparent border-none text-xs text-gray-800 dark:text-gray-155 outline-none w-28 py-0.5 font-semibold"
+                                className="bg-transparent border-none text-xs text-gray-800 dark:text-gray-100 outline-none w-28 py-0.5 font-semibold dark:[color-scheme:dark]"
+                                style={{ colorScheme: 'dark' }}
                             />
                             <button
                                 type="button"
@@ -449,7 +451,7 @@ export const Reports: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Total Expense - Plain design matching layout */}
                 <Card className="flex items-center p-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm">
-                    <div className="w-12 h-12 rounded-xl bg-red-50 dark:bg-rose-950/30 flex items-center justify-center mr-4">
+                    <div className="w-12 h-12 rounded-xl bg-red-50 dark:bg-rose-955/30 flex items-center justify-center mr-4">
                         <Icon name="TrendingDown" className="text-danger dark:text-rose-400" size={24} />
                     </div>
                     <div>
@@ -475,14 +477,22 @@ export const Reports: React.FC = () => {
 
                 {/* Balance (with Carry Over) - Nice gradient background */}
                 <Card className="flex items-center p-6 bg-gradient-to-br from-primary-light/50 to-indigo-50/20 dark:from-indigo-950/30 dark:to-gray-800/40 border border-gray-200 dark:border-gray-700/80 shadow-sm">
-                    <div className="w-12 h-12 rounded-xl bg-primary-light dark:bg-primary/20 flex items-center justify-center mr-4">
-                        <Icon name="CircleDollarSign" className="text-primary dark:text-indigo-300" size={24} />
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center mr-4 ${
+                        carryOver
+                            ? 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                            : 'bg-primary-light dark:bg-primary/20 text-primary dark:text-indigo-300'
+                    }`}>
+                        <Icon name="CircleDollarSign" size={24} />
                     </div>
                     <div>
-                        <h4 className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                        <h4 className="text-sm font-medium text-gray-600 dark:text-gray-305">
                             {carryOver ? 'Balance (with Carry Over)' : 'Net Balance'}
                         </h4>
-                        <p className={`text-2xl font-bold mt-1 ${displayBalance >= 0 ? 'text-gray-900 dark:text-gray-100' : 'text-danger'}`}>
+                        <p className={`text-2xl font-bold mt-1 ${
+                            carryOver
+                                ? 'text-gray-900 dark:text-gray-100'
+                                : 'text-primary dark:text-indigo-400'
+                        }`}>
                             {formatCurrency(displayBalance, currency)}
                         </p>
                     </div>

@@ -67,24 +67,24 @@ const AccountDetailsModal: React.FC<AccountDetailsModalProps> = ({
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
                 <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl pointer-events-auto transform transition-all flex flex-col max-h-[85vh] overflow-hidden">
                     {/* Header */}
-                    <div className="p-6 border-b border-gray-150 dark:border-gray-700 flex justify-between items-center shrink-0 bg-gray-50/50 dark:bg-gray-800/50">
+                    <div className="p-6 border-b border-gray-150 dark:border-gray-700 flex justify-between items-center shrink-0 bg-gray-100 dark:bg-gray-900">
                         <div>
-                            <h3 className="text-xl font-bold text-gray-darkest dark:text-gray-55 flex items-center gap-2">
+                            <h3 className="text-xl font-bold text-gray-darkest dark:text-gray-100 flex items-center gap-2">
                                 <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
                                     <Icon name={account.icon || 'Wallet'} className="text-primary dark:text-indigo-400" size={18} />
                                 </div>
                                 {account.name}
                             </h3>
                             <div className="flex items-baseline gap-4 mt-2">
-                                <span className="text-xs text-gray-505 dark:text-gray-400 font-medium capitalize bg-gray-100 dark:bg-gray-700/60 px-2 py-0.5 rounded">
+                                <span className="text-xs text-gray-500 dark:text-gray-400 font-medium capitalize bg-gray-100 dark:bg-gray-700/60 px-2 py-0.5 rounded">
                                     {account.type}
                                 </span>
                                 <div className="flex items-baseline gap-2">
-                                    <span className="text-xs text-gray-400 dark:text-gray-500">Current:</span>
+                                    <span className="text-xs text-gray-400 dark:text-gray-550">Current:</span>
                                     <span className="text-xl font-black text-primary dark:text-indigo-400">{formatCurrency(account.balance, currency)}</span>
                                 </div>
                                 <div className="flex items-baseline gap-2 border-l border-gray-200 dark:border-gray-700 pl-3">
-                                    <span className="text-xs text-gray-400 dark:text-gray-500">Initial:</span>
+                                    <span className="text-xs text-gray-400 dark:text-gray-550">Initial:</span>
                                     <span className="text-xs font-bold text-gray-500 dark:text-gray-400">{formatCurrency(account.initialBalance ?? 0, currency)}</span>
                                 </div>
                             </div>
@@ -95,12 +95,12 @@ const AccountDetailsModal: React.FC<AccountDetailsModalProps> = ({
                     </div>
 
                     {/* Sorting Control */}
-                    <div className="px-6 py-3 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-white dark:bg-gray-800">
+                    <div className="px-6 py-3 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50/50 dark:bg-gray-900/30">
                         <span className="text-xs font-bold text-gray-450 dark:text-gray-400 uppercase tracking-wider">
                             Transaction History ({accountTransactions.length})
                         </span>
                         <div className="flex items-center gap-2">
-                            <label htmlFor="details-sort" className="text-xs text-gray-550 dark:text-gray-300 font-semibold">Sort by:</label>
+                            <label htmlFor="details-sort" className="text-xs text-gray-500 dark:text-gray-305 font-semibold">Sort by:</label>
                             <select
                                 id="details-sort"
                                 value={sortOrder}
@@ -351,8 +351,8 @@ export const Accounts: React.FC = () => {
                             <Icon name="Landmark" className="text-primary dark:text-indigo-300" size={24} />
                         </div>
                         <div>
-                            <h4 className="text-sm font-medium text-gray-505 dark:text-gray-400">Combined Balance</h4>
-                            <p className={`text-2xl font-bold mt-1 ${totalBalance < 0 ? 'text-danger' : 'text-gray-darkest dark:text-gray-50'}`}>
+                            <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Combined Balance</h4>
+                            <p className="text-2xl font-bold mt-1 text-primary dark:text-indigo-400">
                                 {formatCurrency(totalBalance, currency)}
                             </p>
                         </div>

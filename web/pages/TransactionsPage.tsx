@@ -139,6 +139,7 @@ export const TransactionsPage: React.FC = () => {
 
     // Table Filters collapsible by default
     const [showTableFilters, setShowTableFilters] = useState<boolean>(false);
+    const [showAmountFilterPopup, setShowAmountFilterPopup] = useState<boolean>(false);
 
     // Bulk delete selections
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -463,7 +464,8 @@ export const TransactionsPage: React.FC = () => {
                                         setStartDate(e.target.value);
                                         setViewMode('Custom');
                                     }}
-                                    className="bg-transparent border-none text-xs text-gray-800 dark:text-gray-150 outline-none w-28 py-0.5 font-semibold"
+                                    className="bg-transparent border-none text-xs text-gray-800 dark:text-gray-150 outline-none w-28 py-0.5 font-semibold dark:[color-scheme:dark]"
+                                    style={{ colorScheme: 'dark' }}
                                 />
                                 <button
                                     type="button"
@@ -485,7 +487,8 @@ export const TransactionsPage: React.FC = () => {
                                         setEndDate(e.target.value);
                                         setViewMode('Custom');
                                     }}
-                                    className="bg-transparent border-none text-xs text-gray-800 dark:text-gray-150 outline-none w-28 py-0.5 font-semibold"
+                                    className="bg-transparent border-none text-xs text-gray-800 dark:text-gray-150 outline-none w-28 py-0.5 font-semibold dark:[color-scheme:dark]"
+                                    style={{ colorScheme: 'dark' }}
                                 />
                                 <button
                                     type="button"
@@ -530,45 +533,61 @@ export const TransactionsPage: React.FC = () => {
                 </div>
 
                 {/* 
-                  Summary Stats cards row
+                  Summary Stats cards row - redesigned as separate cards to match Reports and Accounts pages
                 */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-6 p-4 bg-gray-50 dark:bg-gray-800/40 border border-gray-150 dark:border-gray-700 rounded-xl shadow-sm">
-                    {/* Expense Card */}
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-red-50 dark:bg-rose-955/30 flex items-center justify-center text-danger dark:text-rose-400">
-                            <Icon name="TrendingDown" size={20} />
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                    {/* Expense Card - Plain design matching layout */}
+                    <Card className="flex items-center p-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm">
+                        <div className="w-12 h-12 rounded-xl bg-red-50 dark:bg-rose-955/30 flex items-center justify-center mr-4">
+                            <Icon name="TrendingDown" className="text-danger dark:text-rose-400" size={24} />
                         </div>
                         <div>
-                            <p className="text-[10px] font-bold text-gray-450 dark:text-gray-550 uppercase tracking-wider">Expense</p>
-                            <p className="text-base font-bold text-danger dark:text-rose-455">{formatCurrency(rangeExpense, currency)}</p>
+                            <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Total Expense</p>
+                            <p className="text-2xl font-bold mt-1 text-danger dark:text-rose-455">
+                                -{formatCurrency(rangeExpense, currency)}
+                            </p>
                         </div>
-                    </div>
+                    </Card>
 
-                    {/* Income Card */}
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-green-50 dark:bg-emerald-950/30 flex items-center justify-center text-success dark:text-emerald-400">
-                            <Icon name="TrendingUp" size={20} />
+                    {/* Income Card - Plain design matching layout */}
+                    <Card className="flex items-center p-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm">
+                        <div className="w-12 h-12 rounded-xl bg-green-50 dark:bg-emerald-950/30 flex items-center justify-center mr-4">
+                            <Icon name="TrendingUp" className="text-success dark:text-emerald-405" size={24} />
                         </div>
                         <div>
-                            <p className="text-[10px] font-bold text-gray-450 dark:text-gray-550 uppercase tracking-wider">Income</p>
-                            <p className="text-base font-bold text-success dark:text-emerald-405">{formatCurrency(rangeIncome, currency)}</p>
+                            <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Total Income</p>
+                            <p className="text-2xl font-bold mt-1 text-success dark:text-emerald-405">
+                                +{formatCurrency(rangeIncome, currency)}
+                            </p>
                         </div>
-                    </div>
+                    </Card>
 
-                    {/* Balance Card */}
-                    <div className="flex items-center gap-3 border-t sm:border-t-0 sm:border-l border-gray-200 dark:border-gray-700 pt-3 sm:pt-0 sm:pl-4">
-                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${displayBalance >= 0 ? 'bg-primary-light/50 dark:bg-primary/20 text-primary dark:text-indigo-400' : 'bg-red-50 dark:bg-rose-955/30 text-danger dark:text-rose-400'}`}>
-                            <Icon name="CircleDollarSign" size={20} />
+                    {/* Balance Card - Conditional gradient balance */}
+                    <Card className={`flex items-center p-6 border shadow-sm transition-all duration-300 ${
+                        carryOver
+                            ? 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+                            : 'bg-gradient-to-br from-primary-light/50 to-indigo-50/20 dark:from-indigo-950/30 dark:to-gray-800/40 border-gray-200 dark:border-gray-700/80'
+                    }`}>
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center mr-4 transition-colors ${
+                            carryOver
+                                ? 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                                : 'bg-primary-light dark:bg-primary/20 text-primary dark:text-indigo-300'
+                        }`}>
+                            <Icon name="CircleDollarSign" size={24} />
                         </div>
                         <div>
-                            <p className="text-[10px] font-bold text-gray-450 dark:text-gray-550 uppercase tracking-wider">
+                            <p className="text-xs font-medium text-gray-650 dark:text-gray-305">
                                 {carryOver ? 'Balance (with Carry Over)' : 'Net Balance'}
                             </p>
-                            <p className={`text-base font-bold mt-0.5 ${displayBalance >= 0 ? 'text-gray-900 dark:text-gray-105' : 'text-danger'}`}>
+                            <p className={`text-2xl font-bold mt-1 ${
+                                carryOver
+                                    ? 'text-gray-900 dark:text-gray-100'
+                                    : 'text-primary dark:text-indigo-400'
+                            }`}>
                                 {formatCurrency(displayBalance, currency)}
                             </p>
                         </div>
-                    </div>
+                    </Card>
                 </div>
 
                 {/* 
@@ -592,7 +611,7 @@ export const TransactionsPage: React.FC = () => {
                         </button>
 
                         {/* Apply filters to stats directly behind filter button on left side */}
-                        <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-gray-650 dark:text-gray-300 select-none bg-gray-50 dark:bg-gray-800/80 px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-700">
+                        <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-gray-650 dark:text-gray-350 select-none bg-gray-105 dark:bg-gray-800 px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700">
                             <input
                                 type="checkbox"
                                 checked={applyFiltersToSummary}
@@ -615,7 +634,7 @@ export const TransactionsPage: React.FC = () => {
                                 </button>
                                 <button
                                     onClick={() => setSelectedIds([])}
-                                    className="px-2 py-0.5 bg-gray-200 hover:bg-gray-300 text-gray-700 dark:bg-gray-700 dark:hover:bg-gray-650 dark:text-gray-300 rounded font-bold transition-colors"
+                                    className="px-2 py-0.5 bg-amber-500 hover:bg-amber-600 text-white rounded font-bold transition-colors shadow-sm"
                                     title="Deselect all rows"
                                 >
                                     Deselect
@@ -644,96 +663,137 @@ export const TransactionsPage: React.FC = () => {
                                     />
                                 </th>
                                 <SortableHeader columnKey="date" title="Date" className="text-left w-[12%]" />
-                                <SortableHeader columnKey="note" title="Note" className="text-left w-[24%]" />
-                                <SortableHeader columnKey="amount" title="Amount" className="text-left w-[12%]" />
+                                <SortableHeader columnKey="note" title="Note" className="text-left w-[18%]" />
+                                <SortableHeader columnKey="amount" title="Amount" className="text-left w-[18%]" />
                                 <SortableHeader columnKey="accountId" title="Account" className="text-left w-[14%]" />
                                 <SortableHeader columnKey="type" title="Type" className="text-left w-[10%]" />
-                                <SortableHeader columnKey="categoryId" title="Category" className="text-left w-[14%]" />
-                                <th scope="col" className="px-6 py-3 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider text-left w-[14%]">
+                                <SortableHeader columnKey="categoryId" title="Category" className="text-left w-[12%]" />
+                                <th scope="col" className="px-6 py-3 text-xs font-semibold text-gray-550 dark:text-gray-305 uppercase tracking-wider text-left w-[10%]">
                                     Transfer To
                                 </th>
-                                <th scope="col" className="px-6 py-3 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider text-right w-[6%]">
+                                <th scope="col" className="px-6 py-3 text-xs font-semibold text-gray-550 dark:text-gray-305 uppercase tracking-wider text-right w-[6%]">
                                     Actions
                                 </th>
                             </tr>
-                            {/* Excel-like Inline Columns Filter Row */}
-                            {showTableFilters && (
-                                <tr className="bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
-                                    <th className="px-4 py-1.5"></th>
-                                    <th className="px-4 py-1.5"></th>
-                                    <th className="px-4 py-1.5">
-                                        <input
-                                            type="text"
-                                            placeholder="Filter Note..."
-                                            value={colFilters.note}
-                                            onChange={e => setColFilters(prev => ({ ...prev, note: e.target.value }))}
-                                            className="input text-xs py-1 px-2 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md outline-none focus:ring-1 focus:ring-primary text-gray-900 dark:text-gray-100"
-                                        />
-                                    </th>
-                                    <th className="px-4 py-1.5">
-                                        <div className="flex gap-1 items-center">
-                                            <input
-                                                type="number"
-                                                placeholder="Min"
-                                                value={colFilters.minAmount}
-                                                onChange={e => setColFilters(prev => ({ ...prev, minAmount: e.target.value }))}
-                                                className="input text-[10px] py-0.5 px-1.5 w-1/2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md outline-none focus:ring-1 focus:ring-primary text-right text-gray-900 dark:text-gray-100"
-                                            />
-                                            <input
-                                                type="number"
-                                                placeholder="Max"
-                                                value={colFilters.maxAmount}
-                                                onChange={e => setColFilters(prev => ({ ...prev, maxAmount: e.target.value }))}
-                                                className="input text-[10px] py-0.5 px-1.5 w-1/2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md outline-none focus:ring-1 focus:ring-primary text-right text-gray-900 dark:text-gray-100"
-                                            />
-                                        </div>
-                                    </th>
-                                    <th className="px-4 py-1.5">
-                                        <select
-                                            value={colFilters.account}
-                                            onChange={e => setColFilters(prev => ({ ...prev, account: e.target.value }))}
-                                            className="input text-xs py-1 px-2 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md outline-none cursor-pointer focus:ring-1 focus:ring-primary font-medium text-gray-900 dark:text-gray-100"
-                                        >
-                                            <option value="">All Accounts</option>
-                                            {accounts.map(a => (
-                                                <option key={a.id} value={a.name}>{a.name}</option>
-                                            ))}
-                                        </select>
-                                    </th>
-                                    <th className="px-4 py-1.5">
-                                        <select
-                                            value={colFilters.type}
-                                            onChange={e => setColFilters(prev => ({ ...prev, type: e.target.value }))}
-                                            className="input text-xs py-1 px-2 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md outline-none cursor-pointer focus:ring-1 focus:ring-primary font-medium text-gray-900 dark:text-gray-100"
-                                        >
-                                            <option value="">All Types</option>
-                                            <option value="income">Income</option>
-                                            <option value="expense">Expense</option>
-                                            <option value="transfer">Transfer</option>
-                                        </select>
-                                    </th>
-                                    <th className="px-4 py-1.5">
-                                        <select
-                                            value={colFilters.category}
-                                            onChange={e => setColFilters(prev => ({ ...prev, category: e.target.value }))}
-                                            className="input text-xs py-1 px-2 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md outline-none cursor-pointer focus:ring-1 focus:ring-primary font-medium text-gray-900 dark:text-gray-100"
-                                        >
-                                            <option value="">All Categories</option>
-                                            <option value="Transfer">Transfer</option>
-                                            {categories.map(c => (
-                                                <option key={c.id} value={c.name}>{c.name}</option>
-                                            ))}
-                                        </select>
-                                    </th>
-                                    <th className="px-4 py-1.5"></th>
-                                    <th className="px-4 py-1.5 text-right">
-                                        {(colFilters.note || colFilters.category || colFilters.account || colFilters.type || colFilters.minAmount || colFilters.maxAmount) && (
-                                            <button
-                                                onClick={() => setColFilters({ note: '', category: '', account: '', type: '', minAmount: '', maxAmount: '' })}
-                                                className="text-xs text-rose-500 hover:text-rose-700 dark:text-rose-400 font-bold hover:underline transition-colors"
-                                                title="Clear column filters"
-                                            >
-                                                Clear
+                             {/* Excel-like Inline Columns Filter Row */}
+                             {showTableFilters && (
+                                 <tr className="bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+                                     <th className="px-4 py-1.5"></th>
+                                     <th className="px-4 py-1.5"></th>
+                                     <th className="px-4 py-1.5">
+                                         <input
+                                             type="text"
+                                             placeholder="Filter Note..."
+                                             value={colFilters.note}
+                                             onChange={e => setColFilters(prev => ({ ...prev, note: e.target.value }))}
+                                             className="input text-xs py-1 px-2 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md outline-none focus:ring-1 focus:ring-primary text-gray-900 dark:text-gray-100"
+                                         />
+                                     </th>
+                                     <th className="px-4 py-1.5 relative">
+                                         <button
+                                             type="button"
+                                             onClick={() => setShowAmountFilterPopup(!showAmountFilterPopup)}
+                                             className={`flex items-center justify-between text-xs py-1 px-2 w-full bg-white dark:bg-gray-700 border rounded-md outline-none text-left font-medium transition-all ${
+                                                 (colFilters.minAmount || colFilters.maxAmount)
+                                                     ? 'text-primary dark:text-indigo-400 border-primary dark:border-indigo-500 bg-primary-light/30 dark:bg-primary/10'
+                                                     : 'text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-600'
+                                             }`}
+                                         >
+                                             <span className="truncate">
+                                                 {colFilters.minAmount || colFilters.maxAmount
+                                                     ? `${colFilters.minAmount || '0'} to ${colFilters.maxAmount || '∞'}`
+                                                     : 'Filter...'}
+                                             </span>
+                                             <Icon name="ChevronDown" size={12} className="ml-1 flex-shrink-0" />
+                                         </button>
+                                         {showAmountFilterPopup && (
+                                             <div className="absolute top-full right-0 mt-1 w-52 p-3 bg-white dark:bg-gray-800 border border-gray-250 dark:border-gray-700 rounded-lg shadow-xl z-50 flex flex-col gap-2">
+                                                 <div className="text-[10px] font-bold text-gray-450 dark:text-gray-400 uppercase tracking-wider">Amount Range</div>
+                                                 <div className="flex gap-2 items-center">
+                                                     <input
+                                                         type="number"
+                                                         placeholder="Min"
+                                                         value={colFilters.minAmount}
+                                                         onChange={e => setColFilters(prev => ({ ...prev, minAmount: e.target.value }))}
+                                                         className="input text-xs py-1 px-2 w-1/2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md outline-none text-right text-gray-900 dark:text-gray-100"
+                                                     />
+                                                     <span className="text-gray-400">-</span>
+                                                     <input
+                                                         type="number"
+                                                         placeholder="Max"
+                                                         value={colFilters.maxAmount}
+                                                         onChange={e => setColFilters(prev => ({ ...prev, maxAmount: e.target.value }))}
+                                                         className="input text-xs py-1 px-2 w-1/2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md outline-none text-right text-gray-900 dark:text-gray-100"
+                                                     />
+                                                 </div>
+                                                 <div className="flex justify-end gap-2 mt-1 border-t border-gray-105 dark:border-gray-700 pt-2">
+                                                     <button
+                                                         type="button"
+                                                         onClick={() => {
+                                                             setColFilters(prev => ({ ...prev, minAmount: '', maxAmount: '' }));
+                                                             setShowAmountFilterPopup(false);
+                                                         }}
+                                                         className="text-[10px] font-bold text-rose-500 hover:text-rose-750"
+                                                     >
+                                                         Reset
+                                                     </button>
+                                                     <button
+                                                         type="button"
+                                                         onClick={() => setShowAmountFilterPopup(false)}
+                                                         className="text-[10px] font-bold text-primary dark:text-indigo-400 hover:underline"
+                                                     >
+                                                         Apply
+                                                     </button>
+                                                 </div>
+                                             </div>
+                                         )}
+                                     </th>
+                                     <th className="px-4 py-1.5">
+                                         <select
+                                             value={colFilters.account}
+                                             onChange={e => setColFilters(prev => ({ ...prev, account: e.target.value }))}
+                                             className="input text-xs py-1 px-2 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md outline-none cursor-pointer focus:ring-1 focus:ring-primary font-medium text-gray-900 dark:text-gray-100"
+                                         >
+                                             <option value="">All Accounts</option>
+                                             {accounts.map(a => (
+                                                 <option key={a.id} value={a.name}>{a.name}</option>
+                                             ))}
+                                         </select>
+                                     </th>
+                                     <th className="px-4 py-1.5">
+                                         <select
+                                             value={colFilters.type}
+                                             onChange={e => setColFilters(prev => ({ ...prev, type: e.target.value }))}
+                                             className="input text-xs py-1 px-2 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md outline-none cursor-pointer focus:ring-1 focus:ring-primary font-medium text-gray-900 dark:text-gray-100"
+                                         >
+                                             <option value="">All Types</option>
+                                             <option value="income">Income</option>
+                                             <option value="expense">Expense</option>
+                                             <option value="transfer">Transfer</option>
+                                         </select>
+                                     </th>
+                                     <th className="px-4 py-1.5">
+                                         <select
+                                             value={colFilters.category}
+                                             onChange={e => setColFilters(prev => ({ ...prev, category: e.target.value }))}
+                                             className="input text-xs py-1 px-2 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md outline-none cursor-pointer focus:ring-1 focus:ring-primary font-medium text-gray-900 dark:text-gray-100"
+                                         >
+                                             <option value="">All Categories</option>
+                                             <option value="Transfer">Transfer</option>
+                                             {categories.map(c => (
+                                                 <option key={c.id} value={c.name}>{c.name}</option>
+                                             ))}
+                                         </select>
+                                     </th>
+                                     <th className="px-4 py-1.5"></th>
+                                     <th className="px-4 py-1.5 text-right">
+                                         {(colFilters.note || colFilters.category || colFilters.account || colFilters.type || colFilters.minAmount || colFilters.maxAmount) && (
+                                             <button
+                                                 onClick={() => setColFilters({ note: '', category: '', account: '', type: '', minAmount: '', maxAmount: '' })}
+                                                 className="text-xs text-rose-500 hover:text-rose-700 dark:text-rose-400 font-bold hover:underline transition-colors"
+                                                 title="Clear column filters"
+                                             >
+                                                 Clear
                                             </button>
                                         )}
                                     </th>

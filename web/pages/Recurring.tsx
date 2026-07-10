@@ -432,12 +432,13 @@ export const Recurring: React.FC = () => {
               </label>
               <label className="block">
                 <span className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{form.id ? 'Next occurrence' : 'First occurrence'}</span>
-                <input
-                  type="date"
-                  value={form.startDate}
-                  onChange={event => setForm(prev => ({ ...prev, startDate: event.target.value }))}
-                  className="input"
-                />
+                 <input
+                   type="date"
+                   value={form.startDate}
+                   onChange={event => setForm(prev => ({ ...prev, startDate: event.target.value }))}
+                   className="input dark:[color-scheme:dark]"
+                   style={{ colorScheme: 'dark' }}
+                 />
               </label>
             </div>
 
@@ -466,7 +467,8 @@ export const Recurring: React.FC = () => {
                   type="date"
                   value={form.endDate}
                   onChange={event => setForm(prev => ({ ...prev, endDate: event.target.value }))}
-                  className="input"
+                  className="input dark:[color-scheme:dark]"
+                  style={{ colorScheme: 'dark' }}
                 />
               </label>
             )}
