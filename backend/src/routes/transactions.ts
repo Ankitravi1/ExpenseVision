@@ -254,19 +254,7 @@ router.post('/parse-text', async (req, res, next) => {
 
         const aiConfig = await prisma.aiSettings.findUnique({ where: { userId } });
 
-        let autoParseEnabled = true;
-        if (aiConfig?.baseUrl) {
-            try {
-                const parsed = JSON.parse(aiConfig.baseUrl);
-                if (typeof parsed === 'object' && parsed !== null) {
-                    if (parsed.autoParseEnabled === false) {
-                        autoParseEnabled = false;
-                    }
-                }
-            } catch (e) {}
-        }
-
-        if (!aiConfig?.enabled || !autoParseEnabled) {
+        if (!aiConfig?.enabled || aiConfig.autoParseEnabled === false) {
             return res.status(400).json({ error: 'AI quick entry transaction parsing is disabled' });
         }
         
@@ -423,19 +411,8 @@ router.post('/parse-statement', async (req, res, next) => {
         }
 
         const aiConfig = await prisma.aiSettings.findUnique({ where: { userId } });
-        let importEnabled = true;
-        if (aiConfig?.baseUrl) {
-            try {
-                const parsed = JSON.parse(aiConfig.baseUrl);
-                if (typeof parsed === 'object' && parsed !== null) {
-                    if (parsed.importEnabled === false) {
-                        importEnabled = false;
-                    }
-                }
-            } catch (e) {}
-        }
 
-        if (!aiConfig?.enabled || !importEnabled) {
+        if (!aiConfig?.enabled || aiConfig.importEnabled === false) {
             return res.status(400).json({ error: 'AI statement parsing is disabled' });
         }
 

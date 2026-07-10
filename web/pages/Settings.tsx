@@ -170,7 +170,8 @@ export const Settings: React.FC = () => {
     const customConfiguredProviders = Array.from(new Set([
         ...Object.keys(aiSettings.keys || {}),
         ...Object.keys(aiSettings.customModels || {}),
-        ...Object.keys(aiSettings.baseUrl || {})
+        // Only take non-flag keys from baseUrl for provider detection
+        ...Object.keys(aiSettings.baseUrl || {}).filter(k => k !== 'importEnabled' && k !== 'autoParseEnabled')
     ])).filter(p => !defaultProviders.includes(p) && p !== 'custom' && p.trim() !== '');
 
     useEffect(() => {
@@ -531,20 +532,16 @@ export const Settings: React.FC = () => {
                         <label className="relative inline-flex items-center cursor-pointer ml-4">
                             <input
                                 type="checkbox"
-                                checked={aiSettings.enabled && aiSettings.baseUrl?.importEnabled !== 'false'}
+                                checked={aiSettings.importEnabled !== false}
                                 onChange={(e) => {
                                     setAiSaved(false);
-                                    const nextImportEnabled = e.target.checked;
-                                    const nextAutoParseEnabled = aiSettings.enabled && aiSettings.baseUrl?.autoParseEnabled !== 'false';
-                                    setAiSettings(prev => {
-                                        const nextBaseUrl = { ...prev.baseUrl };
-                                        nextBaseUrl.importEnabled = nextImportEnabled ? 'true' : 'false';
-                                        return {
-                                            ...prev,
-                                            enabled: nextImportEnabled || nextAutoParseEnabled,
-                                            baseUrl: nextBaseUrl
-                                        };
-                                    });
+                                    const nextImport = e.target.checked;
+                                    const nextAutoParse = aiSettings.autoParseEnabled !== false;
+                                    setAiSettings(prev => ({
+                                        ...prev,
+                                        importEnabled: nextImport,
+                                        enabled: nextImport || nextAutoParse
+                                    }));
                                 }}
                                 className="sr-only peer"
                             />
@@ -565,20 +562,16 @@ export const Settings: React.FC = () => {
                         <label className="relative inline-flex items-center cursor-pointer ml-4">
                             <input
                                 type="checkbox"
-                                checked={aiSettings.enabled && aiSettings.baseUrl?.autoParseEnabled !== 'false'}
+                                checked={aiSettings.autoParseEnabled !== false}
                                 onChange={(e) => {
                                     setAiSaved(false);
-                                    const nextAutoParseEnabled = e.target.checked;
-                                    const nextImportEnabled = aiSettings.enabled && aiSettings.baseUrl?.importEnabled !== 'false';
-                                    setAiSettings(prev => {
-                                        const nextBaseUrl = { ...prev.baseUrl };
-                                        nextBaseUrl.autoParseEnabled = nextAutoParseEnabled ? 'true' : 'false';
-                                        return {
-                                            ...prev,
-                                            enabled: nextImportEnabled || nextAutoParseEnabled,
-                                            baseUrl: nextBaseUrl
-                                        };
-                                    });
+                                    const nextAutoParse = e.target.checked;
+                                    const nextImport = aiSettings.importEnabled !== false;
+                                    setAiSettings(prev => ({
+                                        ...prev,
+                                        autoParseEnabled: nextAutoParse,
+                                        enabled: nextImport || nextAutoParse
+                                    }));
                                 }}
                                 className="sr-only peer"
                             />

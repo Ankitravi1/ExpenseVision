@@ -186,11 +186,13 @@ model AiSettings {
   id              String   @id @default(cuid())
   userId          String   @unique
   enabled         Boolean  @default(false)
+  importEnabled   Boolean  @default(true)
+  autoParseEnabled Boolean @default(true)
   provider        String   @default("deepseek")
   model           String   @default("deepseek-v4-flash")
   baseUrl         String?
-  keys            String?  // JSON string: { "openai": "encryptedKey", ... }
-  customModels    String?  // JSON string array: ["model1", "model2"]
+  keys            String?  // JSON string: { "openai": ["encryptedKey", ...], ... }
+  customModels    String?  // JSON string: { "openai": ["model1", ...], ... }
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

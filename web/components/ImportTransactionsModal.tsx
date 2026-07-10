@@ -1,4 +1,4 @@
-import React, { useState, useContext, useRef } from 'react';
+import React, { useState, useContext, useRef, useEffect } from 'react';
 import { AppContext } from '../App';
 import { Icon } from './Icon';
 import { api } from '../services/api';
@@ -26,6 +26,19 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
     const [aiText, setAiText] = useState('');
     const [aiDrafts, setAiDrafts] = useState<any[]>([]);
     const [selectedAiDraftIndexes, setSelectedAiDraftIndexes] = useState<number[]>([]);
+
+    const [aiSettings, setAiSettings] = useState<any>(null);
+    const [isSettingsLoading, setIsSettingsLoading] = useState(true);
+
+    useEffect(() => {
+        api.fetch('/ai-settings')
+            .then(r => r.ok ? r.json() : null)
+            .then(data => {
+                setAiSettings(data);
+                setIsSettingsLoading(false);
+            })
+            .catch(() => setIsSettingsLoading(false));
+    }, []);
 
     if (!isOpen || !context) return null;
 
@@ -146,6 +159,9 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
         setValidationErrors([]);
         
         const fileName = selectedFile.name.toLowerCase();
+        const isAiImportEnabled = aiSettings?.enabled === true &&
+                                  aiSettings?.importEnabled !== false &&
+                                  aiSettings?.keys?.[aiSettings.provider]?.length > 0;
         
         try {
             if (fileName.endsWith('.csv') || fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
@@ -180,6 +196,9 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
                         parseCSVText(csvText);
                         setMode('standard');
                     } else {
+                        if (!isAiImportEnabled) {
+                            throw new Error('AI Statement Import is disabled or has no API key configured. To parse files with custom/shuffled columns, please enable AI Statement Imports and set up your API credentials in Settings.');
+                        }
                         setProcessStatus('Shuffled columns detected. Invoking AI to rearrange...');
                         const result = await api.parseStatement(csvText);
                         const drafts = result.drafts || [];
@@ -197,6 +216,9 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
                     throw new Error('File is empty.');
                 }
             } else if (fileName.endsWith('.pdf')) {
+                if (!isAiImportEnabled) {
+                    throw new Error('AI Statement Import is disabled or has no API key configured. To parse PDFs, please enable AI Statement Imports and set up your API credentials in Settings.');
+                }
                 setProcessStatus('Extracting text from PDF...');
                 const extractedText = await extractTextFromPdf(selectedFile);
                 
@@ -213,6 +235,9 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
                 setSelectedAiDraftIndexes(autoSelectIndices);
                 setMode('ai');
             } else if (/\.(png|jpe?g|webp)$/i.test(fileName)) {
+                if (!isAiImportEnabled) {
+                    throw new Error('AI Statement Import is disabled or has no API key configured. To scan receipt images, please enable AI Statement Imports and set up your API credentials in Settings.');
+                }
                 setProcessStatus('Loading OCR engine...');
                 const Tesseract = await loadTesseract();
                 
@@ -237,6 +262,9 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
                 setSelectedAiDraftIndexes(autoSelectIndices);
                 setMode('ai');
             } else {
+                if (!isAiImportEnabled) {
+                    throw new Error('AI Statement Import is disabled or has no API key configured. To parse text statements, please enable AI Statement Imports and set up your API credentials in Settings.');
+                }
                 // Treat as text
                 setProcessStatus('Reading text file...');
                 const text = await selectedFile.text();
@@ -264,6 +292,13 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
     };
 
     const handleAiParse = async () => {
+        const isAiImportEnabled = aiSettings?.enabled === true &&
+                                  aiSettings?.importEnabled !== false &&
+                                  aiSettings?.keys?.[aiSettings.provider]?.length > 0;
+        if (!isAiImportEnabled) {
+            alert('AI Statement Import is disabled or has no API key configured. Please enable it in Settings first.');
+            return;
+        }
         if (!aiText.trim()) {
             alert('Please paste some text first.');
             return;

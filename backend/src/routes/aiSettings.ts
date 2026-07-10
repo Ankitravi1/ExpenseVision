@@ -6,6 +6,8 @@ const router = Router();
 
 const settingsSchema = z.object({
     enabled: z.boolean(),
+    importEnabled: z.boolean().optional(),
+    autoParseEnabled: z.boolean().optional(),
     provider: z.string().min(1),
     model: z.string(), // Allow empty string for model initially
     baseUrl: z.union([z.string(), z.record(z.string())]).nullish(),
@@ -15,6 +17,8 @@ const settingsSchema = z.object({
 
 const defaultSettings = {
     enabled: false,
+    importEnabled: true,
+    autoParseEnabled: true,
     provider: 'deepseek',
     model: '',
     baseUrl: {},
@@ -91,11 +95,16 @@ router.get('/', async (req, res, next) => {
             console.error('Failed to parse keys, custom models or baseUrl', e);
         }
 
+        // Strip any legacy importEnabled/autoParseEnabled keys from baseUrl if stored there
+        const { importEnabled: _ie, autoParseEnabled: _ape, ...cleanBaseUrl } = parsedBaseUrl as any;
+
         res.json({
             enabled: settings.enabled,
+            importEnabled: settings.importEnabled ?? true,
+            autoParseEnabled: settings.autoParseEnabled ?? true,
             provider: settings.provider,
             model: settings.model,
-            baseUrl: parsedBaseUrl,
+            baseUrl: cleanBaseUrl,
             keys: decryptedKeys,
             customModels: parsedCustomModels
         });
@@ -127,8 +136,10 @@ router.put('/', async (req, res, next) => {
 
         let baseUrlJson: string | null = null;
         if (data.baseUrl) {
+            // Strip any legacy boolean flags that might have been saved inside baseUrl
+            const { importEnabled: _ie, autoParseEnabled: _ape, ...cleanBaseUrl } = (typeof data.baseUrl === 'object' && !Array.isArray(data.baseUrl) ? data.baseUrl : {}) as any;
             if (typeof data.baseUrl === 'object' && !Array.isArray(data.baseUrl)) {
-                baseUrlJson = JSON.stringify(data.baseUrl);
+                baseUrlJson = Object.keys(cleanBaseUrl).length ? JSON.stringify(cleanBaseUrl) : null;
             } else if (typeof data.baseUrl === 'string') {
                 baseUrlJson = JSON.stringify({ custom: data.baseUrl });
             }
@@ -139,6 +150,8 @@ router.put('/', async (req, res, next) => {
             create: {
                 userId,
                 enabled: data.enabled,
+                importEnabled: data.importEnabled ?? true,
+                autoParseEnabled: data.autoParseEnabled ?? true,
                 provider: data.provider,
                 model: data.model,
                 baseUrl: baseUrlJson,
@@ -147,6 +160,8 @@ router.put('/', async (req, res, next) => {
             },
             update: {
                 enabled: data.enabled,
+                importEnabled: data.importEnabled ?? true,
+                autoParseEnabled: data.autoParseEnabled ?? true,
                 provider: data.provider,
                 model: data.model,
                 baseUrl: baseUrlJson,
@@ -164,11 +179,14 @@ router.put('/', async (req, res, next) => {
             }
         }
 
+        const { importEnabled: _ie2, autoParseEnabled: _ape2, ...cleanReturnedBaseUrl } = returnedBaseUrl as any;
         res.json({
             enabled: saved.enabled,
+            importEnabled: saved.importEnabled,
+            autoParseEnabled: saved.autoParseEnabled,
             provider: saved.provider,
             model: saved.model,
-            baseUrl: returnedBaseUrl,
+            baseUrl: cleanReturnedBaseUrl,
             keys: data.keys || {},
             customModels: data.customModels || {}
         });

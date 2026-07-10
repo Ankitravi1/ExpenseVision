@@ -4,6 +4,8 @@ export type AiProvider = 'deepseek' | 'openai' | 'openrouter' | 'gemini' | 'cust
 
 export interface AiSettings {
     enabled: boolean;
+    importEnabled: boolean;
+    autoParseEnabled: boolean;
     provider: AiProvider;
     model: string;
     keys: Record<string, string[]>;          // per-provider list of encrypted API keys
@@ -13,6 +15,8 @@ export interface AiSettings {
 
 export const defaultAiSettings: AiSettings = {
     enabled: false,
+    importEnabled: true,
+    autoParseEnabled: true,
     provider: 'deepseek',
     model: '',
     keys: {},
