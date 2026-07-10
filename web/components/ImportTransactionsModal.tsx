@@ -53,10 +53,41 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
     const extractTextFromPdf = async (pdfFile: File): Promise<string> => {
         const pdfjsLib = await loadPdfJs();
         const arrayBuffer = await pdfFile.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        let pdfDoc;
+        let password = '';
+        let attempts = 0;
+        
+        while (attempts < 3) {
+            try {
+                pdfDoc = await pdfjsLib.getDocument({
+                    data: arrayBuffer,
+                    password: password
+                }).promise;
+                break;
+            } catch (err: any) {
+                if (err.name === 'PasswordException' || err.message.toLowerCase().includes('password')) {
+                    const promptMsg = attempts === 0 
+                        ? 'This PDF is password-protected. Please enter the password:'
+                        : 'Incorrect password. Please enter the password again:';
+                    const userPassword = prompt(promptMsg);
+                    if (userPassword === null) {
+                        throw new Error('Password extraction cancelled by user.');
+                    }
+                    password = userPassword;
+                    attempts++;
+                } else {
+                    throw err;
+                }
+            }
+        }
+        
+        if (!pdfDoc) {
+            throw new Error('Too many password attempts or failed to open PDF.');
+        }
+
         let fullText = '';
-        for (let i = 1; i <= pdf.numPages; i++) {
-            const page = await pdf.getPage(i);
+        for (let i = 1; i <= pdfDoc.numPages; i++) {
+            const page = await pdfDoc.getPage(i);
             const textContent = await page.getTextContent();
             const pageText = textContent.items.map((item: any) => item.str).join(' ');
             fullText += `\n--- Page ${i} ---\n` + pageText;

@@ -495,7 +495,7 @@ export const Recurring: React.FC = () => {
                 <button 
                   type="button" 
                   onClick={resetForm}
-                  className="btn flex-1 flex items-center justify-center gap-2 font-bold py-2.5 transition-all duration-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 rounded-xl"
+                  className="btn flex-1 flex items-center justify-center gap-2 font-bold py-2.5 transition-all duration-300 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/20 dark:hover:bg-rose-900/30 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/40 rounded-xl"
                 >
                   <Icon name="X" size={18} />
                   Cancel

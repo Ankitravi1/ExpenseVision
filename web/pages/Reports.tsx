@@ -484,11 +484,7 @@ export const Reports: React.FC = () => {
                         <h4 className="text-sm font-medium text-blue-700 dark:text-gray-300">
                             {carryOver ? 'Balance (with Carry Over)' : 'Net Balance'}
                         </h4>
-                        <p className={`text-2xl font-bold mt-1 ${
-                            carryOver
-                                ? 'text-gray-900 dark:text-gray-100'
-                                : 'text-primary dark:text-indigo-400'
-                        }`}>
+                        <p className="text-2xl font-bold mt-1 text-primary dark:text-indigo-400">
                             {formatCurrency(displayBalance, currency)}
                         </p>
                     </div>

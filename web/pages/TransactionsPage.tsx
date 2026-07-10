@@ -569,11 +569,7 @@ export const TransactionsPage: React.FC = () => {
                             <p className="text-xs font-medium text-blue-700 dark:text-gray-300">
                                 {carryOver ? 'Balance (with Carry Over)' : 'Net Balance'}
                             </p>
-                            <p className={`text-2xl font-bold mt-1 ${
-                                carryOver
-                                    ? 'text-gray-900 dark:text-gray-100'
-                                    : 'text-primary dark:text-indigo-400'
-                            }`}>
+                            <p className="text-2xl font-bold mt-1 text-primary dark:text-indigo-400">
                                 {formatCurrency(displayBalance, currency)}
                             </p>
                         </div>
@@ -692,7 +688,7 @@ export const TransactionsPage: React.FC = () => {
                                              <span className="truncate">
                                                  {colFilters.amountLimit
                                                      ? `${colFilters.amountType === 'expense' ? 'Exp' : 'Inc'} ≤ ${colFilters.amountLimit}`
-                                                     : 'Filter...'}
+                                                     : 'Range'}
                                              </span>
                                              <Icon name="ChevronDown" size={12} className="ml-1 flex-shrink-0" />
                                          </button>
@@ -733,26 +729,6 @@ export const TransactionsPage: React.FC = () => {
                                                          onChange={e => setColFilters(prev => ({ ...prev, amountLimit: e.target.value }))}
                                                          className="input text-xs py-1 px-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md outline-none text-gray-900 dark:text-gray-100 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                      />
-                                                 </div>
-
-                                                 <div className="flex justify-end gap-2 mt-1 border-t border-gray-105 dark:border-gray-700 pt-2">
-                                                     <button
-                                                         type="button"
-                                                         onClick={() => {
-                                                             setColFilters(prev => ({ ...prev, amountLimit: '' }));
-                                                             setShowAmountFilterPopup(false);
-                                                         }}
-                                                         className="text-[10px] font-bold text-rose-500 hover:text-rose-750"
-                                                     >
-                                                         Reset
-                                                     </button>
-                                                     <button
-                                                         type="button"
-                                                         onClick={() => setShowAmountFilterPopup(false)}
-                                                         className="text-[10px] font-bold text-primary dark:text-indigo-400 hover:underline"
-                                                     >
-                                                         Apply
-                                                     </button>
                                                  </div>
                                              </div>
                                          )}
