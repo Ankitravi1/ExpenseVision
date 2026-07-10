@@ -1,8 +1,9 @@
-import React, { useEffect, useState, useContext } from 'react';
+﻿import React, { useEffect, useState, useContext } from 'react';
 import { Card } from '../components/Card';
 import { Icon } from '../components/Icon';
 import { api } from '../services/api';
 import { AppContext } from '../App';
+import { useToast } from '../context/ToastContext';
 
 interface UserItem {
     id: string;
@@ -58,7 +59,7 @@ const ResetPasswordModal: React.FC<{
             <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40" onClick={onClose} />
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
                 <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md pointer-events-auto border border-gray-200 dark:border-gray-700">
-                    <div className="p-6 border-b border-gray-150 dark:border-gray-700 flex justify-between items-center">
+                    <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
                         <div>
                             <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
                                 <Icon name="KeyRound" size={20} className="text-primary" />
@@ -130,6 +131,7 @@ const ResetPasswordModal: React.FC<{
 // ─── Main Admin Page ──────────────────────────────────────────────────────────
 export const Admin: React.FC = () => {
     const context = useContext(AppContext);
+    const { showToast } = useToast();
     const [users, setUsers] = useState<UserItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -169,10 +171,10 @@ export const Admin: React.FC = () => {
                 showSuccess('User deleted successfully.');
             } else {
                 const err = await res.json();
-                alert(err.error || 'Failed to delete user');
+                showToast(err.error || 'Failed to delete user', 'error');
             }
         } catch (e: any) {
-            alert(e.message || 'Failed to delete user');
+            showToast(e.message || 'Failed to delete user', 'error');
         } finally {
             setDeletingId(null);
         }

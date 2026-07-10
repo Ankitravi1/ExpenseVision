@@ -30,7 +30,7 @@ const TransactionRow: React.FC<{
     let icon = category?.icon || 'Tags';
 
     if (isTransfer) {
-        amountColor = 'text-gray-700 dark:text-gray-355';
+        amountColor = 'text-gray-700 dark:text-gray-300';
         prefix = '';
         categoryName = 'Transfer';
         icon = 'ArrowLeftRight';
@@ -57,7 +57,7 @@ const TransactionRow: React.FC<{
                     <div className="w-8 h-8 rounded-full bg-primary-light/50 dark:bg-primary/20 flex items-center justify-center mr-3 flex-shrink-0">
                         <Icon name={icon} className="text-primary dark:text-indigo-300" size={16} />
                     </div>
-                    <span className="text-sm font-medium text-gray-955 dark:text-gray-100 truncate max-w-xs" title={note}>
+                    <span className="text-sm font-medium text-gray-950 dark:text-gray-100 truncate max-w-xs" title={note}>
                         {note}
                     </span>
                 </div>
@@ -67,15 +67,15 @@ const TransactionRow: React.FC<{
                 {prefix}{formatCurrency(transaction.amount, currency)}
             </td>
             {/* Account */}
-            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-405 font-medium">
+            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 font-medium">
                 {account?.name}
             </td>
             {/* Type */}
             <td className="px-6 py-4 whitespace-nowrap">
                 <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                    isExpense ? 'bg-red-150 text-red-800 dark:bg-red-500/20 dark:text-red-200' :
+                    isExpense ? 'bg-red-200 text-red-800 dark:bg-red-500/20 dark:text-red-200' :
                     isTransfer ? 'bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-200' :
-                    'bg-green-150 text-green-800 dark:bg-green-500/20 dark:text-green-200'
+                    'bg-green-200 text-green-800 dark:bg-green-500/20 dark:text-green-200'
                 }`}>
                     {transaction.type}
                 </span>
@@ -101,7 +101,7 @@ const TransactionRow: React.FC<{
             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                 <button
                     onClick={onEdit}
-                    className="text-gray-500 hover:text-primary dark:text-gray-400 dark:hover:text-primary-light transition-colors p-2 rounded-full hover:bg-gray-105 dark:hover:bg-gray-700"
+                    className="text-gray-500 hover:text-primary dark:text-gray-400 dark:hover:text-primary-light transition-colors p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
                     title="Edit transaction"
                 >
                     <Icon name="MoreHorizontal" size={18} />
@@ -387,7 +387,7 @@ export const TransactionsPage: React.FC = () => {
         title: string,
         className?: string
     }> = ({ columnKey, title, className }) => (
-        <th scope="col" className={`px-6 py-3 text-xs font-semibold text-gray-550 dark:text-gray-300 uppercase tracking-wider cursor-pointer ${className}`} onClick={() => requestSort(columnKey)}>
+        <th scope="col" className={`px-6 py-3 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer ${className}`} onClick={() => requestSort(columnKey)}>
             <div className="flex items-center">
                 <span>{title}</span>
                 {sortConfig.key === columnKey && (
@@ -419,7 +419,7 @@ export const TransactionsPage: React.FC = () => {
                                 </button>
                             )}
 
-                            <label htmlFor="view-mode" className="text-[10px] font-bold text-gray-500 dark:text-gray-405 px-2 uppercase">View</label>
+                            <label htmlFor="view-mode" className="text-[10px] font-bold text-gray-500 dark:text-gray-400 px-2 uppercase">View</label>
                             <select
                                 id="view-mode"
                                 value={viewMode}
@@ -428,7 +428,7 @@ export const TransactionsPage: React.FC = () => {
                                     setViewMode(mode);
                                     updateDatesForViewMode(mode);
                                 }}
-                                className="input text-xs py-1 px-2.5 bg-white dark:bg-gray-700 border border-gray-250 dark:border-gray-600 rounded-lg text-gray-800 dark:text-gray-205 cursor-pointer outline-none font-bold"
+                                className="input text-xs py-1 px-2.5 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-800 dark:text-gray-200 cursor-pointer outline-none font-bold"
                             >
                                 <option value="Daily">Daily</option>
                                 <option value="Weekly">Weekly</option>
@@ -451,7 +451,7 @@ export const TransactionsPage: React.FC = () => {
 
                         {/* Dates with Manual Typing + Calendar Ref openers */}
                         <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 p-1.5 rounded-xl border border-gray-200 dark:border-gray-700">
-                            <label htmlFor="start-date" className="text-[10px] font-bold text-gray-550 dark:text-gray-400 px-1 uppercase">From</label>
+                            <label htmlFor="start-date" className="text-[10px] font-bold text-gray-500 dark:text-gray-400 px-1 uppercase">From</label>
                             <div className="flex items-center bg-white dark:bg-gray-700 px-2 py-0.5 rounded-lg border border-gray-200/60 dark:border-gray-600">
                                 <input
                                     type="date"
@@ -468,13 +468,13 @@ export const TransactionsPage: React.FC = () => {
                                 <button
                                     type="button"
                                     onClick={() => startDateRef.current?.showPicker?.()}
-                                    className="p-1 hover:bg-gray-100 dark:hover:bg-gray-650 rounded text-gray-450 hover:text-gray-300 flex items-center justify-center"
+                                    className="p-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded text-gray-400 hover:text-gray-300 flex items-center justify-center"
                                 >
                                     <Icon name="Calendar" size={13} />
                                 </button>
                             </div>
 
-                            <label htmlFor="end-date" className="text-[10px] font-bold text-gray-550 dark:text-gray-400 px-1 uppercase">To</label>
+                            <label htmlFor="end-date" className="text-[10px] font-bold text-gray-500 dark:text-gray-400 px-1 uppercase">To</label>
                             <div className="flex items-center bg-white dark:bg-gray-700 px-2 py-0.5 rounded-lg border border-gray-200/60 dark:border-gray-600">
                                 <input
                                     type="date"
@@ -491,7 +491,7 @@ export const TransactionsPage: React.FC = () => {
                                 <button
                                     type="button"
                                     onClick={() => endDateRef.current?.showPicker?.()}
-                                    className="p-1 hover:bg-gray-100 dark:hover:bg-gray-650 rounded text-gray-455 hover:text-gray-300 flex items-center justify-center"
+                                    className="p-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded text-gray-455 hover:text-gray-300 flex items-center justify-center"
                                 >
                                     <Icon name="Calendar" size={13} />
                                 </button>
@@ -513,7 +513,7 @@ export const TransactionsPage: React.FC = () => {
                                 Carry Over
                             </label>
                             <div className="relative group/tooltip">
-                                <Icon name="Info" size={12} className="text-gray-450 dark:text-gray-500 hover:text-primary dark:hover:text-indigo-400 cursor-pointer" />
+                                <Icon name="Info" size={12} className="text-gray-400 dark:text-gray-500 hover:text-primary dark:hover:text-indigo-400 cursor-pointer" />
                                 <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-[10px] rounded-lg shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-205 z-50 leading-normal">
                                     Includes your savings/expenses from previous months in the starting balance.
                                 </div>
@@ -536,12 +536,12 @@ export const TransactionsPage: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                     {/* Expense Card - Rose Gradient styled matching dashboard */}
                     <Card className="flex items-center p-6 bg-gradient-to-br from-rose-50 to-rose-100/50 dark:from-rose-950/20 dark:to-gray-800/40 border border-rose-150 dark:border-rose-900/30 shadow-sm rounded-xl">
-                        <div className="w-12 h-12 rounded-xl bg-red-100/80 dark:bg-rose-955/40 flex items-center justify-center mr-4">
+                        <div className="w-12 h-12 rounded-xl bg-red-100/80 dark:bg-rose-950/40 flex items-center justify-center mr-4">
                             <Icon name="TrendingDown" className="text-danger dark:text-rose-400" size={24} />
                         </div>
                         <div>
                             <p className="text-xs font-medium text-rose-700 dark:text-gray-300">Total Expense</p>
-                            <p className="text-2xl font-bold mt-1 text-danger dark:text-rose-455">
+                            <p className="text-2xl font-bold mt-1 text-danger dark:text-rose-400">
                                 -{formatCurrency(rangeExpense, currency)}
                             </p>
                         </div>
@@ -597,12 +597,12 @@ export const TransactionsPage: React.FC = () => {
                         </button>
 
                         {/* Apply filters to stats directly behind filter button on left side */}
-                        <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-gray-650 dark:text-gray-350 select-none bg-gray-105 dark:bg-gray-800 px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700">
+                        <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-gray-600 dark:text-gray-350 select-none bg-gray-100 dark:bg-gray-800 px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700">
                             <input
                                 type="checkbox"
                                 checked={applyFiltersToSummary}
                                 onChange={e => setApplyFiltersToSummary(e.target.checked)}
-                                className="w-4 h-4 rounded text-primary focus:ring-primary border-gray-300 dark:border-gray-650 focus:ring-2 cursor-pointer"
+                                className="w-4 h-4 rounded text-primary focus:ring-primary border-gray-300 dark:border-gray-600 focus:ring-2 cursor-pointer"
                             />
                             <span>Apply filters to stats</span>
                         </label>
@@ -610,7 +610,7 @@ export const TransactionsPage: React.FC = () => {
 
                     <div className="flex items-center gap-4 flex-wrap">
                         {selectedIds.length > 0 && (
-                            <div className="flex items-center gap-2 bg-rose-50 dark:bg-rose-955/20 border border-rose-200 dark:border-rose-900/50 px-3 py-1 rounded-lg text-[10px]">
+                            <div className="flex items-center gap-2 bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/50 px-3 py-1 rounded-lg text-[10px]">
                                 <span className="font-extrabold text-rose-650 dark:text-rose-400">{selectedIds.length} selected</span>
                                 <button
                                     onClick={() => setIsBulkDeleteConfirmOpen(true)}
@@ -654,10 +654,10 @@ export const TransactionsPage: React.FC = () => {
                                 <SortableHeader columnKey="accountId" title="Account" className="text-left w-[14%]" />
                                 <SortableHeader columnKey="type" title="Type" className="text-left w-[10%]" />
                                 <SortableHeader columnKey="categoryId" title="Category" className="text-left w-[12%]" />
-                                <th scope="col" className="px-6 py-3 text-xs font-semibold text-gray-550 dark:text-gray-305 uppercase tracking-wider text-left w-[10%]">
+                                <th scope="col" className="px-6 py-3 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider text-left w-[10%]">
                                     Transfer To
                                 </th>
-                                <th scope="col" className="px-6 py-3 text-xs font-semibold text-gray-550 dark:text-gray-305 uppercase tracking-wider text-right w-[6%]">
+                                <th scope="col" className="px-6 py-3 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider text-right w-[6%]">
                                     Actions
                                 </th>
                             </tr>
@@ -694,7 +694,7 @@ export const TransactionsPage: React.FC = () => {
                                          </button>
                                          {showAmountFilterPopup && (
                                              <div className="absolute top-full right-0 mt-1 w-56 p-3 bg-white dark:bg-gray-800 border border-gray-255 dark:border-gray-700 rounded-lg shadow-xl z-50 flex flex-col gap-3">
-                                                 <div className="text-[10px] font-bold text-gray-450 dark:text-gray-400 uppercase tracking-wider">Amount Filter</div>
+                                                 <div className="text-[10px] font-bold text-gray-400 dark:text-gray-400 uppercase tracking-wider">Amount Filter</div>
                                                  <div className="grid grid-cols-2 gap-1 bg-gray-100 dark:bg-gray-900 p-0.5 rounded-lg">
                                                      <button
                                                          type="button"
@@ -721,7 +721,7 @@ export const TransactionsPage: React.FC = () => {
                                                  </div>
 
                                                  <div className="flex flex-col gap-1">
-                                                     <label className="text-[10px] font-semibold text-gray-400 dark:text-gray-550">Up to Limit (0 to value):</label>
+                                                     <label className="text-[10px] font-semibold text-gray-400 dark:text-gray-500">Up to Limit (0 to value):</label>
                                                      <input
                                                          type="number"
                                                          placeholder="Enter limit..."
@@ -772,9 +772,9 @@ export const TransactionsPage: React.FC = () => {
                                      </th>
                                      <th className="px-4 py-1.5"></th>
                                      <th className="px-4 py-1.5 text-right">
-                                         {(colFilters.note || colFilters.category || colFilters.account || colFilters.type || colFilters.minAmount || colFilters.maxAmount) && (
+                                         {(colFilters.note || colFilters.category || colFilters.account || colFilters.type || colFilters.amountLimit) && (
                                              <button
-                                                 onClick={() => setColFilters({ note: '', category: '', account: '', type: '', minAmount: '', maxAmount: '' })}
+                                                 onClick={() => setColFilters({ note: '', category: '', account: '', type: '', amountType: 'expense', amountLimit: '' })}
                                                  className="text-xs text-rose-500 hover:text-rose-700 dark:text-rose-400 font-bold hover:underline transition-colors"
                                                  title="Clear column filters"
                                              >
@@ -785,10 +785,10 @@ export const TransactionsPage: React.FC = () => {
                                 </tr>
                             )}
                         </thead>
-                        <tbody className="bg-white divide-y divide-gray-250 dark:bg-gray-800 dark:divide-gray-700">
+                        <tbody className="bg-white divide-y divide-gray-300 dark:bg-gray-800 dark:divide-gray-700">
                             {filteredAndSortedTransactions.length === 0 ? (
                                 <tr>
-                                    <td colSpan={9} className="px-6 py-8 text-center text-gray-500 dark:text-gray-450">
+                                    <td colSpan={9} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                                         No transactions found matching the selected filters
                                     </td>
                                 </tr>

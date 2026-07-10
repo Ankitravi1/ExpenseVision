@@ -1,6 +1,7 @@
 
 import React, { useState, useContext, useEffect, useRef } from 'react';
 import { AppContext } from '../App';
+import { useToast } from '../context/ToastContext';
 import { Icon } from './Icon';
 import { TransactionType } from '../types';
 import { getCurrencySymbol, formatCurrency } from '../utils/currency';
@@ -19,6 +20,7 @@ interface NewTransactionModalProps {
 
 export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen, onClose, transaction, onDelete }) => {
     const context = useContext(AppContext);
+    const { showToast } = useToast();
 
     const [type, setType] = useState<TransactionType>('expense');
     const [amount, setAmount] = useState('');
@@ -86,8 +88,6 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
 
     if (!isMounted || !context) return null;
 
-    if (!isMounted || !context) return null;
-
     const { accounts, categories, addTransaction, updateTransaction, currency } = context;
 
     const filteredCategories = categories.filter(c => c.type === type);
@@ -137,28 +137,28 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
         e.preventDefault();
 
         if (!amount || !note || !accountId) {
-            alert("Please fill required fields.");
+            showToast('Please fill required fields.', 'error');
             return;
         }
 
         if (type === 'transfer' && !transferToAccountId) {
-            alert("Please select a destination account.");
+            showToast('Please select a destination account.', 'error');
             return;
         }
 
         if (type !== 'transfer' && !categoryId) {
-            alert("Please select a category.");
+            showToast('Please select a category.', 'error');
             return;
         }
 
         if (type === 'transfer' && accountId === transferToAccountId) {
-            alert("Source and destination accounts cannot be the same.");
+            showToast('Source and destination accounts cannot be the same.', 'error');
             return;
         }
 
         const isoDate = displayDateToIso(date);
         if (!isoDate) {
-            alert("Please enter date as DD-MM-YYYY.");
+            showToast('Please enter date as DD-MM-YYYY.', 'error');
             return;
         }
 

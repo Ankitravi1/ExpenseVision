@@ -1,4 +1,4 @@
-
+﻿
 import React, { useContext, useMemo, useState } from 'react';
 import { AppContext } from '../App';
 import { Card } from '../components/Card';
@@ -267,7 +267,7 @@ export const Dashboard: React.FC = () => {
       {/* Month Navigator Header with Date Range Label */}
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
         {/* Month slider on the left */}
-        <div className="flex items-center bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-250 dark:border-gray-700 p-1">
+        <div className="flex items-center bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-300 dark:border-gray-700 p-1">
           <button
             onClick={() => changeMonth(-1)}
             className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors"
@@ -389,7 +389,7 @@ export const Dashboard: React.FC = () => {
                       <span className="font-semibold text-sm text-gray-800 dark:text-gray-200">{cat.name}</span>
                     </div>
                     <div className="flex items-center gap-4">
-                      <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-150 dark:bg-gray-800 px-2 py-1 rounded-md">
+                      <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-800 px-2 py-1 rounded-md">
                         {percentage}%
                       </span>
                       <span className="font-bold text-sm text-gray-900 dark:text-white">

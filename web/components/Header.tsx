@@ -1,4 +1,4 @@
-import React, { useContext } from 'react';
+﻿import React, { useContext } from 'react';
 import { AppContext } from '../App';
 import { Icon } from './Icon';
 import { NotificationCenter } from './NotificationCenter';
@@ -46,7 +46,7 @@ export const Header: React.FC<HeaderProps> = ({ pageTitle, onNewTransaction }) =
         : pageTitle;
 
   return (
-    <header className="sticky top-0 z-40 bg-white border-b border-gray-250 p-4 sm:px-6 lg:px-8 flex items-center justify-between dark:bg-gray-800 dark:border-gray-700 backdrop-blur-sm bg-opacity-95 dark:bg-opacity-95 shadow-sm">
+    <header className="sticky top-0 z-40 bg-white border-b border-gray-300 p-4 sm:px-6 lg:px-8 flex items-center justify-between dark:bg-gray-800 dark:border-gray-700 backdrop-blur-sm bg-opacity-95 dark:bg-opacity-95 shadow-sm">
       <div className="flex flex-col">
         <h2 className="text-xl sm:text-2xl font-black text-gray-darkest dark:text-gray-50 leading-tight">{displayTitle}</h2>
         <span className="text-xs text-gray-medium dark:text-gray-400 font-medium hidden sm:inline">{getPageSubtitle(pageTitle)}</span>

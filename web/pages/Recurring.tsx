@@ -1,5 +1,6 @@
-import React, { useContext, useMemo, useState } from 'react';
+﻿import React, { useContext, useMemo, useState } from 'react';
 import { AppContext } from '../App';
+import { useToast } from '../context/ToastContext';
 import { Card } from '../components/Card';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { Icon } from '../components/Icon';
@@ -70,10 +71,10 @@ const RecurringRuleCard: React.FC<{
         <div className="flex items-center justify-between gap-2 mb-2">
           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold capitalize ${
             rule.type === 'income'
-              ? 'bg-green-150 text-green-800 dark:bg-green-950/40 dark:text-green-300'
+              ? 'bg-green-200 text-green-800 dark:bg-green-950/40 dark:text-green-300'
               : rule.type === 'transfer'
                 ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-350'
-                : 'bg-red-150 text-red-800 dark:bg-red-950/40 dark:text-red-300'
+                : 'bg-red-200 text-red-800 dark:bg-red-950/40 dark:text-red-300'
           }`}>
             {rule.type}
           </span>
@@ -81,14 +82,14 @@ const RecurringRuleCard: React.FC<{
             {rule.active ? 'Active' : 'Paused'}
           </span>
         </div>
-        <h3 className="text-base font-bold text-gray-900 dark:text-gray-550 truncate" title={rule.note}>
+        <h3 className="text-base font-bold text-gray-900 dark:text-gray-500 truncate" title={rule.note}>
           {rule.note}
         </h3>
         <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1 uppercase tracking-wider font-bold">
           {frequencyLabels[rule.frequency]} • next on {rule.nextRun}
           {rule.endDate ? ` • ends ${rule.endDate}` : ''}
         </p>
-        <p className="text-xs text-gray-550 dark:text-gray-400 mt-1 truncate">
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">
           {rule.type === 'transfer'
             ? `${accountName(rule.accountId)} → ${accountName(rule.transferToAccountId || '')}`
             : `${accountName(rule.accountId)} • ${categoryName(rule.categoryId || '')}`}
@@ -119,7 +120,7 @@ const RecurringRuleCard: React.FC<{
             {ruleTransactions.map(t => (
               <div key={t.id} className="flex justify-between items-center text-[10px] text-gray-600 dark:text-gray-400 border-b border-gray-100 dark:border-gray-808 pb-1 last:border-b-0 last:pb-0">
                 <span className="font-semibold">{formatTransactionDate(t.date, true)}</span>
-                <span className="font-medium text-gray-500 dark:text-gray-450 truncate max-w-[130px]">{t.note}</span>
+                <span className="font-medium text-gray-500 dark:text-gray-400 truncate max-w-[130px]">{t.note}</span>
               </div>
             ))}
           </div>
@@ -130,7 +131,7 @@ const RecurringRuleCard: React.FC<{
             onClick={() => updateRecurring(rule.id, { active: !rule.active })}
             className={`px-3 py-1 rounded-lg text-xs font-bold transition-all border ${
               rule.active
-                ? 'bg-gray-150 border-gray-205 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-650'
+                ? 'bg-gray-200 border-gray-200 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-600'
                 : 'bg-green-50 border-green-200 text-success hover:bg-green-100 dark:bg-green-950/20 dark:border-green-800 dark:text-green-400'
             }`}
           >
@@ -191,6 +192,7 @@ const RecurringRuleCard: React.FC<{
 
 export const Recurring: React.FC = () => {
   const context = useContext(AppContext)!;
+  const { showToast } = useToast();
   const {
     accounts,
     categories,
@@ -238,29 +240,29 @@ export const Recurring: React.FC = () => {
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!form.note.trim()) {
-      alert('Please enter a note.');
+      showToast('Please enter a note.', 'error');
       return;
     }
     const amount = parseFloat(form.amount);
     if (isNaN(amount) || amount <= 0) {
-      alert('Please enter a positive amount.');
+      showToast('Please enter a positive amount.', 'error');
       return;
     }
     if (!form.accountId) {
-      alert('Please choose an account.');
+      showToast('Please choose an account.', 'error');
       return;
     }
     if (form.type === 'transfer') {
       if (!form.transferToAccountId) {
-        alert('Please choose a destination account.');
+        showToast('Please choose a destination account.', 'error');
         return;
       }
       if (form.accountId === form.transferToAccountId) {
-        alert('Source and destination accounts must be different.');
+        showToast('Source and destination accounts must be different.', 'error');
         return;
       }
     } else if (!form.categoryId) {
-      alert('Please choose a category.');
+      showToast('Please choose a category.', 'error');
       return;
     }
 

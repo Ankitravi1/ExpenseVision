@@ -54,7 +54,7 @@ const seedUserData = async (userId: string, prismaClient: PrismaClient) => {
 // Validation schemas
 const signupSchema = z.object({
     email: z.string().email(),
-    password: z.string().min(6),
+    password: z.string().min(8),
     name: z.string().min(1),
 });
 
@@ -176,6 +176,11 @@ router.post('/login', async (req, res) => {
 
         if (!user || !user.password) {
             return res.status(401).json({ error: 'Invalid credentials' });
+        }
+
+        // Email verification guard (only when SMTP is configured)
+        if (process.env.SMTP_HOST && !user.emailVerified) {
+            return res.status(403).json({ error: 'Please verify your email before logging in.' });
         }
 
         // Verify password
@@ -722,6 +727,31 @@ router.post('/refresh-token', async (req, res) => {
         });
     } catch (error) {
         console.error('Refresh token error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// POST /api/auth/logout
+router.post('/logout', async (req, res) => {
+    try {
+        const { refreshToken } = req.body;
+
+        if (refreshToken) {
+            const storedToken = await prisma.refreshToken.findUnique({
+                where: { token: refreshToken },
+            });
+
+            if (storedToken) {
+                await prisma.refreshToken.update({
+                    where: { id: storedToken.id },
+                    data: { revoked: true },
+                });
+            }
+        }
+
+        res.json({ message: 'Logged out' });
+    } catch (error) {
+        console.error('Logout error:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });

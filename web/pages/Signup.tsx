@@ -30,8 +30,8 @@ export const Signup: React.FC<SignupProps> = ({ onSuccess, onBackToLanding, onSw
             return;
         }
 
-        if (password.length < 6) {
-            setError('Password must be at least 6 characters');
+        if (password.length < 8) {
+            setError('Password must be at least 8 characters');
             return;
         }
 
@@ -173,9 +173,9 @@ export const Signup: React.FC<SignupProps> = ({ onSuccess, onBackToLanding, onSw
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
                                         required
-                                        minLength={6}
+                                        minLength={8}
                                         className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                                        placeholder="At least 6 characters"
+                                        placeholder="At least 8 characters"
                                     />
                                 </div>
 
@@ -188,7 +188,7 @@ export const Signup: React.FC<SignupProps> = ({ onSuccess, onBackToLanding, onSw
                                         value={confirmPassword}
                                         onChange={(e) => setConfirmPassword(e.target.value)}
                                         required
-                                        minLength={6}
+                                        minLength={8}
                                         className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                                         placeholder="Re-enter password"
                                     />

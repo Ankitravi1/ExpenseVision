@@ -568,6 +568,10 @@ router.post('/bulk', async (req, res, next) => {
             return res.status(400).json({ error: 'Invalid transactions data' });
         }
 
+        if (transactions.length > 500) {
+            return res.status(400).json({ error: 'Bulk import limited to 500 transactions per batch.' });
+        }
+
         const result = await prisma.$transaction(async (tx: any) => {
             let createdCount = 0;
 
@@ -638,6 +642,26 @@ router.post('/', async (req, res, next) => {
             ...transactionSchema.parse(req.body),
             date: normalizeTransactionDate(req.body.date) as string
         };
+
+        // Ownership checks before entering the DB transaction
+        const ownedAccount = await prisma.account.findFirst({ where: { id: data.accountId, userId } });
+        if (!ownedAccount) {
+            return res.status(403).json({ error: 'Account does not belong to you' });
+        }
+
+        if (data.transferToAccountId) {
+            const ownedTransferTo = await prisma.account.findFirst({ where: { id: data.transferToAccountId, userId } });
+            if (!ownedTransferTo) {
+                return res.status(403).json({ error: 'Transfer destination account does not belong to you' });
+            }
+        }
+
+        if (data.categoryId) {
+            const ownedCategory = await prisma.category.findFirst({ where: { id: data.categoryId, userId } });
+            if (!ownedCategory) {
+                return res.status(403).json({ error: 'Category does not belong to you' });
+            }
+        }
 
         // Start transaction
         const result = await prisma.$transaction(async (tx: any) => {
@@ -718,6 +742,28 @@ router.put('/:id', async (req, res, next) => {
             ...parsedData,
             ...(parsedData.date ? { date: normalizeTransactionDate(parsedData.date) as string } : {})
         };
+
+        // Ownership checks before entering the DB transaction
+        if (parsedData.accountId) {
+            const ownedAccount = await prisma.account.findFirst({ where: { id: parsedData.accountId, userId } });
+            if (!ownedAccount) {
+                return res.status(403).json({ error: 'Account does not belong to you' });
+            }
+        }
+
+        if (parsedData.transferToAccountId) {
+            const ownedTransferTo = await prisma.account.findFirst({ where: { id: parsedData.transferToAccountId, userId } });
+            if (!ownedTransferTo) {
+                return res.status(403).json({ error: 'Transfer destination account does not belong to you' });
+            }
+        }
+
+        if (parsedData.categoryId) {
+            const ownedCategory = await prisma.category.findFirst({ where: { id: parsedData.categoryId, userId } });
+            if (!ownedCategory) {
+                return res.status(403).json({ error: 'Category does not belong to you' });
+            }
+        }
 
         const result = await prisma.$transaction(async (tx: any) => {
             // Get old transaction

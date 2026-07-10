@@ -1,12 +1,14 @@
-import React, { useState, useContext, useEffect, useMemo } from 'react';
+﻿import React, { useState, useContext, useEffect, useMemo } from 'react';
 import { Card } from '../components/Card';
 import { Icon } from '../components/Icon';
 import { AppContext } from '../App';
 import { authService, User } from '../services/auth';
+import { useToast } from '../context/ToastContext';
 import { CURRENCIES } from '../utils/currency';
 
 export const Profile: React.FC = () => {
     const context = useContext(AppContext);
+    const { showToast } = useToast();
     const [currency, setCurrency] = useState('INR');
     const [timezone, setTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone);
     const [user, setUser] = useState<User | null>(null);
@@ -40,10 +42,10 @@ export const Profile: React.FC = () => {
             });
             setUser(updatedUser.user);
             setGlobalCurrency(currency);
-            alert('Profile updated successfully!');
+            showToast('Profile updated successfully!', 'success');
         } catch (error) {
             console.error('Failed to update profile:', error);
-            alert('Failed to update profile');
+            showToast('Failed to update profile', 'error');
         } finally {
             setIsSaving(false);
         }

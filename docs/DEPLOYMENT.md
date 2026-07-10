@@ -1,4 +1,4 @@
-
+﻿
 
 # Deployment Guide for ExpenseVision
 
@@ -16,8 +16,8 @@ Create a `.env` file in the `backend` directory:
 # Port for the backend server
 PORT=5000
 
-# Database URL (SQLite file path)
-DATABASE_URL="file:./dev.db"
+# Database URL (PostgreSQL file path)
+DATABASE_URL=postgresql://postgres:postgres@localhost:5433/expensevision
 
 # JWT Secret (Generate a strong random string)
 JWT_SECRET=your_super_secret_jwt_key_here
@@ -140,3 +140,4 @@ Use Certbot (Let's Encrypt) to automatically generate and renew SSL certificates
 sudo apt install certbot python3-certbot-nginx
 sudo certbot --nginx -d your-domain.com
 ```
+

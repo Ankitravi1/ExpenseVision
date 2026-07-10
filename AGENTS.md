@@ -1,4 +1,4 @@
-# ExpenseVision
+﻿# ExpenseVision
 
 Personal finance monorepo: Express + Prisma + PostgreSQL backend, React 19 + Vite web app, Expo (React Native) mobile app. Web and mobile share the same backend API, so data syncs across both.
 
@@ -41,3 +41,7 @@ Typecheck any package with `npx tsc --noEmit`. There are no automated tests.
 - AI features are per-user only — users configure their own provider/API key in Settings. No shared platform key. Two independent DB boolean toggles: `importEnabled` (AI Statement Imports) and `autoParseEnabled` (AI Transaction Auto-Parsing) stored on the `AiSettings` model.
 - Superadmin: Only `ankitravione@gmail.com` is the designated superadmin. The email is hardcoded in `backend/src/routes/admin.ts`. Do not change this without user confirmation.
 
+
+## Database & Math
+- Money fields in Prisma use Float today. A migration to Decimal is planned in Sprint C. Until then, always use Math.round(x * 100) / 100 for display and avoid accumulating floating-point arithmetic across many values.
+- DB inspection: run cd backend && npx prisma studio for the GUI. DBeaver: host=localhost, port=5433, db=expensevision, user=postgres, pass=postgres.

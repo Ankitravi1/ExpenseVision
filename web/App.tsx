@@ -188,9 +188,9 @@ const App: React.FC = () => {
       setTransactions(prev => [newTransaction, ...prev].sort((a, b) => transactionDateToIso(b.date).localeCompare(transactionDateToIso(a.date))));
       await refreshFinancials();
       showToast('Transaction added', 'success');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to add transaction:', err);
-      showToast('Failed to add transaction', 'error');
+      showToast(err.message || 'Failed to add transaction', 'error');
     }
   }, [refreshFinancials, showToast]);
 
@@ -201,9 +201,9 @@ const App: React.FC = () => {
         .sort((a, b) => transactionDateToIso(b.date).localeCompare(transactionDateToIso(a.date))));
       await refreshFinancials();
       showToast('Transaction updated', 'success');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to update transaction:', err);
-      showToast('Failed to update transaction', 'error');
+      showToast(err.message || 'Failed to update transaction', 'error');
     }
   }, [refreshFinancials, showToast]);
 
@@ -213,9 +213,9 @@ const App: React.FC = () => {
       setTransactions(prev => prev.filter(t => t.id !== id));
       await refreshFinancials();
       showToast('Transaction deleted', 'success');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to delete transaction:', err);
-      showToast('Failed to delete transaction', 'error');
+      showToast(err.message || 'Failed to delete transaction', 'error');
     }
   }, [refreshFinancials, showToast]);
 
@@ -225,9 +225,9 @@ const App: React.FC = () => {
       setTransactions(prev => prev.filter(t => !ids.includes(t.id)));
       await refreshFinancials();
       showToast(`${ids.length} transactions deleted`, 'success');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to bulk delete transactions:', err);
-      showToast('Failed to bulk delete transactions', 'error');
+      showToast(err.message || 'Failed to bulk delete transactions', 'error');
     }
   }, [refreshFinancials, showToast]);
 
@@ -237,9 +237,9 @@ const App: React.FC = () => {
       setTransactions([]);
       await refreshFinancials();
       showToast('All transactions cleared successfully', 'success');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to clear transactions:', err);
-      showToast('Failed to clear transactions', 'error');
+      showToast(err.message || 'Failed to clear transactions', 'error');
     }
   }, [refreshFinancials, showToast]);
 
@@ -248,9 +248,9 @@ const App: React.FC = () => {
       const newAccount = await api.createAccount(account);
       setAccounts(prev => [...prev, newAccount]);
       showToast('Account added', 'success');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to add account:', err);
-      showToast('Failed to add account', 'error');
+      showToast(err.message || 'Failed to add account', 'error');
     }
   }, [showToast]);
 
@@ -259,9 +259,9 @@ const App: React.FC = () => {
       const updatedAccount = await api.updateAccount(id, updatedData);
       setAccounts(prev => prev.map(acc => acc.id === id ? updatedAccount : acc));
       showToast('Account updated', 'success');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to update account:', err);
-      showToast('Failed to update account', 'error');
+      showToast(err.message || 'Failed to update account', 'error');
     }
   }, [showToast]);
 
@@ -284,9 +284,9 @@ const App: React.FC = () => {
       const newCategory = await api.createCategory(category);
       setCategories(prev => [...prev, newCategory]);
       showToast('Category added', 'success');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to add category:', err);
-      showToast('Failed to add category', 'error');
+      showToast(err.message || 'Failed to add category', 'error');
     }
   }, [showToast]);
 
@@ -295,9 +295,9 @@ const App: React.FC = () => {
       const updatedCategory = await api.updateCategory(id, updatedData);
       setCategories(prev => prev.map(cat => cat.id === id ? updatedCategory : cat));
       showToast('Category updated', 'success');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to update category:', err);
-      showToast('Failed to update category', 'error');
+      showToast(err.message || 'Failed to update category', 'error');
     }
   }, [showToast]);
 
@@ -326,9 +326,9 @@ const App: React.FC = () => {
         return [...prev, newBudget];
       });
       showToast('Budget saved', 'success');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to set budget:', err);
-      showToast('Failed to set budget', 'error');
+      showToast(err.message || 'Failed to set budget', 'error');
     }
   }, [showToast]);
 
@@ -337,9 +337,9 @@ const App: React.FC = () => {
       await api.deleteBudget(id);
       setBudgets(prev => prev.filter(b => b.id !== id));
       showToast('Budget deleted', 'success');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to delete budget:', err);
-      showToast('Failed to delete budget', 'error');
+      showToast(err.message || 'Failed to delete budget', 'error');
     }
   }, [showToast]);
 

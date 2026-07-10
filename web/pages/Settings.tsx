@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useContext } from 'react';
+﻿import React, { useState, useEffect, useContext } from 'react';
 import { Card } from '../components/Card';
 import { Icon } from '../components/Icon';
 import { AppContext } from '../App';
+import { useToast } from '../context/ToastContext';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { authService } from '../services/auth';
 import { pushService } from '../services/push';
@@ -21,6 +22,7 @@ const ClearDataModal: React.FC<ClearDataModalProps> = ({ isOpen, onClose, onConf
     const [delAccounts, setDelAccounts] = useState(false);
     const [phrase, setPhrase] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const { showToast } = useToast();
 
     if (!isOpen) return null;
 
@@ -37,7 +39,7 @@ const ClearDataModal: React.FC<ClearDataModalProps> = ({ isOpen, onClose, onConf
             });
             onClose();
         } catch (error: any) {
-            alert(error.message || 'Failed to clear data');
+            showToast(error.message || 'Failed to clear data', 'error');
         } finally {
             setIsSubmitting(false);
         }
@@ -50,8 +52,8 @@ const ClearDataModal: React.FC<ClearDataModalProps> = ({ isOpen, onClose, onConf
                 onClick={onClose}
             />
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
-                <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md pointer-events-auto transform transition-all flex flex-col overflow-hidden border border-gray-150 dark:border-gray-700">
-                    <div className="p-6 border-b border-gray-150 dark:border-gray-700 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/50">
+                <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md pointer-events-auto transform transition-all flex flex-col overflow-hidden border border-gray-200 dark:border-gray-700">
+                    <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/50">
                         <h3 className="text-xl font-bold text-gray-darkest dark:text-gray-50 flex items-center gap-2">
                             <Icon name="AlertTriangle" className="text-danger" size={22} />
                             Clear / Reset Data
@@ -122,7 +124,7 @@ const ClearDataModal: React.FC<ClearDataModalProps> = ({ isOpen, onClose, onConf
                         </div>
                     </div>
 
-                    <div className="p-6 bg-gray-50/50 dark:bg-gray-800/50 border-t border-gray-150 dark:border-gray-700 flex justify-end gap-3">
+                    <div className="p-6 bg-gray-50/50 dark:bg-gray-800/50 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
                         <button
                             type="button"
                             onClick={onClose}
@@ -149,6 +151,7 @@ const ClearDataModal: React.FC<ClearDataModalProps> = ({ isOpen, onClose, onConf
 
 export const Settings: React.FC = () => {
     const context = useContext(AppContext);
+    const { showToast } = useToast();
     if (!context) return null;
     const { theme, setTheme, transactions, refreshData } = context;
 
@@ -224,7 +227,7 @@ export const Settings: React.FC = () => {
                 message = 'Push notification configuration is missing on the backend.';
             }
 
-            alert(message);
+            showToast(message, 'success');
         }
     };
 
@@ -248,7 +251,7 @@ export const Settings: React.FC = () => {
             await refreshData();
         } catch (error: any) {
             console.error('Clear data failed:', error);
-            alert(error.message || 'Failed to clear data');
+            showToast(error.message || 'Failed to clear data', 'error');
         }
     };
 
@@ -276,7 +279,7 @@ export const Settings: React.FC = () => {
             window.URL.revokeObjectURL(url);
         } catch (error) {
             console.error('Export failed:', error);
-            alert('Failed to export data');
+            showToast('Failed to export data', 'error');
         }
     };
 
@@ -519,7 +522,7 @@ export const Settings: React.FC = () => {
                 <h3 className="text-xl font-semibold mb-1 text-gray-darkest dark:text-gray-50">AI Settings</h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">Configure providers, models, and API keys for AI transaction parsing.</p>
                 <div className="space-y-5">
-                    <div className="flex items-start justify-between p-4 bg-gray-50 dark:bg-gray-700/10 rounded-lg border border-gray-150 dark:border-gray-700/50">
+                    <div className="flex items-start justify-between p-4 bg-gray-50 dark:bg-gray-700/10 rounded-lg border border-gray-200 dark:border-gray-700/50">
                         <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1">
                                 <Icon name="Sparkles" size={18} className="text-primary" />
@@ -549,7 +552,7 @@ export const Settings: React.FC = () => {
                         </label>
                     </div>
 
-                    <div className="flex items-start justify-between p-4 bg-gray-50 dark:bg-gray-700/10 rounded-lg border border-gray-150 dark:border-gray-700/50">
+                    <div className="flex items-start justify-between p-4 bg-gray-50 dark:bg-gray-700/10 rounded-lg border border-gray-200 dark:border-gray-700/50">
                         <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1">
                                 <Icon name="Zap" size={18} className="text-primary" />

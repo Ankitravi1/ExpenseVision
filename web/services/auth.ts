@@ -53,6 +53,13 @@ export const authService = {
         }
 
         const json = await res.json();
+
+        // If the backend requires a 2FA code, return early without touching localStorage
+        // so no partial auth state leaks through.
+        if (json.require2FA) {
+            return json;
+        }
+
         localStorage.setItem('token', json.token);
         localStorage.setItem('refreshToken', json.refreshToken);
         localStorage.setItem('user', JSON.stringify(json.user));
@@ -129,6 +136,15 @@ export const authService = {
     },
 
     logout: () => {
+        // Revoke refresh token on the backend before clearing local storage
+        const refreshToken = authService.getRefreshToken();
+        if (refreshToken) {
+            fetch(`${API_URL}/auth/logout`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ refreshToken }),
+            }).catch(() => { /* best-effort — ignore network failures on logout */ });
+        }
         localStorage.removeItem('token');
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');

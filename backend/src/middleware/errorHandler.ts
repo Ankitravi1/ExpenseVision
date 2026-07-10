@@ -8,12 +8,16 @@ export function errorHandler(
 ) {
     console.error('Error:', err);
 
-    const status = err.status || 500;
-    const message = err.status ? err.message : 'Internal Server Error';
+    // Known application error with explicit status
+    if (err.status) {
+        return res.status(err.status).json({ error: err.message });
+    }
 
-    // Frontend expects { error: string }
-    res.status(status).json({
-        error: message,
-        ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
-    });
+    // Prisma error (codes start with 'P')
+    if (err.code && typeof err.code === 'string' && err.code.startsWith('P')) {
+        return res.status(400).json({ error: 'Database error' });
+    }
+
+    // Fallback
+    res.status(500).json({ error: 'Internal server error' });
 }

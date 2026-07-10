@@ -1,5 +1,6 @@
-import React, { useState, useContext, useRef, useEffect } from 'react';
+﻿import React, { useState, useContext, useRef, useEffect } from 'react';
 import { AppContext } from '../App';
+import { useToast } from '../context/ToastContext';
 import { Icon } from './Icon';
 import { api } from '../services/api';
 import { displayDateToIso, formatTransactionDate } from '../utils/date';
@@ -13,6 +14,7 @@ interface ImportTransactionsModalProps {
 
 export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = ({ isOpen, onClose, onImportSuccess }) => {
     const context = useContext(AppContext);
+    const { showToast } = useToast();
     const [mode, setMode] = useState<'none' | 'standard' | 'ai'>('none');
     const [isProcessing, setIsProcessing] = useState(false);
     const [processStatus, setProcessStatus] = useState('');
@@ -296,11 +298,11 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
                                   aiSettings?.importEnabled !== false &&
                                   aiSettings?.keys?.[aiSettings.provider]?.length > 0;
         if (!isAiImportEnabled) {
-            alert('AI Statement Import is disabled or has no API key configured. Please enable it in Settings first.');
+            showToast('AI Statement Import is disabled or has no API key configured. Please enable it in Settings first.', 'error');
             return;
         }
         if (!aiText.trim()) {
-            alert('Please paste some text first.');
+            showToast('Please paste some text first.', 'error');
             return;
         }
         setIsProcessing(true);
@@ -494,7 +496,7 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
             alert(`Successfully imported ${previewData.length} transactions.`);
         } catch (error) {
             console.error('Import failed:', error);
-            alert('Failed to import transactions.');
+            showToast('Failed to import transactions.', 'error');
         } finally {
             setIsImporting(false);
         }
@@ -503,7 +505,7 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
     const handleImportAiDrafts = async () => {
         const selectedDrafts = aiDrafts.filter((_, idx) => selectedAiDraftIndexes.includes(idx));
         if (selectedDrafts.length === 0) {
-            alert('Please select at least one transaction to import.');
+            showToast('Please select at least one transaction to import.', 'error');
             return;
         }
 
@@ -534,7 +536,7 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
             alert(`Successfully imported ${payload.length} transactions using AI.`);
         } catch (error) {
             console.error('AI Import failed:', error);
-            alert('Failed to import transactions.');
+            showToast('Failed to import transactions.', 'error');
         } finally {
             setIsImporting(false);
         }
@@ -550,15 +552,15 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
         <>
             <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40" onClick={onClose} />
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
-                <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col pointer-events-auto transform transition-all border border-gray-150 dark:border-gray-700">
+                <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col pointer-events-auto transform transition-all border border-gray-200 dark:border-gray-700">
                     
                     {/* Header */}
-                    <div className="p-6 border-b border-gray-150 dark:border-gray-700 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/50 shrink-0">
+                    <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/50 shrink-0">
                         <h3 className="text-xl font-bold dark:text-white flex items-center gap-2">
                             <Icon name="Upload" className="text-primary dark:text-indigo-400" />
                             <span>Import Transactions</span>
                         </h3>
-                        <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-205 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 transition-colors">
+                        <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 transition-colors">
                             <Icon name="X" size={20} />
                         </button>
                     </div>
@@ -576,7 +578,7 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
                                             Download our standard template. If your spreadsheet doesn't match this exact format or is from a bank statements PDF/image, our AI parser will automatically rearrange and map the columns.
                                         </p>
                                     </div>
-                                    <button onClick={downloadTemplate} className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-gray-850 text-blue-600 dark:text-blue-400 rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-all text-xs font-bold border border-gray-100 dark:border-gray-700 shrink-0">
+                                    <button onClick={downloadTemplate} className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-all text-xs font-bold border border-gray-100 dark:border-gray-700 shrink-0">
                                         <Icon name="Download" size={14} />
                                         Template
                                     </button>
@@ -584,7 +586,7 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
 
                                 {/* Drag-and-drop / selector Zone */}
                                 <div 
-                                    className="border-2 border-dashed border-gray-300 dark:border-gray-650 rounded-xl p-8 text-center hover:border-primary dark:hover:border-indigo-400 transition-all cursor-pointer bg-gray-50/20 dark:bg-gray-800/10 flex flex-col items-center justify-center min-h-[160px]" 
+                                    className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-8 text-center hover:border-primary dark:hover:border-indigo-400 transition-all cursor-pointer bg-gray-50/20 dark:bg-gray-800/10 flex flex-col items-center justify-center min-h-[160px]" 
                                     onClick={() => fileInputRef.current?.click()}
                                 >
                                     <input
@@ -604,7 +606,7 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
                                 </div>
 
                                 {/* Paste Statement text block */}
-                                <div className="flex flex-col border-t border-gray-150 dark:border-gray-700 pt-4">
+                                <div className="flex flex-col border-t border-gray-200 dark:border-gray-700 pt-4">
                                     <label htmlFor="ai-pasted-text" className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-1.5 uppercase">Or Paste Statement Text</label>
                                     <div className="flex flex-col gap-3">
                                         <textarea
@@ -662,7 +664,7 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
                         {/* MODE: STANDARD PREVIEW GRID */}
                         {mode === 'standard' && previewData.length > 0 && (
                             <div className="space-y-4">
-                                <div className="flex items-center justify-between border-b border-gray-150 dark:border-gray-750 pb-2">
+                                <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 pb-2">
                                     <div>
                                         <h4 className="font-bold text-sm dark:text-white flex items-center gap-1.5">
                                             <Icon name="FileSpreadsheet" size={16} className="text-primary dark:text-indigo-400" />
@@ -691,7 +693,7 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
                                 ) : (
                                     <div className="bg-gray-50 dark:bg-gray-800/40 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
                                         <table className="w-full text-xs text-left">
-                                            <thead className="bg-gray-100 dark:bg-gray-700 text-gray-550 dark:text-gray-305 font-bold border-b border-gray-200 dark:border-gray-700">
+                                            <thead className="bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300 font-bold border-b border-gray-200 dark:border-gray-700">
                                                 <tr>
                                                     <th className="px-4 py-2">Date</th>
                                                     <th className="px-4 py-2">Note</th>
@@ -701,7 +703,7 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
                                                     <th className="px-4 py-2">Duplicates</th>
                                                 </tr>
                                             </thead>
-                                            <tbody className="divide-y divide-gray-200 dark:divide-gray-750">
+                                            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                                                 {previewData.map((row, i) => {
                                                     const isDup = checkIsDuplicate(row);
                                                     return (
@@ -731,7 +733,7 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
                         {/* MODE: AI PREVIEW DRAFTS GRID */}
                         {mode === 'ai' && aiDrafts.length > 0 && (
                             <div className="space-y-4">
-                                <div className="flex items-center justify-between border-b border-gray-150 dark:border-gray-750 pb-2">
+                                <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 pb-2">
                                     <div>
                                         <h4 className="font-bold text-sm dark:text-white flex items-center gap-1.5">
                                             <Icon name="Sparkles" size={16} className="text-amber-500 animate-pulse" />
@@ -750,7 +752,7 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
 
                                 <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-gray-50/30 dark:bg-gray-800/40">
                                     <table className="w-full text-xs text-left">
-                                        <thead className="bg-gray-100 dark:bg-gray-700 text-gray-550 dark:text-gray-305 font-bold border-b border-gray-200 dark:border-gray-700">
+                                        <thead className="bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300 font-bold border-b border-gray-200 dark:border-gray-700">
                                             <tr>
                                                 <th className="px-4 py-2 w-[5%] text-center">
                                                     <input
@@ -763,7 +765,7 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
                                                                 setSelectedAiDraftIndexes(aiDrafts.map((_, i) => i));
                                                             }
                                                         }}
-                                                        className="w-4 h-4 rounded text-primary focus:ring-primary border-gray-300 dark:border-gray-650 focus:ring-2 cursor-pointer"
+                                                        className="w-4 h-4 rounded text-primary focus:ring-primary border-gray-300 dark:border-gray-600 focus:ring-2 cursor-pointer"
                                                     />
                                                 </th>
                                                 <th className="px-4 py-2">Date</th>
@@ -774,7 +776,7 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
                                                 <th className="px-4 py-2 text-right">Duplicate?</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-gray-200 dark:divide-gray-750">
+                                        <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                                             {aiDrafts.map((row, i) => {
                                                 const isSelected = selectedAiDraftIndexes.includes(i);
                                                 const isDup = checkIsDuplicate(row);
@@ -785,7 +787,7 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
                                                                 type="checkbox"
                                                                 checked={isSelected}
                                                                 onChange={() => toggleSelectAiDraft(i)}
-                                                                className="w-4 h-4 rounded text-primary focus:ring-primary border-gray-300 dark:border-gray-650 focus:ring-2 cursor-pointer"
+                                                                className="w-4 h-4 rounded text-primary focus:ring-primary border-gray-300 dark:border-gray-600 focus:ring-2 cursor-pointer"
                                                             />
                                                         </td>
                                                         <td className="px-4 py-2">{row.date}</td>
@@ -803,7 +805,7 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
                                                         <td className="px-4 py-2">{row.accountName || 'Unknown Account'}</td>
                                                         <td className="px-4 py-2 text-right">
                                                             {isDup && (
-                                                                <span className="inline-flex text-[10px] bg-rose-50 text-rose-600 dark:bg-rose-950/20 dark:text-rose-455 px-2 py-0.5 rounded font-extrabold align-middle">
+                                                                <span className="inline-flex text-[10px] bg-rose-50 text-rose-600 dark:bg-rose-950/20 dark:text-rose-400 px-2 py-0.5 rounded font-extrabold align-middle">
                                                                     ⚠️ Duplicate
                                                                 </span>
                                                             )}
@@ -820,7 +822,7 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
 
                     {/* Footer buttons */}
                     <div className="p-6 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3 bg-gray-50/30 dark:bg-gray-800/20 shrink-0">
-                        <button onClick={onClose} className="px-4 py-2 text-sm text-gray-750 dark:text-gray-300 font-bold hover:bg-gray-105 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-205 dark:border-gray-700">
+                        <button onClick={onClose} className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 font-bold hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-200 dark:border-gray-700">
                             Cancel
                         </button>
                         

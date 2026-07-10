@@ -1,4 +1,4 @@
-import React, { useContext, useMemo, useState } from 'react';
+﻿import React, { useContext, useMemo, useState } from 'react';
 import { AppContext } from '../App';
 import { Card } from '../components/Card';
 import { Icon } from '../components/Icon';
@@ -67,7 +67,7 @@ const AccountDetailsModal: React.FC<AccountDetailsModalProps> = ({
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
                 <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl pointer-events-auto transform transition-all flex flex-col max-h-[85vh] overflow-hidden">
                     {/* Header */}
-                    <div className="p-6 border-b border-gray-150 dark:border-gray-700 flex justify-between items-center shrink-0 bg-gray-100 dark:bg-gray-900">
+                    <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center shrink-0 bg-gray-100 dark:bg-gray-900">
                         <div>
                             <h3 className="text-xl font-bold text-gray-darkest dark:text-gray-100 flex items-center gap-2">
                                 <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -80,27 +80,27 @@ const AccountDetailsModal: React.FC<AccountDetailsModalProps> = ({
                                     {account.type}
                                 </span>
                                 <div className="flex items-baseline gap-2">
-                                    <span className="text-xs text-gray-400 dark:text-gray-550">Current:</span>
+                                    <span className="text-xs text-gray-400 dark:text-gray-500">Current:</span>
                                     <span className="text-xl font-black text-primary dark:text-indigo-400">{formatCurrency(account.balance, currency)}</span>
                                 </div>
                                 <div className="flex items-baseline gap-2 border-l border-gray-200 dark:border-gray-700 pl-3">
-                                    <span className="text-xs text-gray-400 dark:text-gray-550">Initial:</span>
+                                    <span className="text-xs text-gray-400 dark:text-gray-500">Initial:</span>
                                     <span className="text-xs font-bold text-gray-500 dark:text-gray-400">{formatCurrency(account.initialBalance ?? 0, currency)}</span>
                                 </div>
                             </div>
                         </div>
-                        <button onClick={onClose} className="p-1.5 rounded-full hover:bg-gray-205 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
+                        <button onClick={onClose} className="p-1.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
                             <Icon name="X" size={20} />
                         </button>
                     </div>
 
                     {/* Sorting Control */}
                     <div className="px-6 py-3 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50/50 dark:bg-gray-900/30">
-                        <span className="text-xs font-bold text-gray-450 dark:text-gray-400 uppercase tracking-wider">
+                        <span className="text-xs font-bold text-gray-400 dark:text-gray-400 uppercase tracking-wider">
                             Transaction History ({accountTransactions.length})
                         </span>
                         <div className="flex items-center gap-2">
-                            <label htmlFor="details-sort" className="text-xs text-gray-500 dark:text-gray-305 font-semibold">Sort by:</label>
+                            <label htmlFor="details-sort" className="text-xs text-gray-500 dark:text-gray-300 font-semibold">Sort by:</label>
                             <select
                                 id="details-sort"
                                 value={sortOrder}
@@ -116,7 +116,7 @@ const AccountDetailsModal: React.FC<AccountDetailsModalProps> = ({
                     {/* Records List */}
                     <div className="flex-1 overflow-y-auto p-6 space-y-6">
                         {accountTransactions.length === 0 ? (
-                            <div className="text-center py-12 text-gray-550 dark:text-gray-400">
+                            <div className="text-center py-12 text-gray-500 dark:text-gray-400">
                                 <Icon name="RefreshCw" size={48} className="mx-auto mb-3 opacity-30" />
                                 <p className="text-base font-medium">No transactions recorded for this account</p>
                             </div>
@@ -148,7 +148,7 @@ const AccountDetailsModal: React.FC<AccountDetailsModalProps> = ({
                                                         title="Click to Edit transaction"
                                                     >
                                                         <div className="flex items-center min-w-0 mr-4">
-                                                            <div className="w-8 h-8 rounded-lg bg-gray-105 dark:bg-gray-700 flex items-center justify-center mr-3 flex-shrink-0 group-hover:bg-primary-light dark:group-hover:bg-primary/20 transition-colors">
+                                                            <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center mr-3 flex-shrink-0 group-hover:bg-primary-light dark:group-hover:bg-primary/20 transition-colors">
                                                                 <Icon name={iconName} size={15} className="text-gray-600 dark:text-gray-300 group-hover:text-primary dark:group-hover:text-indigo-300 transition-colors" />
                                                             </div>
                                                             <div className="min-w-0">
@@ -262,7 +262,7 @@ const AccountCard: React.FC<{ account: Account; onEdit: () => void; onClick: () 
                             e.stopPropagation();
                             onEdit();
                         }}
-                        className={`p-2 transition-colors rounded-full hover:bg-white/10 ${isPredefined ? 'text-white/80 hover:text-white' : 'text-gray-405 hover:text-primary'}`}
+                        className={`p-2 transition-colors rounded-full hover:bg-white/10 ${isPredefined ? 'text-white/80 hover:text-white' : 'text-gray-400 hover:text-primary'}`}
                         title="Edit account"
                     >
                         <Icon name="Settings" size={18} />
@@ -323,7 +323,7 @@ export const Accounts: React.FC = () => {
                 */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <Card className="flex items-center p-6 bg-gradient-to-br from-red-50/30 to-rose-50/10 dark:from-rose-950/20 dark:to-gray-800/40">
-                        <div className="w-12 h-12 rounded-xl bg-red-100 dark:bg-rose-955/40 flex items-center justify-center mr-4">
+                        <div className="w-12 h-12 rounded-xl bg-red-100 dark:bg-rose-950/40 flex items-center justify-center mr-4">
                             <Icon name="TrendingDown" className="text-danger dark:text-rose-400" size={24} />
                         </div>
                         <div>

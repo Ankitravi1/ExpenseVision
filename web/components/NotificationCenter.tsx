@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useContext } from 'react';
+﻿import React, { useState, useEffect, useRef, useContext } from 'react';
 import { Icon } from './Icon';
 import { api } from '../services/api';
 import { authService } from '../services/auth';
@@ -159,7 +159,7 @@ export const NotificationCenter: React.FC = () => {
                                         <div className="flex gap-3">
                                             <div className={`mt-1 h-2 w-2 rounded-full flex-shrink-0 ${!notification.read ? 'bg-blue-500' : 'bg-transparent'}`} />
                                             <div className="min-w-0 flex-1">
-                                                <h4 className={`text-sm font-medium ${!notification.read ? 'text-gray-900 dark:text-white' : 'text-gray-700 dark:text-gray-305'}`}>
+                                                <h4 className={`text-sm font-medium ${!notification.read ? 'text-gray-900 dark:text-white' : 'text-gray-700 dark:text-gray-300'}`}>
                                                     {notification.title}
                                                 </h4>
                                                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 break-words leading-relaxed">
@@ -176,7 +176,7 @@ export const NotificationCenter: React.FC = () => {
                                                             e.stopPropagation(); 
                                                             markAsRead(notification.id); 
                                                         }} 
-                                                        className="p-1.5 text-gray-450 hover:text-success rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors" 
+                                                        className="p-1.5 text-gray-400 hover:text-success rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors" 
                                                         title="Mark Read"
                                                     >
                                                         <Icon name="CheckCheck" size={16} />
