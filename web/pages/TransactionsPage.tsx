@@ -409,18 +409,18 @@ export const TransactionsPage: React.FC = () => {
                 <div className="flex flex-wrap justify-between items-center mb-6 gap-4 border-b border-gray-100 dark:border-gray-800 pb-4">
                     <div className="flex items-center gap-3 flex-wrap">
                         {/* Left chevrons + View select */}
-                        <div className="flex items-center bg-gray-50 dark:bg-gray-855 p-1 rounded-xl border border-gray-200 dark:border-gray-700">
+                        <div className="flex items-center bg-gray-100 dark:bg-gray-800 p-1 rounded-xl border border-gray-200 dark:border-gray-700">
                             {viewMode !== 'Custom' && (
                                 <button
                                     onClick={() => handleShiftPeriod(-1)}
-                                    className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-550 dark:text-gray-400"
+                                    className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400"
                                     title="Go back period"
                                 >
                                     <Icon name="ChevronLeft" size={14} />
                                 </button>
                             )}
 
-                            <label htmlFor="view-mode" className="text-[10px] font-bold text-gray-500 dark:text-gray-400 px-2 uppercase">View</label>
+                            <label htmlFor="view-mode" className="text-[10px] font-bold text-gray-500 dark:text-gray-405 px-2 uppercase">View</label>
                             <select
                                 id="view-mode"
                                 value={viewMode}
@@ -429,7 +429,7 @@ export const TransactionsPage: React.FC = () => {
                                     setViewMode(mode);
                                     updateDatesForViewMode(mode);
                                 }}
-                                className="input text-xs py-1 px-2 bg-white dark:bg-gray-800 border-none rounded-lg text-gray-700 dark:text-gray-200 cursor-pointer outline-none font-bold"
+                                className="input text-xs py-1 px-2.5 bg-white dark:bg-gray-700 border border-gray-250 dark:border-gray-600 rounded-lg text-gray-800 dark:text-gray-205 cursor-pointer outline-none font-bold"
                             >
                                 <option value="Daily">Daily</option>
                                 <option value="Weekly">Weekly</option>
@@ -442,7 +442,7 @@ export const TransactionsPage: React.FC = () => {
                             {viewMode !== 'Custom' && (
                                 <button
                                     onClick={() => handleShiftPeriod(1)}
-                                    className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-555 dark:text-gray-400"
+                                    className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400"
                                     title="Go forward period"
                                 >
                                     <Icon name="ChevronRight" size={14} />
@@ -451,9 +451,9 @@ export const TransactionsPage: React.FC = () => {
                         </div>
 
                         {/* Dates with Manual Typing + Calendar Ref openers */}
-                        <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-855 p-1.5 rounded-xl border border-gray-200 dark:border-gray-700">
-                            <label htmlFor="start-date" className="text-[10px] font-bold text-gray-500 dark:text-gray-400 px-1 uppercase">From</label>
-                            <div className="flex items-center bg-white dark:bg-gray-800 px-2 py-0.5 rounded-lg border border-gray-200/60 dark:border-gray-700">
+                        <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 p-1.5 rounded-xl border border-gray-200 dark:border-gray-700">
+                            <label htmlFor="start-date" className="text-[10px] font-bold text-gray-550 dark:text-gray-400 px-1 uppercase">From</label>
+                            <div className="flex items-center bg-white dark:bg-gray-700 px-2 py-0.5 rounded-lg border border-gray-200/60 dark:border-gray-600">
                                 <input
                                     type="date"
                                     id="start-date"
@@ -463,19 +463,19 @@ export const TransactionsPage: React.FC = () => {
                                         setStartDate(e.target.value);
                                         setViewMode('Custom');
                                     }}
-                                    className="bg-transparent border-none text-xs text-gray-700 dark:text-gray-200 outline-none w-28 py-0.5 font-semibold"
+                                    className="bg-transparent border-none text-xs text-gray-800 dark:text-gray-150 outline-none w-28 py-0.5 font-semibold"
                                 />
                                 <button
                                     type="button"
                                     onClick={() => startDateRef.current?.showPicker?.()}
-                                    className="p-1 hover:bg-gray-105 dark:hover:bg-gray-705 rounded text-gray-450 hover:text-gray-650 flex items-center justify-center"
+                                    className="p-1 hover:bg-gray-100 dark:hover:bg-gray-650 rounded text-gray-450 hover:text-gray-300 flex items-center justify-center"
                                 >
                                     <Icon name="Calendar" size={13} />
                                 </button>
                             </div>
 
-                            <label htmlFor="end-date" className="text-[10px] font-bold text-gray-500 dark:text-gray-400 px-1 uppercase">To</label>
-                            <div className="flex items-center bg-white dark:bg-gray-805 px-2 py-0.5 rounded-lg border border-gray-200/60 dark:border-gray-700">
+                            <label htmlFor="end-date" className="text-[10px] font-bold text-gray-550 dark:text-gray-400 px-1 uppercase">To</label>
+                            <div className="flex items-center bg-white dark:bg-gray-700 px-2 py-0.5 rounded-lg border border-gray-200/60 dark:border-gray-600">
                                 <input
                                     type="date"
                                     id="end-date"
@@ -485,12 +485,12 @@ export const TransactionsPage: React.FC = () => {
                                         setEndDate(e.target.value);
                                         setViewMode('Custom');
                                     }}
-                                    className="bg-transparent border-none text-xs text-gray-700 dark:text-gray-200 outline-none w-28 py-0.5 font-semibold"
+                                    className="bg-transparent border-none text-xs text-gray-800 dark:text-gray-150 outline-none w-28 py-0.5 font-semibold"
                                 />
                                 <button
                                     type="button"
                                     onClick={() => endDateRef.current?.showPicker?.()}
-                                    className="p-1 hover:bg-gray-105 dark:hover:bg-gray-705 rounded text-gray-455 hover:text-gray-650 flex items-center justify-center"
+                                    className="p-1 hover:bg-gray-100 dark:hover:bg-gray-650 rounded text-gray-455 hover:text-gray-300 flex items-center justify-center"
                                 >
                                     <Icon name="Calendar" size={13} />
                                 </button>
@@ -500,19 +500,19 @@ export const TransactionsPage: React.FC = () => {
 
                     {/* Right side: Carry Over & Import Button */}
                     <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-1.5 bg-gray-50 dark:bg-gray-850 border border-gray-200 dark:border-gray-700 px-3 py-1.5 rounded-xl">
+                        <div className="flex items-center gap-1.5 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-1.5 rounded-xl text-gray-700 dark:text-gray-200">
                             <input
                                 type="checkbox"
                                 id="carryover-balance-chk"
                                 checked={carryOver}
                                 onChange={e => setCarryOver(e.target.checked)}
-                                className="w-3.5 h-3.5 text-primary rounded cursor-pointer border-gray-300 dark:border-gray-650 focus:ring-primary"
+                                className="w-3.5 h-3.5 text-primary rounded cursor-pointer border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-primary"
                             />
                             <label htmlFor="carryover-balance-chk" className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer select-none">
                                 Carry Over
                             </label>
                             <div className="relative group/tooltip">
-                                <Icon name="Info" size={12} className="text-gray-450 dark:text-gray-555 hover:text-primary dark:hover:text-indigo-400 cursor-pointer" />
+                                <Icon name="Info" size={12} className="text-gray-450 dark:text-gray-500 hover:text-primary dark:hover:text-indigo-400 cursor-pointer" />
                                 <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-[10px] rounded-lg shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-205 z-50 leading-normal">
                                     Includes your savings/expenses from previous months in the starting balance.
                                 </div>
@@ -632,7 +632,7 @@ export const TransactionsPage: React.FC = () => {
 
                 <div className="overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-xl">
                     <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                        <thead className="bg-gray-50 dark:bg-gray-805/80">
+                        <thead className="bg-gray-100 dark:bg-gray-900">
                             {/* Table Column Order: Date, Note, Amount, Account, Type, Category, Transfer To, Actions */}
                             <tr>
                                 <th scope="col" className="px-4 py-3 text-center w-[4%]">
@@ -640,7 +640,7 @@ export const TransactionsPage: React.FC = () => {
                                         type="checkbox"
                                         checked={filteredAndSortedTransactions.length > 0 && selectedIds.length === filteredAndSortedTransactions.length}
                                         onChange={toggleSelectAll}
-                                        className="w-4 h-4 rounded text-primary focus:ring-primary border-gray-300 dark:border-gray-650 focus:ring-2 cursor-pointer"
+                                        className="w-4 h-4 rounded text-primary focus:ring-primary border-gray-300 dark:border-gray-600 focus:ring-2 cursor-pointer dark:bg-gray-800"
                                     />
                                 </th>
                                 <SortableHeader columnKey="date" title="Date" className="text-left w-[12%]" />
@@ -649,16 +649,16 @@ export const TransactionsPage: React.FC = () => {
                                 <SortableHeader columnKey="accountId" title="Account" className="text-left w-[14%]" />
                                 <SortableHeader columnKey="type" title="Type" className="text-left w-[10%]" />
                                 <SortableHeader columnKey="categoryId" title="Category" className="text-left w-[14%]" />
-                                <th scope="col" className="px-6 py-3 text-xs font-semibold text-gray-550 dark:text-gray-300 uppercase tracking-wider text-left w-[14%]">
+                                <th scope="col" className="px-6 py-3 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider text-left w-[14%]">
                                     Transfer To
                                 </th>
-                                <th scope="col" className="px-6 py-3 text-xs font-semibold text-gray-550 dark:text-gray-300 uppercase tracking-wider text-right w-[6%]">
+                                <th scope="col" className="px-6 py-3 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider text-right w-[6%]">
                                     Actions
                                 </th>
                             </tr>
                             {/* Excel-like Inline Columns Filter Row */}
                             {showTableFilters && (
-                                <tr className="bg-gray-50/50 dark:bg-gray-800/40 border-t border-gray-100 dark:border-gray-750">
+                                <tr className="bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
                                     <th className="px-4 py-1.5"></th>
                                     <th className="px-4 py-1.5"></th>
                                     <th className="px-4 py-1.5">
@@ -667,7 +667,7 @@ export const TransactionsPage: React.FC = () => {
                                             placeholder="Filter Note..."
                                             value={colFilters.note}
                                             onChange={e => setColFilters(prev => ({ ...prev, note: e.target.value }))}
-                                            className="input text-xs py-1 px-2 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md outline-none focus:ring-1 focus:ring-primary"
+                                            className="input text-xs py-1 px-2 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md outline-none focus:ring-1 focus:ring-primary text-gray-900 dark:text-gray-100"
                                         />
                                     </th>
                                     <th className="px-4 py-1.5">
@@ -677,14 +677,14 @@ export const TransactionsPage: React.FC = () => {
                                                 placeholder="Min"
                                                 value={colFilters.minAmount}
                                                 onChange={e => setColFilters(prev => ({ ...prev, minAmount: e.target.value }))}
-                                                className="input text-[10px] py-0.5 px-1.5 w-1/2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md outline-none focus:ring-1 focus:ring-primary text-right"
+                                                className="input text-[10px] py-0.5 px-1.5 w-1/2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md outline-none focus:ring-1 focus:ring-primary text-right text-gray-900 dark:text-gray-100"
                                             />
                                             <input
                                                 type="number"
                                                 placeholder="Max"
                                                 value={colFilters.maxAmount}
                                                 onChange={e => setColFilters(prev => ({ ...prev, maxAmount: e.target.value }))}
-                                                className="input text-[10px] py-0.5 px-1.5 w-1/2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md outline-none focus:ring-1 focus:ring-primary text-right"
+                                                className="input text-[10px] py-0.5 px-1.5 w-1/2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md outline-none focus:ring-1 focus:ring-primary text-right text-gray-900 dark:text-gray-100"
                                             />
                                         </div>
                                     </th>
@@ -692,7 +692,7 @@ export const TransactionsPage: React.FC = () => {
                                         <select
                                             value={colFilters.account}
                                             onChange={e => setColFilters(prev => ({ ...prev, account: e.target.value }))}
-                                            className="input text-xs py-1 px-2 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-650 rounded-md outline-none cursor-pointer focus:ring-1 focus:ring-primary font-medium"
+                                            className="input text-xs py-1 px-2 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md outline-none cursor-pointer focus:ring-1 focus:ring-primary font-medium text-gray-900 dark:text-gray-100"
                                         >
                                             <option value="">All Accounts</option>
                                             {accounts.map(a => (
@@ -704,7 +704,7 @@ export const TransactionsPage: React.FC = () => {
                                         <select
                                             value={colFilters.type}
                                             onChange={e => setColFilters(prev => ({ ...prev, type: e.target.value }))}
-                                            className="input text-xs py-1 px-2 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-650 rounded-md outline-none cursor-pointer focus:ring-1 focus:ring-primary font-medium"
+                                            className="input text-xs py-1 px-2 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md outline-none cursor-pointer focus:ring-1 focus:ring-primary font-medium text-gray-900 dark:text-gray-100"
                                         >
                                             <option value="">All Types</option>
                                             <option value="income">Income</option>
@@ -716,7 +716,7 @@ export const TransactionsPage: React.FC = () => {
                                         <select
                                             value={colFilters.category}
                                             onChange={e => setColFilters(prev => ({ ...prev, category: e.target.value }))}
-                                            className="input text-xs py-1 px-2 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-650 rounded-md outline-none cursor-pointer focus:ring-1 focus:ring-primary font-medium"
+                                            className="input text-xs py-1 px-2 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md outline-none cursor-pointer focus:ring-1 focus:ring-primary font-medium text-gray-900 dark:text-gray-100"
                                         >
                                             <option value="">All Categories</option>
                                             <option value="Transfer">Transfer</option>

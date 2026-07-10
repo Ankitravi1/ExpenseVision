@@ -95,17 +95,17 @@ const AccountDetailsModal: React.FC<AccountDetailsModalProps> = ({
                     </div>
 
                     {/* Sorting Control */}
-                    <div className="px-6 py-3 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-white dark:bg-gray-850">
-                        <span className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+                    <div className="px-6 py-3 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-white dark:bg-gray-800">
+                        <span className="text-xs font-bold text-gray-450 dark:text-gray-400 uppercase tracking-wider">
                             Transaction History ({accountTransactions.length})
                         </span>
                         <div className="flex items-center gap-2">
-                            <label htmlFor="details-sort" className="text-xs text-gray-500 dark:text-gray-400 font-semibold">Sort by:</label>
+                            <label htmlFor="details-sort" className="text-xs text-gray-550 dark:text-gray-300 font-semibold">Sort by:</label>
                             <select
                                 id="details-sort"
                                 value={sortOrder}
                                 onChange={(e) => setSortOrder(e.target.value as 'desc' | 'asc')}
-                                className="bg-gray-50 dark:bg-gray-700 border border-gray-250 dark:border-gray-600 rounded-lg px-2.5 py-1 text-xs font-bold text-gray-700 dark:text-gray-200 outline-none focus:ring-1 focus:ring-primary focus:border-primary cursor-pointer"
+                                className="bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg px-2.5 py-1 text-xs font-bold text-gray-700 dark:text-gray-200 outline-none focus:ring-1 focus:ring-primary focus:border-primary cursor-pointer"
                             >
                                 <option value="desc">Newest to Oldest</option>
                                 <option value="asc">Oldest to Newest</option>
@@ -116,7 +116,7 @@ const AccountDetailsModal: React.FC<AccountDetailsModalProps> = ({
                     {/* Records List */}
                     <div className="flex-1 overflow-y-auto p-6 space-y-6">
                         {accountTransactions.length === 0 ? (
-                            <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                            <div className="text-center py-12 text-gray-550 dark:text-gray-400">
                                 <Icon name="RefreshCw" size={48} className="mx-auto mb-3 opacity-30" />
                                 <p className="text-base font-medium">No transactions recorded for this account</p>
                             </div>
@@ -148,11 +148,11 @@ const AccountDetailsModal: React.FC<AccountDetailsModalProps> = ({
                                                         title="Click to Edit transaction"
                                                     >
                                                         <div className="flex items-center min-w-0 mr-4">
-                                                            <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-750 flex items-center justify-center mr-3 flex-shrink-0 group-hover:bg-primary-light dark:group-hover:bg-primary/20 transition-colors">
-                                                                <Icon name={iconName} size={15} className="text-gray-500 dark:text-gray-400 group-hover:text-primary dark:group-hover:text-indigo-300 transition-colors" />
+                                                            <div className="w-8 h-8 rounded-lg bg-gray-105 dark:bg-gray-700 flex items-center justify-center mr-3 flex-shrink-0 group-hover:bg-primary-light dark:group-hover:bg-primary/20 transition-colors">
+                                                                <Icon name={iconName} size={15} className="text-gray-600 dark:text-gray-300 group-hover:text-primary dark:group-hover:text-indigo-300 transition-colors" />
                                                             </div>
                                                             <div className="min-w-0">
-                                                                <p className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate group-hover:text-primary dark:group-hover:text-indigo-300 transition-colors">
+                                                                <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate group-hover:text-primary dark:group-hover:text-indigo-300 transition-colors">
                                                                     {t.note || (t.type === 'transfer' ? 'Transfer' : category?.name || 'Uncategorized')}
                                                                 </p>
                                                                 <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">
@@ -231,11 +231,11 @@ const AccountCard: React.FC<{ account: Account; onEdit: () => void; onClick: () 
                 cardClass = "bg-gradient-to-br from-rose-800 to-red-950 shadow-md text-white hover:brightness-105";
                 break;
             default:
-                cardClass = "bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-750";
+                cardClass = "bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700";
         }
     } else {
         // Plain Theme
-        cardClass = "bg-white dark:bg-gray-850 hover:border-gray-300 dark:hover:border-gray-650 hover:shadow-sm";
+        cardClass = "bg-white dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-sm";
     }
 
     return (

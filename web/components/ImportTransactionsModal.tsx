@@ -406,7 +406,7 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
                                 </div>
 
                                 {/* CSV Drag and Drop */}
-                                <div className="border-2 border-dashed border-gray-300 dark:border-gray-650 rounded-xl p-8 text-center hover:border-primary transition-all cursor-pointer bg-gray-50/20 dark:bg-gray-850/10" onClick={() => fileInputRef.current?.click()}>
+                                <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-8 text-center hover:border-primary transition-all cursor-pointer bg-gray-50/20 dark:bg-gray-800/10" onClick={() => fileInputRef.current?.click()}>
                                     <input
                                         type="file"
                                         ref={fileInputRef}

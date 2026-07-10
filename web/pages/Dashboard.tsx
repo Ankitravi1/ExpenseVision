@@ -452,7 +452,7 @@ export const Dashboard: React.FC = () => {
                 else if (acc.type.toLowerCase().includes('bank') || acc.type.toLowerCase().includes('checking')) accIcon = 'Landmark';
                 
                 return (
-                  <div key={acc.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50/50 dark:bg-gray-800/20 border border-gray-100 dark:border-gray-850/40">
+                  <div key={acc.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50/50 dark:bg-gray-800/20 border border-gray-100 dark:border-gray-700/40">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-lg bg-primary-light dark:bg-primary/10 flex items-center justify-center text-primary dark:text-indigo-300">
                         <Icon name={acc.icon || accIcon} size={16} />

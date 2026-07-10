@@ -65,7 +65,7 @@ const RecurringRuleCard: React.FC<{
   }, [transactions, rule]);
 
   return (
-    <Card className={`flex flex-col justify-between h-full hover:shadow-md transition-all ${!rule.active ? 'opacity-70 bg-gray-50/50 dark:bg-gray-805/30' : ''}`}>
+    <Card className={`flex flex-col justify-between h-full hover:shadow-md transition-all ${!rule.active ? 'opacity-70 bg-gray-50/50 dark:bg-gray-800/30' : ''}`}>
       <div>
         <div className="flex items-center justify-between gap-2 mb-2">
           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold capitalize ${
@@ -314,7 +314,7 @@ export const Recurring: React.FC = () => {
           </h3>
 
           {form.id && (
-            <div className="p-3 mb-4 bg-amber-50 dark:bg-amber-955/20 border border-amber-200 dark:border-amber-900/50 rounded-xl flex items-center justify-between text-xs text-amber-700 dark:text-amber-300">
+            <div className="p-3 mb-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 rounded-xl flex items-center justify-between text-xs text-amber-700 dark:text-amber-300">
               <div className="flex items-center gap-1.5">
                 <Icon name="AlertCircle" size={14} className="text-amber-500 animate-pulse" />
                 <span className="font-bold">Editing: "{form.note}"</span>
