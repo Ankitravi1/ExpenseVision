@@ -13,19 +13,19 @@ interface AddAccountModalProps {
 }
 
 const predefinedAccountTypes: { type: AccountType; icon: string; label: string }[] = [
-    { type: 'Checking', icon: 'Landmark', label: 'Checking' },
-    { type: 'Savings', icon: 'PiggyBank', label: 'Savings' },
+    { type: 'Savings', icon: 'PiggyBank', label: 'Savings Account' },
     { type: 'Credit Card', icon: 'CreditCard', label: 'Credit Card' },
     { type: 'Cash', icon: 'Wallet', label: 'Cash' },
-    { type: 'Asset', icon: 'TrendingUp', label: 'Asset' },
-    { type: 'Liability', icon: 'TrendingDown', label: 'Loan' },
+    { type: 'Investment', icon: 'TrendingUp', label: 'Investment' },
+    { type: 'Loan', icon: 'TrendingDown', label: 'Loan / EMI' },
+    { type: 'Other', icon: 'Landmark', label: 'Other Account' },
 ];
 
 export const AddAccountModal: React.FC<AddAccountModalProps> = ({ isOpen, onClose, account, onDelete }) => { // Modified
     const context = useContext(AppContext);
     const [name, setName] = useState('');
     const [balance, setBalance] = useState('');
-    const [selectedType, setSelectedType] = useState<string>('Checking');
+    const [selectedType, setSelectedType] = useState<string>('Savings');
     const [customTypeName, setCustomTypeName] = useState('');
     const [selectedIcon, setSelectedIcon] = useState('Wallet');
     const [showIconPicker, setShowIconPicker] = useState(false);
@@ -50,7 +50,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ isOpen, onClos
                 // Reset form for new account
                 setName('');
                 setBalance('');
-                setSelectedType('Checking');
+                setSelectedType('Savings');
                 setCustomTypeName('');
                 setSelectedIcon('Wallet');
                 setShowIconPicker(false);
@@ -85,7 +85,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ isOpen, onClos
         // Reset form (for add or after update)
         setName('');
         setBalance('');
-        setSelectedType('Checking');
+        setSelectedType('Savings');
         setCustomTypeName('');
         setSelectedIcon('Wallet');
         setShowIconPicker(false);

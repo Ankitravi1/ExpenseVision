@@ -246,12 +246,27 @@ export const Dashboard: React.FC = () => {
     };
   }, [transactions, categories, currentDate, user?.timezone]);
 
+  const dateRangeLabel = useMemo(() => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const format = (d: Date) => {
+      const dd = String(d.getDate()).padStart(2, '0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const yyyy = d.getFullYear();
+      return `${dd}-${mm}-${yyyy}`;
+    };
+    return `Showing transaction date from ${format(firstDay)} to ${format(lastDay)}`;
+  }, [currentDate]);
+
   const topSpendingCategories = expenseByCategory.slice(0, 5);
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto">
-      {/* Month Navigator Header (Minimalist) */}
-      <div className="flex justify-end items-center">
+      {/* Month Navigator Header with Date Range Label */}
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+        {/* Month slider on the left */}
         <div className="flex items-center bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-250 dark:border-gray-700 p-1">
           <button
             onClick={() => changeMonth(-1)}
@@ -272,6 +287,11 @@ export const Dashboard: React.FC = () => {
             <Icon name="ChevronRight" size={20} />
           </button>
         </div>
+
+        {/* Date range label on the right */}
+        <span className="text-xs font-bold text-primary bg-primary-light/60 dark:bg-primary/20 dark:text-indigo-300 border border-primary-light px-3 py-1.5 rounded-lg inline-block shadow-sm">
+          {dateRangeLabel}
+        </span>
       </div>
 
       {/* Stats Cards (Total Expenses card swapped to first column) */}
@@ -284,20 +304,18 @@ export const Dashboard: React.FC = () => {
       {/* Merged Expense Distribution Layout (spans full 3 columns) */}
       <Card className="lg:col-span-3">
         <div className="flex justify-between items-center gap-4 mb-6">
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              onClick={() => setActivePage('Reports')}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-primary bg-primary-light hover:bg-primary hover:text-white dark:bg-primary/20 dark:text-indigo-300 dark:hover:bg-primary dark:hover:text-white rounded-full transition-all"
-              title="View Detailed Report"
-            >
-              <Icon name="PieChart" size={14} />
-              <span>Detailed Report</span>
-            </button>
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-baseline flex-wrap">
-              <span>Expense Distribution</span>
-              <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 ml-1.5">(Monthly Category Breakdown)</span>
-            </h3>
-          </div>
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-baseline flex-wrap">
+            <span>Expense Distribution</span>
+            <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 ml-1.5">(Monthly Category Breakdown)</span>
+          </h3>
+          <button
+            onClick={() => setActivePage('Reports')}
+            className="flex items-center gap-1 text-sm font-semibold text-primary hover:text-primary-600 hover:underline transition-colors"
+            title="View Detailed Report"
+          >
+            <Icon name="PieChart" size={16} />
+            <span>Detailed Report</span>
+          </button>
         </div>
 
         {expenseByCategory.length === 0 ? (
@@ -394,7 +412,7 @@ export const Dashboard: React.FC = () => {
             <h3 className="text-lg font-bold text-gray-900 dark:text-white">Recent Transactions</h3>
             <button
               onClick={() => setActivePage('Transactions')}
-              className="text-sm font-semibold text-primary hover:text-primary-600 transition-colors"
+              className="text-sm font-semibold text-primary hover:text-primary-600 hover:underline transition-colors"
             >
               View All
             </button>
@@ -416,7 +434,7 @@ export const Dashboard: React.FC = () => {
             <h3 className="text-lg font-bold text-gray-900 dark:text-white">Accounts Summary</h3>
             <button
               onClick={() => setActivePage('Accounts')}
-              className="text-sm font-semibold text-primary hover:underline transition-colors"
+              className="text-sm font-semibold text-primary hover:text-primary-600 hover:underline transition-colors"
             >
               Manage
             </button>

@@ -219,6 +219,18 @@ const App: React.FC = () => {
     }
   }, [refreshFinancials, showToast]);
 
+  const bulkDeleteTransactions = useCallback(async (ids: string[]) => {
+    try {
+      await api.bulkDeleteTransactions(ids);
+      setTransactions(prev => prev.filter(t => !ids.includes(t.id)));
+      await refreshFinancials();
+      showToast(`${ids.length} transactions deleted`, 'success');
+    } catch (err) {
+      console.error('Failed to bulk delete transactions:', err);
+      showToast('Failed to bulk delete transactions', 'error');
+    }
+  }, [refreshFinancials, showToast]);
+
   const clearAllTransactions = useCallback(async (confirmationPhrase: string) => {
     try {
       await api.clearAllTransactions(confirmationPhrase);
@@ -366,6 +378,17 @@ const App: React.FC = () => {
     }
   }, [showToast]);
 
+  const runRecurring = useCallback(async (id: string) => {
+    try {
+      await api.runRecurring(id);
+      await fetchData();
+      showToast('Recurring rule executed manually', 'success');
+    } catch (err: any) {
+      console.error('Failed to manually execute recurring rule:', err);
+      showToast(err.message || 'Failed to execute recurring rule', 'error');
+    }
+  }, [fetchData, showToast]);
+
   const appContextValue = useMemo(() => ({
     accounts,
     categories,
@@ -379,6 +402,7 @@ const App: React.FC = () => {
     addTransaction,
     updateTransaction,
     deleteTransaction,
+    bulkDeleteTransactions,
     addAccount,
     updateAccount,
     deleteAccount,
@@ -390,11 +414,12 @@ const App: React.FC = () => {
     addRecurring,
     updateRecurring,
     deleteRecurring,
+    runRecurring,
     clearAllTransactions,
     setActivePage,
     refreshData: fetchData,
     user,
-  }), [accounts, categories, transactions, budgets, recurring, currency, setCurrency, theme, setTheme, addTransaction, updateTransaction, deleteTransaction, clearAllTransactions, addAccount, updateAccount, deleteAccount, addCategory, updateCategory, deleteCategory, setBudget, deleteBudget, addRecurring, updateRecurring, deleteRecurring, setActivePage, fetchData, user]);
+  }), [accounts, categories, transactions, budgets, recurring, currency, setCurrency, theme, setTheme, addTransaction, updateTransaction, deleteTransaction, bulkDeleteTransactions, clearAllTransactions, addAccount, updateAccount, deleteAccount, addCategory, updateCategory, deleteCategory, setBudget, deleteBudget, addRecurring, updateRecurring, deleteRecurring, runRecurring, setActivePage, fetchData, user]);
 
   // Auth handlers
   const handleAuthSuccess = () => {

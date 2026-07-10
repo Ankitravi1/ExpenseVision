@@ -55,10 +55,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ activePage, setActivePage, isC
     const items: { icon: IconName; label: Page }[] = [
       { icon: 'LayoutDashboard', label: 'Dashboard' },
       { icon: 'ArrowLeftRight', label: 'Transactions' },
-      { icon: 'Repeat', label: 'Recurring' },
-      { icon: 'Target', label: 'Budgets' },
       { icon: 'Wallet', label: 'Accounts' },
+      { icon: 'Target', label: 'Budgets' },
       { icon: 'Tags', label: 'Categories' },
+      { icon: 'RefreshCw', label: 'Recurring' },
       { icon: 'PieChart', label: 'Reports' },
     ];
     if (user?.role === 'superadmin') {

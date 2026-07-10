@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
 import { Icon } from './Icon';
 import { api } from '../services/api';
 import { authService } from '../services/auth';
+import { AppContext } from '../App';
 
 interface AppNotification {
     id: string;
@@ -16,6 +17,9 @@ export const NotificationCenter: React.FC = () => {
     const [notifications, setNotifications] = useState<AppNotification[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const dropdownRef = useRef<HTMLDivElement>(null);
+
+    const context = useContext(AppContext);
+    const setActivePage = context?.setActivePage;
 
     const fetchNotifications = async () => {
         if (!authService.isAuthenticated()) return;
@@ -88,6 +92,26 @@ export const NotificationCenter: React.FC = () => {
         }
     };
 
+    const handleNotificationClick = async (notification: AppNotification) => {
+        if (!notification.read) {
+            await markAsRead(notification.id);
+        }
+        setIsOpen(false);
+
+        if (!setActivePage) return;
+
+        const titleText = notification.title.toLowerCase();
+        const msgText = notification.message.toLowerCase();
+
+        if (titleText.includes('budget') || msgText.includes('budget') || titleText.includes('limit') || msgText.includes('limit')) {
+            setActivePage('Budgets');
+        } else if (titleText.includes('recurring') || msgText.includes('recurring') || msgText.includes('emi') || msgText.includes('rent')) {
+            setActivePage('Recurring');
+        } else {
+            setActivePage('Transactions');
+        }
+    };
+
     return (
         <div className="relative" ref={dropdownRef}>
             <button
@@ -127,31 +151,45 @@ export const NotificationCenter: React.FC = () => {
                                 {notifications.map(notification => (
                                     <div
                                         key={notification.id}
-                                        onClick={() => !notification.read && markAsRead(notification.id)}
+                                        onClick={() => handleNotificationClick(notification)}
                                         className={`p-4 transition-colors cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 ${
                                             !notification.read ? 'bg-blue-50/30 dark:bg-blue-900/10' : ''
                                         }`}
                                     >
                                         <div className="flex gap-3">
                                             <div className={`mt-1 h-2 w-2 rounded-full flex-shrink-0 ${!notification.read ? 'bg-blue-500' : 'bg-transparent'}`} />
-                                            <div>
-                                                <h4 className={`text-sm font-medium ${!notification.read ? 'text-gray-900 dark:text-white' : 'text-gray-700 dark:text-gray-300'}`}>
+                                            <div className="min-w-0 flex-1">
+                                                <h4 className={`text-sm font-medium ${!notification.read ? 'text-gray-900 dark:text-white' : 'text-gray-700 dark:text-gray-305'}`}>
                                                     {notification.title}
                                                 </h4>
-                                                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                                                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 break-words leading-relaxed">
                                                     {notification.message}
                                                 </p>
                                                 <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">
                                                     {new Date(notification.createdAt).toLocaleString()}
                                                 </p>
                                             </div>
-                                            <div className="flex gap-2 ml-auto items-center">
+                                            <div className="flex gap-2 ml-auto items-center flex-shrink-0 self-start">
                                                 {!notification.read && (
-                                                    <button onClick={(e) => { e.stopPropagation(); markAsRead(notification.id); }} className="p-1.5 text-gray-400 hover:text-success rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors" title="Mark Read">
+                                                    <button 
+                                                        onClick={(e) => { 
+                                                            e.stopPropagation(); 
+                                                            markAsRead(notification.id); 
+                                                        }} 
+                                                        className="p-1.5 text-gray-450 hover:text-success rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors" 
+                                                        title="Mark Read"
+                                                    >
                                                         <Icon name="CheckCheck" size={16} />
                                                     </button>
                                                 )}
-                                                <button onClick={(e) => { e.stopPropagation(); deleteNotification(notification.id); }} className="p-1.5 text-gray-400 hover:text-danger rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors" title="Clear">
+                                                <button 
+                                                    onClick={(e) => { 
+                                                        e.stopPropagation(); 
+                                                        deleteNotification(notification.id); 
+                                                    }} 
+                                                    className="p-1.5 text-gray-455 hover:text-danger rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors" 
+                                                    title="Clear"
+                                                >
                                                     <Icon name="Trash2" size={16} />
                                                 </button>
                                             </div>

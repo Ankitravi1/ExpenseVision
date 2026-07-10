@@ -399,6 +399,163 @@ router.post('/parse-text', async (req, res, next) => {
     }
 });
 
+// POST /api/transactions/parse-statement - Use AI to parse multiple transactions from statement text
+router.post('/parse-statement', async (req, res, next) => {
+    try {
+        const prisma = (req as any).prisma;
+        const userId = (req as any).userId;
+        const { text } = req.body;
+
+        if (!text || text.trim().length < 10) {
+            return res.status(400).json({ error: 'Please enter statement text to parse' });
+        }
+
+        const aiConfig = await prisma.aiSettings.findUnique({ where: { userId } });
+        if (!aiConfig?.enabled) {
+            return res.status(400).json({ error: 'AI transaction parsing is disabled' });
+        }
+
+        let apiKey = '';
+        if (aiConfig.keys) {
+            try {
+                const parsedKeys = JSON.parse(aiConfig.keys);
+                if (typeof parsedKeys === 'object' && parsedKeys !== null) {
+                    const providerKeys = parsedKeys[aiConfig.provider];
+                    if (Array.isArray(providerKeys) && providerKeys.length > 0) {
+                        const activeKey = providerKeys[0];
+                        if (activeKey) {
+                            const { decrypt } = await import('./aiSettings.js');
+                            apiKey = decrypt(activeKey);
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to parse keys in transactions route:', e);
+            }
+        }
+
+        if (!apiKey) {
+            return res.status(400).json({ error: `AI API key is missing for provider: ${aiConfig.provider}` });
+        }
+
+        const isDefaultProvider = ['deepseek', 'openai', 'openrouter', 'gemini'].includes(aiConfig.provider);
+        let resolvedBaseUrl = '';
+        if (aiConfig.baseUrl) {
+            try {
+                const parsed = JSON.parse(aiConfig.baseUrl);
+                if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+                    resolvedBaseUrl = parsed[aiConfig.provider] || '';
+                } else {
+                    resolvedBaseUrl = aiConfig.baseUrl;
+                }
+            } catch (e) {
+                resolvedBaseUrl = aiConfig.baseUrl;
+            }
+        }
+
+        if (!isDefaultProvider && !resolvedBaseUrl) {
+            return res.status(400).json({ error: `AI provider ${aiConfig.provider} requires a base URL` });
+        }
+
+        const [accounts, categories] = await Promise.all([
+            prisma.account.findMany({ where: { userId }, select: { id: true, name: true, type: true } }),
+            prisma.category.findMany({ where: { userId }, select: { id: true, name: true, type: true } })
+        ]);
+
+        const now = getCurrentDateTimeParts();
+        const prompt = [
+            'Parse the following bank statement text and extract all transactions as a strict JSON array.',
+            'Return ONLY a JSON array, where each element is an object with EXACTLY the following fields:',
+            '  - date: YYYY-MM-DD string',
+            '  - note: transaction description',
+            '  - amount: positive number',
+            '  - type: "expense", "income", or "transfer"',
+            '  - categoryName: suggested category name from the provided list, or null',
+            '  - accountName: suggested account name from the provided list, or null',
+            '  - transferToAccountName: destination account name if it is a transfer, or null',
+            `Current year is ${now.date.split('-')[0]}.`,
+            `Allowed categories: ${JSON.stringify(categories.map((c: any) => c.name))}`,
+            `Allowed accounts: ${JSON.stringify(accounts.map((a: any) => a.name))}`,
+            `Statement text:`,
+            text
+        ].join('\n');
+
+        const response = await fetch(getAiEndpoint(aiConfig.provider, resolvedBaseUrl), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`,
+                ...(aiConfig.provider === 'openrouter' ? { 'HTTP-Referer': 'http://localhost:3000', 'X-Title': 'ExpenseVision' } : {})
+            },
+            body: JSON.stringify({
+                model: aiConfig.model,
+                messages: [
+                    { role: 'system', content: 'You extract lists of financial transactions from raw text into JSON arrays.' },
+                    { role: 'user', content: prompt }
+                ],
+                temperature: 0.1
+            })
+        });
+
+        if (!response.ok) {
+            const errorBody = await response.text();
+            return res.status(502).json({ error: `AI provider request failed: ${errorBody.slice(0, 180)}` });
+        }
+
+        const resData = await response.json() as any;
+        const content = resData.choices?.[0]?.message?.content;
+        if (!content) {
+            return res.status(502).json({ error: 'AI provider returned an empty response' });
+        }
+
+        const extractJsonArray = (val: string) => {
+            const start = val.indexOf('[');
+            const end = val.lastIndexOf(']');
+            if (start === -1 || end === -1 || end <= start) {
+                throw new Error('AI response did not include JSON array');
+            }
+            return JSON.parse(val.slice(start, end + 1));
+        };
+
+        const parsedArray = extractJsonArray(content);
+        if (!Array.isArray(parsedArray)) {
+            return res.status(502).json({ error: 'AI response did not return a list/array of transactions' });
+        }
+
+        const drafts = parsedArray.map((item: any) => {
+            const type = ['expense', 'income', 'transfer'].includes(item.type) ? item.type : 'expense';
+            const typeCategories = categories.filter((c: any) => c.type === type);
+            
+            const account = findByIdOrName(accounts, item.accountName);
+            const category = type === 'transfer'
+                ? undefined
+                : findByIdOrName(typeCategories, item.categoryName);
+            const transferToAccount = type === 'transfer'
+                ? findByIdOrName(accounts, item.transferToAccountName)
+                : undefined;
+
+            const cleanDate = normalizeDatePart(item.date) || now.date;
+
+            return {
+                date: cleanDate,
+                note: item.note || 'Unspecified transaction',
+                amount: Number(item.amount) || 0,
+                type,
+                accountId: account?.id || '',
+                accountName: account?.name || null,
+                categoryId: category?.id || '',
+                categoryName: category?.name || null,
+                transferToAccountId: transferToAccount?.id || '',
+                transferToAccountName: transferToAccount?.name || null,
+            };
+        });
+
+        res.json({ drafts });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message || 'Failed to parse statement text' });
+    }
+});
+
 // POST /api/transactions/bulk - Bulk create transactions
 router.post('/bulk', async (req, res, next) => {
     try {
@@ -801,7 +958,7 @@ router.get('/export', async (req, res, next) => {
         });
 
         // Generate CSV
-        const headers = ['Date', 'Time', 'Note', 'Amount', 'Type', 'Category', 'Account', 'Transfer To'];
+        const headers = ['Date', 'Time', 'Note', 'Amount', 'Account', 'Type', 'Category', 'Transfer To'];
         const rows = transactions.map((t: any) => {
             const formatted = formatDateForCsv(t.date);
             return [
@@ -809,9 +966,9 @@ router.get('/export', async (req, res, next) => {
                 formatted.time,
                 `"${t.note.replace(/"/g, '""')}"`,
                 t.amount,
-                t.type,
-                t.category?.name || '',
                 t.account.name,
+                t.type,
+                t.category?.name || (t.type === 'transfer' ? 'Transfer' : ''),
                 t.transferToAccount?.name || ''
             ];
         });
@@ -824,6 +981,67 @@ router.get('/export', async (req, res, next) => {
         res.setHeader('Content-Type', 'text/csv');
         res.setHeader('Content-Disposition', `attachment; filename=transactions_${new Date().toISOString().split('T')[0]}.csv`);
         res.send(csv);
+    } catch (error) {
+        next(error);
+    }
+});
+
+// POST /api/transactions/bulk-delete - delete multiple transactions at once
+router.post('/bulk-delete', async (req, res, next) => {
+    try {
+        const prisma = (req as any).prisma;
+        const userId = (req as any).userId;
+        const { ids } = req.body;
+
+        if (!Array.isArray(ids) || ids.length === 0) {
+            return res.status(400).json({ error: 'Invalid transaction IDs' });
+        }
+
+        await prisma.$transaction(async (tx: any) => {
+            for (const id of ids) {
+                const transaction = await tx.transaction.findUnique({
+                    where: { id }
+                });
+
+                if (!transaction || transaction.userId !== userId) {
+                    continue;
+                }
+
+                // Reverse account balance effects
+                const sourceAccount = await tx.account.findUnique({
+                    where: { id: transaction.accountId }
+                });
+
+                if (sourceAccount) {
+                    const delta = transaction.type === 'expense' || transaction.type === 'transfer'
+                        ? transaction.amount
+                        : -transaction.amount;
+                    await tx.account.update({
+                        where: { id: transaction.accountId },
+                        data: { balance: { increment: delta } }
+                    });
+                }
+
+                if (transaction.type === 'transfer' && transaction.transferToAccountId) {
+                    const destAccount = await tx.account.findUnique({
+                        where: { id: transaction.transferToAccountId }
+                    });
+                    if (destAccount) {
+                        await tx.account.update({
+                            where: { id: transaction.transferToAccountId },
+                            data: { balance: { increment: -transaction.amount } }
+                        });
+                    }
+                }
+
+                // Delete transaction
+                await tx.transaction.delete({
+                    where: { id }
+                });
+            }
+        });
+
+        res.json({ message: `${ids.length} transactions deleted successfully` });
     } catch (error) {
         next(error);
     }

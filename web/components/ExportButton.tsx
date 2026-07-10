@@ -17,7 +17,7 @@ export const ExportButton: React.FC<ExportButtonProps> = ({ className = '' }) =>
 
     const exportToCSV = () => {
         // Prepare CSV data
-        const headers = ['Date', 'Time', 'Note', 'Amount', 'Type', 'Category', 'Account', 'Transfer To'];
+        const headers = ['Date', 'Time', 'Note', 'Amount', 'Account', 'Type', 'Category', 'Transfer To'];
 
         const rows = transactions.map(transaction => {
             const category = categories.find(c => c.id === transaction.categoryId);
@@ -29,11 +29,11 @@ export const ExportButton: React.FC<ExportButtonProps> = ({ className = '' }) =>
             return [
                 formatTransactionDate(transaction.date),
                 transaction.date.split('T')[1]?.slice(0, 5) || '',
-                `"${transaction.note.replace(/"/g, '""')}"`, // Escape quotes
+                `"${transaction.note.replace(/"/g, '""')}"`,
                 transaction.amount.toFixed(2),
-                transaction.type,
-                category?.name || '',
                 account?.name || '',
+                transaction.type,
+                category?.name || (transaction.type === 'transfer' ? 'Transfer' : ''),
                 transferAccount?.name || ''
             ];
         });

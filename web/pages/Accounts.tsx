@@ -4,6 +4,7 @@ import { Card } from '../components/Card';
 import { Icon } from '../components/Icon';
 import { Account, Category, Transaction } from '../types';
 import { AddAccountModal } from '../components/AddAccountModal';
+import { NewTransactionModal } from '../components/NewTransactionModal';
 import { formatCurrency } from '../utils/currency';
 
 interface AccountDetailsModalProps {
@@ -13,6 +14,7 @@ interface AccountDetailsModalProps {
     transactions: Transaction[];
     categories: Category[];
     currency: string;
+    onEditTransaction: (t: Transaction) => void;
 }
 
 const AccountDetailsModal: React.FC<AccountDetailsModalProps> = ({
@@ -21,7 +23,8 @@ const AccountDetailsModal: React.FC<AccountDetailsModalProps> = ({
     account,
     transactions,
     categories,
-    currency
+    currency,
+    onEditTransaction
 }) => {
     const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
 
@@ -58,7 +61,7 @@ const AccountDetailsModal: React.FC<AccountDetailsModalProps> = ({
     return (
         <>
             <div
-                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 transition-opacity duration-300"
+                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 transition-opacity duration-300 pointer-events-auto"
                 onClick={onClose}
             />
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
@@ -66,43 +69,43 @@ const AccountDetailsModal: React.FC<AccountDetailsModalProps> = ({
                     {/* Header */}
                     <div className="p-6 border-b border-gray-150 dark:border-gray-700 flex justify-between items-center shrink-0 bg-gray-50/50 dark:bg-gray-800/50">
                         <div>
-                            <h3 className="text-xl font-bold text-gray-darkest dark:text-gray-50 flex items-center gap-2">
+                            <h3 className="text-xl font-bold text-gray-darkest dark:text-gray-55 flex items-center gap-2">
                                 <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
                                     <Icon name={account.icon || 'Wallet'} className="text-primary dark:text-indigo-400" size={18} />
                                 </div>
                                 {account.name}
                             </h3>
                             <div className="flex items-baseline gap-4 mt-2">
-                                <span className="text-xs text-gray-500 dark:text-gray-400 font-medium capitalize">
+                                <span className="text-xs text-gray-505 dark:text-gray-400 font-medium capitalize bg-gray-100 dark:bg-gray-700/60 px-2 py-0.5 rounded">
                                     {account.type}
                                 </span>
                                 <div className="flex items-baseline gap-2">
                                     <span className="text-xs text-gray-400 dark:text-gray-500">Current:</span>
-                                    <span className="text-xl font-extrabold text-primary dark:text-indigo-400">{formatCurrency(account.balance, currency)}</span>
+                                    <span className="text-xl font-black text-primary dark:text-indigo-400">{formatCurrency(account.balance, currency)}</span>
                                 </div>
                                 <div className="flex items-baseline gap-2 border-l border-gray-200 dark:border-gray-700 pl-3">
                                     <span className="text-xs text-gray-400 dark:text-gray-500">Initial:</span>
-                                    <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">{formatCurrency(account.initialBalance ?? 0, currency)}</span>
+                                    <span className="text-xs font-bold text-gray-500 dark:text-gray-400">{formatCurrency(account.initialBalance ?? 0, currency)}</span>
                                 </div>
                             </div>
                         </div>
-                        <button onClick={onClose} className="p-1.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
+                        <button onClick={onClose} className="p-1.5 rounded-full hover:bg-gray-205 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
                             <Icon name="X" size={20} />
                         </button>
                     </div>
 
                     {/* Sorting Control */}
                     <div className="px-6 py-3 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-white dark:bg-gray-850">
-                        <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        <span className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
                             Transaction History ({accountTransactions.length})
                         </span>
                         <div className="flex items-center gap-2">
-                            <label htmlFor="details-sort" className="text-xs text-gray-500 dark:text-gray-400">Sort by:</label>
+                            <label htmlFor="details-sort" className="text-xs text-gray-500 dark:text-gray-400 font-semibold">Sort by:</label>
                             <select
                                 id="details-sort"
                                 value={sortOrder}
                                 onChange={(e) => setSortOrder(e.target.value as 'desc' | 'asc')}
-                                className="bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg px-2.5 py-1 text-xs font-medium text-gray-700 dark:text-gray-200 outline-none focus:ring-1 focus:ring-primary focus:border-primary cursor-pointer"
+                                className="bg-gray-50 dark:bg-gray-700 border border-gray-250 dark:border-gray-600 rounded-lg px-2.5 py-1 text-xs font-bold text-gray-700 dark:text-gray-200 outline-none focus:ring-1 focus:ring-primary focus:border-primary cursor-pointer"
                             >
                                 <option value="desc">Newest to Oldest</option>
                                 <option value="asc">Oldest to Newest</option>
@@ -114,7 +117,7 @@ const AccountDetailsModal: React.FC<AccountDetailsModalProps> = ({
                     <div className="flex-1 overflow-y-auto p-6 space-y-6">
                         {accountTransactions.length === 0 ? (
                             <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-                                <Icon name="History" size={48} className="mx-auto mb-3 opacity-30" />
+                                <Icon name="RefreshCw" size={48} className="mx-auto mb-3 opacity-30" />
                                 <p className="text-base font-medium">No transactions recorded for this account</p>
                             </div>
                         ) : (
@@ -133,18 +136,23 @@ const AccountDetailsModal: React.FC<AccountDetailsModalProps> = ({
                                         <div className="divide-y divide-gray-100 dark:divide-gray-700/40">
                                             {sortedTx.map(t => {
                                                 const category = categories.find(c => c.id === t.categoryId);
-                                                const iconName = category?.icon || (t.type === 'transfer' ? 'ArrowRightLeft' : 'Wallet');
+                                                const iconName = category?.icon || (t.type === 'transfer' ? 'ArrowLeftRight' : 'Wallet');
                                                 const isIncoming = t.type === 'income' || (t.type === 'transfer' && t.transferToAccountId === account.id);
                                                 const displayAmount = (isIncoming ? '+' : '-') + formatCurrency(t.amount, currency);
 
                                                 return (
-                                                    <div key={t.id} className="flex items-center justify-between py-2.5 hover:bg-gray-50/50 dark:hover:bg-gray-750/30 px-2 rounded-lg transition-colors">
+                                                    <div 
+                                                        key={t.id} 
+                                                        onClick={() => onEditTransaction(t)}
+                                                        className="flex items-center justify-between py-2.5 hover:bg-gray-50 dark:hover:bg-gray-700/80 cursor-pointer px-3 -mx-3 rounded-lg transition-colors group"
+                                                        title="Click to Edit transaction"
+                                                    >
                                                         <div className="flex items-center min-w-0 mr-4">
-                                                            <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center mr-3 flex-shrink-0">
-                                                                <Icon name={iconName} size={15} className="text-gray-500 dark:text-gray-400" />
+                                                            <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-750 flex items-center justify-center mr-3 flex-shrink-0 group-hover:bg-primary-light dark:group-hover:bg-primary/20 transition-colors">
+                                                                <Icon name={iconName} size={15} className="text-gray-500 dark:text-gray-400 group-hover:text-primary dark:group-hover:text-indigo-300 transition-colors" />
                                                             </div>
                                                             <div className="min-w-0">
-                                                                <p className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">
+                                                                <p className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate group-hover:text-primary dark:group-hover:text-indigo-300 transition-colors">
                                                                     {t.note || (t.type === 'transfer' ? 'Transfer' : category?.name || 'Uncategorized')}
                                                                 </p>
                                                                 <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">
@@ -152,9 +160,12 @@ const AccountDetailsModal: React.FC<AccountDetailsModalProps> = ({
                                                                 </p>
                                                             </div>
                                                         </div>
-                                                        <span className={`text-sm font-bold flex-shrink-0 ${isIncoming ? 'text-success' : 'text-danger'}`}>
-                                                            {displayAmount}
-                                                        </span>
+                                                        <div className="flex items-center gap-2 flex-shrink-0">
+                                                            <span className={`text-sm font-bold ${isIncoming ? 'text-success' : 'text-danger'}`}>
+                                                                {displayAmount}
+                                                            </span>
+                                                            <Icon name="Pencil" size={12} className="text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity ml-1.5 flex-shrink-0 text-primary dark:text-indigo-400" />
+                                                        </div>
                                                     </div>
                                                 );
                                             })}
@@ -176,33 +187,73 @@ const AccountCard: React.FC<{ account: Account; onEdit: () => void; onClick: () 
 
     // Map standard types to icons, fallback to 'Wallet'
     const accountTypeIcons: Record<string, string> = {
-        'Checking': 'Landmark',
         'Savings': 'PiggyBank',
         'Credit Card': 'CreditCard',
         'Cash': 'Wallet',
-        'Asset': 'TrendingUp',
-        'Liability': 'TrendingDown'
-    }
+        'Investment': 'TrendingUp',
+        'Loan': 'TrendingDown',
+        'Other': 'Landmark'
+    };
 
     // Use custom icon if provided, otherwise mapped icon, otherwise fallback
     const iconName = account.icon || accountTypeIcons[account.type] || 'Wallet';
 
+    // Check if it's predefined to apply theme
+    const isPredefined = ['Savings', 'Credit Card', 'Cash', 'Investment', 'Loan'].includes(account.type);
+
+    let cardClass = "";
+    let textClass = "text-gray-darkest dark:text-gray-100";
+    let subtextClass = "text-gray-medium dark:text-gray-400";
+    let borderClass = "border-gray-200 dark:border-gray-700";
+    let iconBgClass = "bg-gray-light dark:bg-gray-700 text-gray-dark dark:text-gray-300";
+    let dividerClass = "border-gray-100 dark:border-gray-700";
+
+    if (isPredefined) {
+        textClass = "text-white";
+        subtextClass = "text-white/80";
+        dividerClass = "border-white/20";
+        iconBgClass = "bg-white/10 text-white";
+        
+        switch (account.type) {
+            case 'Savings':
+                cardClass = "bg-gradient-to-br from-indigo-600 to-blue-700 shadow-md text-white hover:brightness-105";
+                break;
+            case 'Credit Card':
+                cardClass = "bg-gradient-to-br from-gray-800 via-gray-900 to-slate-950 shadow-md text-white hover:brightness-105";
+                break;
+            case 'Cash':
+                cardClass = "bg-gradient-to-br from-teal-600 to-emerald-700 shadow-md text-white hover:brightness-105";
+                break;
+            case 'Investment':
+                cardClass = "bg-gradient-to-br from-purple-600 to-indigo-700 shadow-md text-white hover:brightness-105";
+                break;
+            case 'Loan':
+                cardClass = "bg-gradient-to-br from-rose-800 to-red-950 shadow-md text-white hover:brightness-105";
+                break;
+            default:
+                cardClass = "bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-750";
+        }
+    } else {
+        // Plain Theme
+        cardClass = "bg-white dark:bg-gray-850 hover:border-gray-300 dark:hover:border-gray-650 hover:shadow-sm";
+    }
+
     return (
-        <div onClick={onClick} className="cursor-pointer">
-            <Card className="flex flex-col h-full hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all">
+        <div onClick={onClick} className="cursor-pointer h-full">
+            <div className={`rounded-2xl p-6 border ${borderClass} ${cardClass} flex flex-col h-full transition-all duration-300 pointer-events-auto`}>
                 <div className="flex items-start justify-between mb-6">
-                    <div>
-                        <h3 className="font-semibold text-lg text-gray-darkest dark:text-gray-100">{account.name}</h3>
-                        <p className="text-gray-medium dark:text-gray-400 text-sm">{account.type}</p>
+                    <div className="min-w-0">
+                        <h3 className={`font-bold text-lg truncate ${textClass}`}>{account.name}</h3>
+                        <p className={`text-xs font-semibold ${subtextClass}`}>{account.type}</p>
                     </div>
-                    <div className="w-10 h-10 rounded-lg bg-gray-light flex items-center justify-center dark:bg-gray-700">
-                        <Icon name={iconName} className="text-gray-dark dark:text-gray-300" size={22} />
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${iconBgClass}`}>
+                        <Icon name={iconName} size={22} />
                     </div>
                 </div>
-                <div className="mt-auto pt-4 border-t border-gray-100 dark:border-gray-700 flex justify-between items-end">
+                <div className={`mt-auto pt-4 border-t ${dividerClass} flex justify-between items-end`}>
                     <div>
-                        <p className="text-sm text-gray-medium dark:text-gray-400">Current Balance</p>
-                        <p className={`text-2xl font-bold ${isNegative ? 'text-danger' : 'text-gray-darkest dark:text-gray-50'}`}>
+                        <p className={`text-xs ${subtextClass}`}>Current Balance</p>
+                        <p className={`text-2xl font-black tabular-nums tracking-tight mt-0.5 ${isNegative && !isPredefined ? 'text-danger' : textClass}`}>
                             {formatCurrency(account.balance, currency)}
                         </p>
                     </div>
@@ -211,16 +262,16 @@ const AccountCard: React.FC<{ account: Account; onEdit: () => void; onClick: () 
                             e.stopPropagation();
                             onEdit();
                         }}
-                        className="p-2 text-gray-400 hover:text-primary dark:hover:text-primary-light transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+                        className={`p-2 transition-colors rounded-full hover:bg-white/10 ${isPredefined ? 'text-white/80 hover:text-white' : 'text-gray-405 hover:text-primary'}`}
                         title="Edit account"
                     >
                         <Icon name="Settings" size={18} />
                     </button>
                 </div>
-            </Card>
+            </div>
         </div>
-    )
-}
+    );
+};
 
 export const Accounts: React.FC = () => {
     const { accounts, deleteAccount, transactions, categories, currency } = useContext(AppContext)!;
@@ -228,8 +279,9 @@ export const Accounts: React.FC = () => {
     const [editAccount, setEditAccount] = useState<Account | null>(null);
     const [selectedDetailAccount, setSelectedDetailAccount] = useState<Account | null>(null);
 
-    const now = new Date();
-    const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    // Edit transaction states
+    const [editTransaction, setEditTransaction] = useState<Transaction | null>(null);
+    const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
 
     const totalBalance = useMemo(() => accounts.reduce((sum, acc) => sum + acc.balance, 0), [accounts]);
 
@@ -263,21 +315,27 @@ export const Accounts: React.FC = () => {
     return (
         <>
             <div className="space-y-6">
+                {/* 
+                  Swapped Cards Order:
+                  1st Expense so far (left)
+                  2nd Income so far (middle)
+                  3rd Combined Balance (right)
+                */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <Card className="flex items-center p-6 bg-gradient-to-br from-primary-light/30 to-indigo-50/10 dark:from-indigo-950/20 dark:to-gray-800/40">
-                        <div className="w-12 h-12 rounded-xl bg-primary-light dark:bg-primary/20 flex items-center justify-center mr-4">
-                            <Icon name="Landmark" className="text-primary dark:text-indigo-300" size={24} />
+                    <Card className="flex items-center p-6 bg-gradient-to-br from-red-50/30 to-rose-50/10 dark:from-rose-950/20 dark:to-gray-800/40">
+                        <div className="w-12 h-12 rounded-xl bg-red-100 dark:bg-rose-955/40 flex items-center justify-center mr-4">
+                            <Icon name="TrendingDown" className="text-danger dark:text-rose-400" size={24} />
                         </div>
                         <div>
-                            <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Combined Balance</h4>
-                            <p className={`text-2xl font-bold mt-1 ${totalBalance < 0 ? 'text-danger' : 'text-gray-darkest dark:text-gray-50'}`}>
-                                {formatCurrency(totalBalance, currency)}
+                            <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Expense so far</h4>
+                            <p className="text-2xl font-bold mt-1 text-danger dark:text-rose-400">
+                                {formatCurrency(allTimeExpenses, currency)}
                             </p>
                         </div>
                     </Card>
 
                     <Card className="flex items-center p-6 bg-gradient-to-br from-green-50/30 to-emerald-50/10 dark:from-emerald-950/20 dark:to-gray-800/40">
-                        <div className="w-12 h-12 rounded-xl bg-green-100 dark:bg-emerald-950/40 flex items-center justify-center mr-4">
+                        <div className="w-12 h-12 rounded-xl bg-green-100 dark:bg-emerald-955/40 flex items-center justify-center mr-4">
                             <Icon name="TrendingUp" className="text-success dark:text-emerald-400" size={24} />
                         </div>
                         <div>
@@ -288,14 +346,14 @@ export const Accounts: React.FC = () => {
                         </div>
                     </Card>
 
-                    <Card className="flex items-center p-6 bg-gradient-to-br from-red-50/30 to-rose-50/10 dark:from-rose-950/20 dark:to-gray-800/40">
-                        <div className="w-12 h-12 rounded-xl bg-red-100 dark:bg-rose-950/40 flex items-center justify-center mr-4">
-                            <Icon name="TrendingDown" className="text-danger dark:text-rose-400" size={24} />
+                    <Card className="flex items-center p-6 bg-gradient-to-br from-primary-light/30 to-indigo-50/10 dark:from-indigo-950/20 dark:to-gray-800/40">
+                        <div className="w-12 h-12 rounded-xl bg-primary-light dark:bg-primary/20 flex items-center justify-center mr-4">
+                            <Icon name="Landmark" className="text-primary dark:text-indigo-300" size={24} />
                         </div>
                         <div>
-                            <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Expense so far</h4>
-                            <p className="text-2xl font-bold mt-1 text-danger dark:text-rose-400">
-                                {formatCurrency(allTimeExpenses, currency)}
+                            <h4 className="text-sm font-medium text-gray-505 dark:text-gray-400">Combined Balance</h4>
+                            <p className={`text-2xl font-bold mt-1 ${totalBalance < 0 ? 'text-danger' : 'text-gray-darkest dark:text-gray-50'}`}>
+                                {formatCurrency(totalBalance, currency)}
                             </p>
                         </div>
                     </Card>
@@ -308,10 +366,11 @@ export const Accounts: React.FC = () => {
                             onClick={handleAdd}
                             className="btn btn-primary flex items-center gap-2"
                         >
-                            <Icon name="Plus" size={20} />
+                            <Icon name="Plus" size={18} />
                             Add Account
                         </button>
                     </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {accounts.map(account => (
                             <AccountCard
@@ -329,17 +388,33 @@ export const Accounts: React.FC = () => {
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 account={editAccount || undefined}
-                onDelete={editAccount ? handleDelete : undefined}
+                onDelete={handleDelete}
             />
 
             {selectedDetailAccount && (
                 <AccountDetailsModal
-                    isOpen={true}
+                    isOpen={!!selectedDetailAccount}
                     onClose={() => setSelectedDetailAccount(null)}
                     account={selectedDetailAccount}
                     transactions={transactions}
                     categories={categories}
                     currency={currency}
+                    onEditTransaction={(t) => {
+                        setSelectedDetailAccount(null);
+                        setEditTransaction(t);
+                        setIsTransactionModalOpen(true);
+                    }}
+                />
+            )}
+
+            {isTransactionModalOpen && editTransaction && (
+                <NewTransactionModal
+                    isOpen={isTransactionModalOpen}
+                    onClose={() => {
+                        setIsTransactionModalOpen(false);
+                        setEditTransaction(null);
+                    }}
+                    transaction={editTransaction}
                 />
             )}
         </>

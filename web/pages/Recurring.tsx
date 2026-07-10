@@ -3,9 +3,9 @@ import { AppContext } from '../App';
 import { Card } from '../components/Card';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { Icon } from '../components/Icon';
-import { RecurringFrequency, RecurringRule, TransactionType } from '../types';
+import { RecurringFrequency, RecurringRule, Transaction, TransactionType } from '../types';
 import { formatCurrency } from '../utils/currency';
-import { todayIsoDate } from '../utils/date';
+import { todayIsoDate, formatTransactionDate } from '../utils/date';
 
 type RuleForm = {
   id?: string;
@@ -41,16 +41,166 @@ const frequencyLabels: Record<RecurringFrequency, string> = {
   yearly: 'Yearly',
 };
 
+const RecurringRuleCard: React.FC<{
+  rule: RecurringRule;
+  transactions: Transaction[];
+  currency: string;
+  accountName: (id: string) => string;
+  categoryName: (id: string) => string;
+  updateRecurring: (id: string, rule: Partial<RecurringRule>) => Promise<void>;
+  runRecurring: (id: string) => Promise<void>;
+  editRule: (rule: RecurringRule) => void;
+  onDelete: (rule: RecurringRule) => void;
+}> = ({ rule, transactions, currency, accountName, categoryName, updateRecurring, runRecurring, editRule, onDelete }) => {
+  const [showHistory, setShowHistory] = useState(false);
+  const [confirmRun, setConfirmRun] = useState(false);
+
+  const ruleTransactions = useMemo(() => {
+    return transactions.filter(t => {
+      const expectedNote = rule.note ? `${rule.note}, recurring` : 'recurring';
+      return t.accountId === rule.accountId &&
+        t.amount === rule.amount &&
+        (t.note === expectedNote || t.note === rule.note || t.note.startsWith(expectedNote));
+    }).sort((a, b) => b.date.localeCompare(a.date));
+  }, [transactions, rule]);
+
+  return (
+    <Card className={`flex flex-col justify-between h-full hover:shadow-md transition-all ${!rule.active ? 'opacity-70 bg-gray-50/50 dark:bg-gray-805/30' : ''}`}>
+      <div>
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold capitalize ${
+            rule.type === 'income'
+              ? 'bg-green-150 text-green-800 dark:bg-green-950/40 dark:text-green-300'
+              : rule.type === 'transfer'
+                ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-350'
+                : 'bg-red-150 text-red-800 dark:bg-red-950/40 dark:text-red-300'
+          }`}>
+            {rule.type}
+          </span>
+          <span className={`text-[11px] font-bold ${rule.active ? 'text-success' : 'text-gray-400'}`}>
+            {rule.active ? 'Active' : 'Paused'}
+          </span>
+        </div>
+        <h3 className="text-base font-bold text-gray-900 dark:text-gray-550 truncate" title={rule.note}>
+          {rule.note}
+        </h3>
+        <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1 uppercase tracking-wider font-bold">
+          {frequencyLabels[rule.frequency]} • next on {rule.nextRun}
+          {rule.endDate ? ` • ends ${rule.endDate}` : ''}
+        </p>
+        <p className="text-xs text-gray-550 dark:text-gray-400 mt-1 truncate">
+          {rule.type === 'transfer'
+            ? `${accountName(rule.accountId)} → ${accountName(rule.transferToAccountId || '')}`
+            : `${accountName(rule.accountId)} • ${categoryName(rule.categoryId || '')}`}
+        </p>
+      </div>
+
+      <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-700/60 flex flex-col gap-2">
+        <div className="flex justify-between items-center">
+          <span className="text-lg font-bold text-gray-900 dark:text-white">
+            {formatCurrency(rule.amount, currency)}
+          </span>
+          
+          {ruleTransactions.length > 0 && (
+            <button
+              onClick={() => setShowHistory(!showHistory)}
+              className="flex items-center gap-0.5 text-xs font-semibold text-primary hover:underline hover:text-primary-600 transition-colors"
+              title="View History / Log collapse"
+            >
+              <span>History ({ruleTransactions.length})</span>
+              <Icon name={showHistory ? 'ChevronUp' : 'ChevronDown'} size={14} />
+            </button>
+          )}
+        </div>
+
+        {/* Collapsible execution log/history */}
+        {showHistory && ruleTransactions.length > 0 && (
+          <div className="mt-2 bg-gray-50 dark:bg-gray-900/30 p-2.5 rounded-lg border border-gray-100 dark:border-gray-700 max-h-[120px] overflow-y-auto space-y-1.5 scrollbar-thin">
+            {ruleTransactions.map(t => (
+              <div key={t.id} className="flex justify-between items-center text-[10px] text-gray-600 dark:text-gray-400 border-b border-gray-100 dark:border-gray-808 pb-1 last:border-b-0 last:pb-0">
+                <span className="font-semibold">{formatTransactionDate(t.date, true)}</span>
+                <span className="font-medium text-gray-500 dark:text-gray-450 truncate max-w-[130px]">{t.note}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100 dark:border-gray-700/40">
+          <button
+            onClick={() => updateRecurring(rule.id, { active: !rule.active })}
+            className={`px-3 py-1 rounded-lg text-xs font-bold transition-all border ${
+              rule.active
+                ? 'bg-gray-150 border-gray-205 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-650'
+                : 'bg-green-50 border-green-200 text-success hover:bg-green-100 dark:bg-green-950/20 dark:border-green-800 dark:text-green-400'
+            }`}
+          >
+            {rule.active ? 'Pause' : 'Resume'}
+          </button>
+          
+          <div className="flex items-center gap-1.5">
+            {confirmRun ? (
+              <div className="flex items-center gap-1 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/40 px-2 py-0.5 rounded-lg">
+                <span className="text-[9px] font-extrabold text-amber-600 dark:text-amber-450 mr-1 animate-pulse">RUN NOW?</span>
+                <button
+                  onClick={async () => {
+                    await runRecurring(rule.id);
+                    setConfirmRun(false);
+                  }}
+                  className="px-1.5 py-0.5 rounded bg-amber-500 hover:bg-amber-600 text-white text-[9px] font-extrabold transition-all"
+                >
+                  YES
+                </button>
+                <button
+                  onClick={() => setConfirmRun(false)}
+                  className="px-1.5 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-[9px] font-extrabold transition-all"
+                >
+                  NO
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmRun(true)}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/60 text-amber-600 dark:text-amber-450 hover:bg-amber-100 transition-colors"
+                title="Run manual execution now"
+              >
+                <Icon name="Play" size={12} />
+                <span>Run Now</span>
+              </button>
+            )}
+            
+            <button
+              onClick={() => editRule(rule)}
+              className="p-1.5 rounded-md text-gray-500 hover:text-primary hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              title="Edit rule"
+            >
+              <Icon name="Pencil" size={16} />
+            </button>
+            <button
+              onClick={() => onDelete(rule)}
+              className="p-1.5 rounded-md text-gray-500 hover:text-danger hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+              title="Delete rule"
+            >
+              <Icon name="Trash2" size={16} />
+            </button>
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+};
+
 export const Recurring: React.FC = () => {
   const context = useContext(AppContext)!;
   const {
     accounts,
     categories,
     recurring,
+    transactions,
     currency,
     addRecurring,
     updateRecurring,
     deleteRecurring,
+    runRecurring,
   } = context;
 
   const [form, setForm] = useState<RuleForm>(() => emptyForm(accounts[0]?.id || ''));
@@ -58,12 +208,12 @@ export const Recurring: React.FC = () => {
 
   const expenseCategories = categories.filter(category => category.type === form.type);
   const sortedRules = useMemo(
-    () => [...recurring].sort((a, b) => a.nextRun.localeCompare(b.nextRun)),
+    () => [...recurring].sort((a, b) => a.note.localeCompare(b.note)),
     [recurring]
   );
 
-  const accountName = (id?: string | null) => accounts.find(account => account.id === id)?.name || 'Unknown account';
-  const categoryName = (id?: string | null) => categories.find(category => category.id === id)?.name || 'Transfer';
+  const accountName = (id: string) => accounts.find(a => a.id === id)?.name || 'Unknown';
+  const categoryName = (id: string) => categories.find(c => c.id === id)?.name || 'Unknown';
 
   const resetForm = () => {
     setForm(emptyForm(accounts[0]?.id || ''));
@@ -79,7 +229,7 @@ export const Recurring: React.FC = () => {
       transferToAccountId: rule.transferToAccountId || '',
       categoryId: rule.categoryId || '',
       frequency: rule.frequency,
-      startDate: rule.nextRun,
+      startDate: rule.startDate,
       endDate: rule.endDate || '',
       active: rule.active,
     });
@@ -87,15 +237,26 @@ export const Recurring: React.FC = () => {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-
-    const amount = Number(form.amount);
-    if (!form.note.trim() || !amount || amount <= 0 || !form.accountId) {
-      alert('Please add a note, amount, and account.');
+    if (!form.note.trim()) {
+      alert('Please enter a note.');
+      return;
+    }
+    const amount = parseFloat(form.amount);
+    if (isNaN(amount) || amount <= 0) {
+      alert('Please enter a positive amount.');
+      return;
+    }
+    if (!form.accountId) {
+      alert('Please choose an account.');
       return;
     }
     if (form.type === 'transfer') {
-      if (!form.transferToAccountId || form.accountId === form.transferToAccountId) {
-        alert('Please choose a different destination account.');
+      if (!form.transferToAccountId) {
+        alert('Please choose a destination account.');
+        return;
+      }
+      if (form.accountId === form.transferToAccountId) {
+        alert('Source and destination accounts must be different.');
         return;
       }
     } else if (!form.categoryId) {
@@ -126,24 +287,48 @@ export const Recurring: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-3xl font-bold text-gray-darkest dark:text-gray-50">Recurring Transactions</h2>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">Rent, EMI, salary, subscriptions, and other scheduled entries.</p>
-        </div>
-        {form.id && (
-          <button onClick={resetForm} className="btn btn-secondary flex items-center gap-2 self-start">
+      {form.id && (
+        <div className="flex justify-end">
+          <button onClick={resetForm} className="btn btn-secondary flex items-center gap-2">
             <Icon name="Plus" size={18} />
             New Rule
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-[380px,1fr] gap-6">
-        <Card>
-          <h3 className="font-semibold text-lg text-gray-darkest dark:text-gray-50 mb-4">
-            {form.id ? 'Edit rule' : 'Add rule'}
+      <div className="grid grid-cols-1 xl:grid-cols-[380px,1fr] gap-8">
+        {/* Form card on left */}
+        <Card className={`self-start transition-all border ${form.id ? 'border-amber-300 dark:border-amber-900 bg-amber-50/5 dark:bg-amber-950/5 shadow-md' : 'border-gray-200 dark:border-gray-700'}`}>
+          <h3 className="font-semibold text-lg text-gray-darkest dark:text-gray-5; flex items-center gap-2 mb-4">
+            {form.id ? (
+              <>
+                <Icon name="Pencil" className="text-amber-500" size={18} />
+                <span>Edit Rule Settings</span>
+              </>
+            ) : (
+              <>
+                <Icon name="Plus" className="text-primary" size={18} />
+                <span>Add Rule template</span>
+              </>
+            )}
           </h3>
+
+          {form.id && (
+            <div className="p-3 mb-4 bg-amber-50 dark:bg-amber-955/20 border border-amber-200 dark:border-amber-900/50 rounded-xl flex items-center justify-between text-xs text-amber-700 dark:text-amber-300">
+              <div className="flex items-center gap-1.5">
+                <Icon name="AlertCircle" size={14} className="text-amber-500 animate-pulse" />
+                <span className="font-bold">Editing: "{form.note}"</span>
+              </div>
+              <button 
+                type="button"
+                onClick={resetForm} 
+                className="text-[10px] uppercase font-black tracking-wider text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-200 hover:underline cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-3 gap-1 bg-gray-100 dark:bg-gray-900 p-1 rounded-lg">
               {(['expense', 'income', 'transfer'] as TransactionType[]).map(type => (
@@ -151,8 +336,10 @@ export const Recurring: React.FC = () => {
                   key={type}
                   type="button"
                   onClick={() => setForm(prev => ({ ...prev, type, categoryId: '', transferToAccountId: '' }))}
-                  className={`px-3 py-2 rounded-md capitalize text-sm font-semibold ${form.type === type
-                    ? 'bg-white text-primary shadow-sm dark:bg-gray-700'
+                  className={`px-3 py-2 rounded-md capitalize text-sm font-semibold transition-all ${form.type === type
+                    ? form.id 
+                      ? 'bg-amber-500 text-white shadow-sm'
+                      : 'bg-white text-primary shadow-sm dark:bg-gray-700'
                     : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100'
                     }`}
                 >
@@ -294,81 +481,45 @@ export const Recurring: React.FC = () => {
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Active</span>
             </label>
 
-            <button type="submit" className="btn btn-primary w-full flex items-center justify-center gap-2">
+            <button 
+              type="submit" 
+              className={`btn w-full flex items-center justify-center gap-2 font-bold py-2.5 transition-all duration-300 text-white rounded-xl ${
+                form.id 
+                  ? 'bg-amber-500 hover:bg-amber-600 hover:shadow-md' 
+                  : 'bg-primary hover:bg-primary-hover shadow-sm'
+              }`}
+            >
               <Icon name={form.id ? 'Save' : 'Plus'} size={18} />
-              {form.id ? 'Save Rule' : 'Add Rule'}
+              {form.id ? 'Update Rule Settings' : 'Add Rule Template'}
             </button>
           </form>
         </Card>
 
-        <div className="space-y-4">
+        {/* Rules Card Grid on right */}
+        <div className="flex-1">
           {sortedRules.length === 0 ? (
             <Card className="text-center py-14">
-              <Icon name="Repeat" size={48} className="mx-auto mb-4 text-gray-400" />
+              <Icon name="RefreshCw" size={48} className="mx-auto mb-4 text-gray-400" />
               <p className="text-lg font-semibold text-gray-darkest dark:text-gray-50">No recurring rules yet</p>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Add rent, salary, EMI, or subscriptions to automate future entries.</p>
             </Card>
           ) : (
-            sortedRules.map(rule => (
-              <Card key={rule.id} className={!rule.active ? 'opacity-70' : ''}>
-                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${rule.type === 'income'
-                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
-                        : rule.type === 'transfer'
-                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-                          : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
-                        }`}>
-                        {rule.type}
-                      </span>
-                      <span className={`text-xs font-semibold ${rule.active ? 'text-success' : 'text-gray-400'}`}>
-                        {rule.active ? 'Active' : 'Paused'}
-                      </span>
-                    </div>
-                    <h3 className="text-lg font-bold text-gray-darkest dark:text-gray-50 truncate">{rule.note}</h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                      {frequencyLabels[rule.frequency]} • next on {rule.nextRun}
-                      {rule.endDate ? ` • ends ${rule.endDate}` : ''}
-                    </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                      {rule.type === 'transfer'
-                        ? `${accountName(rule.accountId)} to ${accountName(rule.transferToAccountId)}`
-                        : `${accountName(rule.accountId)} • ${categoryName(rule.categoryId)}`}
-                    </p>
-                  </div>
-
-                  <div className="flex items-center justify-between gap-4 md:flex-col md:items-end">
-                    <span className="text-xl font-bold text-gray-darkest dark:text-gray-50">
-                      {formatCurrency(rule.amount, currency)}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => updateRecurring(rule.id, { active: !rule.active })}
-                        className="btn btn-secondary px-3 py-2"
-                        title={rule.active ? 'Pause rule' : 'Resume rule'}
-                      >
-                        {rule.active ? 'Pause' : 'Resume'}
-                      </button>
-                      <button
-                        onClick={() => editRule(rule)}
-                        className="p-2 rounded-lg text-gray-500 hover:text-primary hover:bg-gray-100 dark:hover:bg-gray-700"
-                        title="Edit rule"
-                      >
-                        <Icon name="Pencil" size={18} />
-                      </button>
-                      <button
-                        onClick={() => setDeleteTarget(rule)}
-                        className="p-2 rounded-lg text-gray-500 hover:text-danger hover:bg-red-50 dark:hover:bg-red-900/20"
-                        title="Delete rule"
-                      >
-                        <Icon name="Trash2" size={18} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            ))
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {sortedRules.map(rule => (
+                <RecurringRuleCard
+                  key={rule.id}
+                  rule={rule}
+                  transactions={transactions}
+                  currency={currency}
+                  accountName={accountName}
+                  categoryName={categoryName}
+                  updateRecurring={updateRecurring}
+                  runRecurring={runRecurring}
+                  editRule={editRule}
+                  onDelete={setDeleteTarget}
+                />
+              ))}
+            </div>
           )}
         </div>
       </div>

@@ -1,14 +1,20 @@
-import React, { useContext, useMemo, useState } from 'react';
+import React, { useContext, useMemo, useState, useRef } from 'react';
 import { AppContext } from '../App';
 import { Card } from '../components/Card';
 import { Icon } from '../components/Icon';
 import { Transaction } from '../types';
-import { ExportButton } from '../components/ExportButton';
 import { formatCurrency } from '../utils/currency';
 import { NewTransactionModal } from '../components/NewTransactionModal';
-import { displayDateToIso, formatTransactionDate, isoDateToDisplay, transactionDateToIso } from '../utils/date';
+import { ConfirmDialog } from '../components/ConfirmDialog';
+import { ImportTransactionsModal } from '../components/ImportTransactionsModal';
+import { formatTransactionDate, isoDateToDisplay } from '../utils/date';
 
-const TransactionRow: React.FC<{ transaction: Transaction; onEdit: () => void }> = ({ transaction, onEdit }) => {
+const TransactionRow: React.FC<{ 
+    transaction: Transaction; 
+    onEdit: () => void; 
+    isSelected: boolean; 
+    onToggleSelect: () => void; 
+}> = ({ transaction, onEdit, isSelected, onToggleSelect }) => {
     const { categories, accounts, currency } = useContext(AppContext)!;
     const category = categories.find(c => c.id === transaction.categoryId);
     const account = accounts.find(a => a.id === transaction.accountId);
@@ -24,47 +30,78 @@ const TransactionRow: React.FC<{ transaction: Transaction; onEdit: () => void }>
     let icon = category?.icon || 'Tags';
 
     if (isTransfer) {
-        amountColor = 'text-gray-700 dark:text-gray-300';
+        amountColor = 'text-gray-700 dark:text-gray-355';
         prefix = '';
-        note = `Transfer to ${destAccount?.name || 'Account'}`;
         categoryName = 'Transfer';
         icon = 'ArrowLeftRight';
     }
 
     return (
-        <tr className="border-b border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700/50">
-            <td className="px-6 py-4 whitespace-nowrap">
-                <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                    {formatTransactionDate(transaction.date, true)}
-                </div>
+        <tr className={`border-b border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700/50 ${isSelected ? 'bg-primary-light/10 dark:bg-primary/5' : ''}`}>
+            {/* Checkbox Selector */}
+            <td className="px-4 py-4 whitespace-nowrap text-center">
+                <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={onToggleSelect}
+                    className="w-4 h-4 rounded text-primary focus:ring-primary border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 cursor-pointer"
+                />
             </td>
+            {/* Date */}
+            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                {formatTransactionDate(transaction.date, true)}
+            </td>
+            {/* Note */}
             <td className="px-6 py-4 whitespace-nowrap">
                 <div className="flex items-center">
-                    <div className="w-8 h-8 rounded-full bg-primary-light dark:bg-primary/20 flex items-center justify-center mr-3 flex-shrink-0">
-                        <Icon name={icon} className="text-primary dark:text-indigo-300" size={18} />
+                    <div className="w-8 h-8 rounded-full bg-primary-light/50 dark:bg-primary/20 flex items-center justify-center mr-3 flex-shrink-0">
+                        <Icon name={icon} className="text-primary dark:text-indigo-300" size={16} />
                     </div>
-                    <div>
-                        <div className="text-sm font-medium text-gray-900 dark:text-gray-100">{note}</div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">{categoryName}</div>
-                    </div>
+                    <span className="text-sm font-medium text-gray-955 dark:text-gray-100 truncate max-w-xs" title={note}>
+                        {note}
+                    </span>
                 </div>
             </td>
-            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{account?.name}</td>
+            {/* Amount */}
+            <td className={`px-6 py-4 whitespace-nowrap text-sm font-bold ${amountColor}`}>
+                {prefix}{formatCurrency(transaction.amount, currency)}
+            </td>
+            {/* Account */}
+            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-405 font-medium">
+                {account?.name}
+            </td>
+            {/* Type */}
             <td className="px-6 py-4 whitespace-nowrap">
-                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${isExpense ? 'bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-200' :
-                    isTransfer ? 'bg-gray-100 text-gray-800 dark:bg-gray-500/20 dark:text-gray-200' :
-                        'bg-green-100 text-green-800 dark:bg-green-500/20 dark:text-green-200'
-                    }`}>
+                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                    isExpense ? 'bg-red-150 text-red-800 dark:bg-red-500/20 dark:text-red-200' :
+                    isTransfer ? 'bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-200' :
+                    'bg-green-150 text-green-800 dark:bg-green-500/20 dark:text-green-200'
+                }`}>
                     {transaction.type}
                 </span>
             </td>
-            <td className={`px-6 py-4 whitespace-nowrap text-sm font-semibold text-right ${amountColor}`}>
-                {prefix}{formatCurrency(transaction.amount, currency)}
+            {/* Category (moved after Type) */}
+            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-semibold bg-gray-100 dark:bg-gray-700/60 text-gray-600 dark:text-gray-300">
+                    {categoryName}
+                </span>
             </td>
+            {/* Transfer To */}
+            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-555 dark:text-gray-400 font-bold">
+                {isTransfer && destAccount ? (
+                    <span className="inline-flex items-center gap-1 text-primary dark:text-indigo-400">
+                        <Icon name="ArrowRight" size={12} />
+                        {destAccount.name}
+                    </span>
+                ) : (
+                    <span className="text-gray-300 dark:text-gray-600">—</span>
+                )}
+            </td>
+            {/* Actions */}
             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                 <button
                     onClick={onEdit}
-                    className="text-gray-500 hover:text-primary dark:text-gray-400 dark:hover:text-primary-light transition-colors p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+                    className="text-gray-500 hover:text-primary dark:text-gray-400 dark:hover:text-primary-light transition-colors p-2 rounded-full hover:bg-gray-105 dark:hover:bg-gray-700"
                     title="Edit transaction"
                 >
                     <Icon name="MoreHorizontal" size={18} />
@@ -72,10 +109,13 @@ const TransactionRow: React.FC<{ transaction: Transaction; onEdit: () => void }>
             </td>
         </tr>
     );
-}
+};
 
 export const TransactionsPage: React.FC = () => {
-    const { transactions, deleteTransaction, accounts, currency } = useContext(AppContext)!;
+    const { transactions, deleteTransaction, bulkDeleteTransactions, accounts, categories, currency } = useContext(AppContext)!;
+
+    const startDateRef = useRef<HTMLInputElement>(null);
+    const endDateRef = useRef<HTMLInputElement>(null);
 
     // Helper to get YYYY-MM-DD in local time
     const getLocalDateString = (date: Date) => {
@@ -85,18 +125,39 @@ export const TransactionsPage: React.FC = () => {
         return `${year}-${month}-${day}`;
     };
 
-    // Set default dates: 1st of current month to today (DD/MM/YYYY format)
+    // Default dates: 1st of current month to last day of current month
     const today = new Date();
     const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
 
-    const [startDate, setStartDate] = useState(isoDateToDisplay(getLocalDateString(firstDayOfMonth)));
-    const [endDate, setEndDate] = useState(isoDateToDisplay(getLocalDateString(today)));
+    const [startDate, setStartDate] = useState(getLocalDateString(firstDayOfMonth));
+    const [endDate, setEndDate] = useState(getLocalDateString(lastDayOfMonth));
     const [viewMode, setViewMode] = useState<string>('Monthly');
     const [carryOver, setCarryOver] = useState<boolean>(true);
-    const [isFilterCollapsed, setIsFilterCollapsed] = useState(true);
-    const [sortConfig, setSortConfig] = useState<{ key: keyof Transaction | 'accountName'; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
+    const [applyFiltersToSummary, setApplyFiltersToSummary] = useState<boolean>(false);
+    const [sortConfig, setSortConfig] = useState<{ key: keyof Transaction; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
+
+    // Table Filters collapsible by default
+    const [showTableFilters, setShowTableFilters] = useState<boolean>(false);
+
+    // Bulk delete selections
+    const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    const [isBulkDeleteConfirmOpen, setIsBulkDeleteConfirmOpen] = useState<boolean>(false);
+    const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
+
+    // Excel-like Column Filters State
+    const [colFilters, setColFilters] = useState({
+        note: '',
+        category: '',
+        account: '',
+        type: '',
+        minAmount: '',
+        maxAmount: ''
+    });
 
     const updateDatesForViewMode = (mode: string) => {
+        if (mode === 'Custom') return;
+
         const now = new Date();
         let start: Date;
         let end: Date;
@@ -129,16 +190,52 @@ export const TransactionsPage: React.FC = () => {
                 return;
         }
 
-        setStartDate(isoDateToDisplay(getLocalDateString(start)));
-        setEndDate(isoDateToDisplay(getLocalDateString(end)));
+        setStartDate(getLocalDateString(start));
+        setEndDate(getLocalDateString(end));
+    };
+
+    // Navigation arrow shift functionality
+    const handleShiftPeriod = (direction: -1 | 1) => {
+        if (viewMode === 'Custom') return;
+
+        const currentStart = new Date(startDate);
+        let newStart = new Date(startDate);
+        let newEnd = new Date(endDate);
+
+        switch (viewMode) {
+            case 'Daily':
+                newStart.setDate(newStart.getDate() + direction);
+                newEnd.setDate(newEnd.getDate() + direction);
+                break;
+            case 'Weekly':
+                newStart.setDate(newStart.getDate() + (direction * 7));
+                newEnd.setDate(newEnd.getDate() + (direction * 7));
+                break;
+            case 'Monthly':
+                newStart = new Date(currentStart.getFullYear(), currentStart.getMonth() + direction, 1);
+                newEnd = new Date(currentStart.getFullYear(), currentStart.getMonth() + direction + 1, 0);
+                break;
+            case '3 Month':
+                newStart = new Date(currentStart.getFullYear(), currentStart.getMonth() + (direction * 3), 1);
+                newEnd = new Date(currentStart.getFullYear(), currentStart.getMonth() + (direction * 3) + 3, 0);
+                break;
+            case 'Yearly':
+                newStart = new Date(currentStart.getFullYear() + direction, 0, 1);
+                newEnd = new Date(currentStart.getFullYear() + direction, 11, 31);
+                break;
+            default:
+                return;
+        }
+
+        setStartDate(getLocalDateString(newStart));
+        setEndDate(getLocalDateString(newEnd));
     };
 
     // Edit Modal State
     const [editTransaction, setEditTransaction] = useState<Transaction | null>(null);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
-
-    const requestSort = (key: keyof Transaction | 'accountName') => {
+    const requestSort = (key: keyof Transaction) => {
         let direction: 'asc' | 'desc' = 'asc';
         if (sortConfig.key === key && sortConfig.direction === 'asc') {
             direction = 'desc';
@@ -156,54 +253,117 @@ export const TransactionsPage: React.FC = () => {
         setIsEditModalOpen(false);
     };
 
-    const filteredAndSortedTransactions = useMemo(() => {
-        const startIso = startDate ? displayDateToIso(startDate) : null;
-        const endIso = endDate ? displayDateToIso(endDate) : null;
+    const handleBulkDelete = async () => {
+        if (selectedIds.length === 0) return;
+        await bulkDeleteTransactions(selectedIds);
+        setSelectedIds([]);
+        setIsBulkDeleteConfirmOpen(false);
+    };
 
+    const toggleSelectAll = () => {
+        if (selectedIds.length === filteredAndSortedTransactions.length) {
+            setSelectedIds([]);
+        } else {
+            setSelectedIds(filteredAndSortedTransactions.map(t => t.id));
+        }
+    };
+
+    const toggleSelectRow = (id: string) => {
+        setSelectedIds(prev =>
+            prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+        );
+    };
+
+    // Date-only filtered transactions memo (used as fallback for stats calculation)
+    const dateFilteredTransactions = useMemo(() => {
+        return transactions.filter(t => {
+            const datePart = t.date.split('T')[0];
+            if (startDate && endDate) {
+                return datePart >= startDate && datePart <= endDate;
+            }
+            return true;
+        });
+    }, [transactions, startDate, endDate]);
+
+    // Full column filters + date filters memo
+    const filteredAndSortedTransactions = useMemo(() => {
         const filtered = transactions.filter(t => {
-            if (!startIso || !endIso) return true;
-            const tDate = transactionDateToIso(t.date);
-            return tDate >= startIso && tDate <= endIso;
+            const datePart = t.date.split('T')[0];
+            if (startDate && endDate) {
+                if (datePart < startDate || datePart > endDate) return false;
+            }
+
+            // Excel Column Filters
+            if (colFilters.note) {
+                const noteText = t.type === 'transfer'
+                    ? `Transfer to ${accounts.find(a => a.id === t.transferToAccountId)?.name || 'Account'}`
+                    : t.note;
+                if (!noteText.toLowerCase().includes(colFilters.note.toLowerCase())) return false;
+            }
+            if (colFilters.category) {
+                const categoryName = t.type === 'transfer' ? 'Transfer' : (categories.find(c => c.id === t.categoryId)?.name || '');
+                if (categoryName !== colFilters.category) return false;
+            }
+            if (colFilters.account) {
+                const accountName = accounts.find(a => a.id === t.accountId)?.name || '';
+                if (accountName !== colFilters.account) return false;
+            }
+            if (colFilters.type) {
+                if (t.type !== colFilters.type) return false;
+            }
+            const signedAmount = t.type === 'expense' ? -t.amount : t.amount;
+            if (colFilters.minAmount) {
+                if (signedAmount < parseFloat(colFilters.minAmount)) return false;
+            }
+            if (colFilters.maxAmount) {
+                if (signedAmount > parseFloat(colFilters.maxAmount)) return false;
+            }
+
+            return true;
         });
 
         return [...filtered].sort((a, b) => {
-            const key = sortConfig.key as keyof Transaction;
+            const key = sortConfig.key;
             let valA = a[key];
             let valB = b[key];
 
             if (key === 'date') {
-                valA = transactionDateToIso(String(valA));
-                valB = transactionDateToIso(String(valB));
+                valA = a.date;
+                valB = b.date;
             }
+
+            if (valA === undefined) return 1;
+            if (valB === undefined) return -1;
 
             if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
             if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
             return 0;
         });
-    }, [transactions, startDate, endDate, sortConfig]);
+    }, [transactions, startDate, endDate, sortConfig, colFilters, accounts, categories]);
+
+    const summarySourceList = applyFiltersToSummary ? filteredAndSortedTransactions : dateFilteredTransactions;
 
     const rangeIncome = useMemo(() => {
-        return filteredAndSortedTransactions
+        return summarySourceList
             .filter(t => t.type === 'income')
             .reduce((sum, t) => sum + t.amount, 0);
-    }, [filteredAndSortedTransactions]);
+    }, [summarySourceList]);
 
     const rangeExpense = useMemo(() => {
-        return filteredAndSortedTransactions
+        return summarySourceList
             .filter(t => t.type === 'expense')
             .reduce((sum, t) => sum + t.amount, 0);
-    }, [filteredAndSortedTransactions]);
+    }, [summarySourceList]);
 
     const preRangeBalance = useMemo(() => {
-        const startIso = startDate ? displayDateToIso(startDate) : null;
-        if (!startIso) return 0;
+        if (!startDate) return 0;
 
         let incomeAndTransferIn = 0;
         let expenseAndTransferOut = 0;
 
         transactions.forEach(t => {
-            const tDate = transactionDateToIso(t.date);
-            if (tDate < startIso) {
+            const datePart = t.date.split('T')[0];
+            if (datePart < startDate) {
                 if (t.type === 'income') {
                     incomeAndTransferIn += t.amount;
                 } else if (t.type === 'expense') {
@@ -216,7 +376,6 @@ export const TransactionsPage: React.FC = () => {
         });
 
         const sumInitialBalances = accounts.reduce((sum, acc) => sum + acc.initialBalance, 0);
-
         return incomeAndTransferIn - expenseAndTransferOut + sumInitialBalances;
     }, [transactions, startDate, accounts]);
 
@@ -225,15 +384,15 @@ export const TransactionsPage: React.FC = () => {
         : rangeIncome - rangeExpense;
 
     const SortableHeader: React.FC<{
-        columnKey: keyof Transaction | 'accountName',
+        columnKey: keyof Transaction,
         title: string,
         className?: string
     }> = ({ columnKey, title, className }) => (
-        <th scope="col" className={`px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer ${className}`} onClick={() => requestSort(columnKey)}>
+        <th scope="col" className={`px-6 py-3 text-xs font-semibold text-gray-550 dark:text-gray-300 uppercase tracking-wider cursor-pointer ${className}`} onClick={() => requestSort(columnKey)}>
             <div className="flex items-center">
                 <span>{title}</span>
                 {sortConfig.key === columnKey && (
-                    <Icon name={sortConfig.direction === 'asc' ? 'ChevronUp' : 'ChevronDown'} size={16} className="ml-1" />
+                    <Icon name={sortConfig.direction === 'asc' ? 'ChevronUp' : 'ChevronDown'} size={14} className="ml-1" />
                 )}
             </div>
         </th>
@@ -242,11 +401,26 @@ export const TransactionsPage: React.FC = () => {
     return (
         <>
             <Card>
-                <div className="flex flex-wrap justify-between items-center mb-4 gap-4">
-                    <h2 className="text-2xl font-bold text-gray-darkest dark:text-gray-50">All Transactions</h2>
+                {/* 
+                  Controls row (top layout):
+                  Left: [◀] [View Selector] [▶] [From Date Input] [To Date Input]
+                  Right: [Carry Over Toggle] [Import Transactions Button]
+                */}
+                <div className="flex flex-wrap justify-between items-center mb-6 gap-4 border-b border-gray-100 dark:border-gray-800 pb-4">
                     <div className="flex items-center gap-3 flex-wrap">
-                        <div className="flex items-center gap-2">
-                            <label htmlFor="view-mode" className="text-sm font-medium text-gray-medium dark:text-gray-400">View</label>
+                        {/* Left chevrons + View select */}
+                        <div className="flex items-center bg-gray-50 dark:bg-gray-855 p-1 rounded-xl border border-gray-200 dark:border-gray-700">
+                            {viewMode !== 'Custom' && (
+                                <button
+                                    onClick={() => handleShiftPeriod(-1)}
+                                    className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-550 dark:text-gray-400"
+                                    title="Go back period"
+                                >
+                                    <Icon name="ChevronLeft" size={14} />
+                                </button>
+                            )}
+
+                            <label htmlFor="view-mode" className="text-[10px] font-bold text-gray-500 dark:text-gray-400 px-2 uppercase">View</label>
                             <select
                                 id="view-mode"
                                 value={viewMode}
@@ -255,135 +429,322 @@ export const TransactionsPage: React.FC = () => {
                                     setViewMode(mode);
                                     updateDatesForViewMode(mode);
                                 }}
-                                className="input text-sm py-1 px-2.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-200 cursor-pointer outline-none focus:ring-1 focus:ring-primary"
+                                className="input text-xs py-1 px-2 bg-white dark:bg-gray-800 border-none rounded-lg text-gray-700 dark:text-gray-200 cursor-pointer outline-none font-bold"
                             >
                                 <option value="Daily">Daily</option>
                                 <option value="Weekly">Weekly</option>
                                 <option value="Monthly">Monthly</option>
                                 <option value="3 Month">3 Month</option>
                                 <option value="Yearly">Yearly</option>
+                                <option value="Custom">Custom</option>
                             </select>
+
+                            {viewMode !== 'Custom' && (
+                                <button
+                                    onClick={() => handleShiftPeriod(1)}
+                                    className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-555 dark:text-gray-400"
+                                    title="Go forward period"
+                                >
+                                    <Icon name="ChevronRight" size={14} />
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Dates with Manual Typing + Calendar Ref openers */}
+                        <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-855 p-1.5 rounded-xl border border-gray-200 dark:border-gray-700">
+                            <label htmlFor="start-date" className="text-[10px] font-bold text-gray-500 dark:text-gray-400 px-1 uppercase">From</label>
+                            <div className="flex items-center bg-white dark:bg-gray-800 px-2 py-0.5 rounded-lg border border-gray-200/60 dark:border-gray-700">
+                                <input
+                                    type="date"
+                                    id="start-date"
+                                    ref={startDateRef}
+                                    value={startDate}
+                                    onChange={e => {
+                                        setStartDate(e.target.value);
+                                        setViewMode('Custom');
+                                    }}
+                                    className="bg-transparent border-none text-xs text-gray-700 dark:text-gray-200 outline-none w-28 py-0.5 font-semibold"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => startDateRef.current?.showPicker?.()}
+                                    className="p-1 hover:bg-gray-105 dark:hover:bg-gray-705 rounded text-gray-450 hover:text-gray-650 flex items-center justify-center"
+                                >
+                                    <Icon name="Calendar" size={13} />
+                                </button>
+                            </div>
+
+                            <label htmlFor="end-date" className="text-[10px] font-bold text-gray-500 dark:text-gray-400 px-1 uppercase">To</label>
+                            <div className="flex items-center bg-white dark:bg-gray-805 px-2 py-0.5 rounded-lg border border-gray-200/60 dark:border-gray-700">
+                                <input
+                                    type="date"
+                                    id="end-date"
+                                    ref={endDateRef}
+                                    value={endDate}
+                                    onChange={e => {
+                                        setEndDate(e.target.value);
+                                        setViewMode('Custom');
+                                    }}
+                                    className="bg-transparent border-none text-xs text-gray-700 dark:text-gray-200 outline-none w-28 py-0.5 font-semibold"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => endDateRef.current?.showPicker?.()}
+                                    className="p-1 hover:bg-gray-105 dark:hover:bg-gray-705 rounded text-gray-455 hover:text-gray-650 flex items-center justify-center"
+                                >
+                                    <Icon name="Calendar" size={13} />
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Right side: Carry Over & Import Button */}
+                    <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1.5 bg-gray-50 dark:bg-gray-850 border border-gray-200 dark:border-gray-700 px-3 py-1.5 rounded-xl">
+                            <input
+                                type="checkbox"
+                                id="carryover-balance-chk"
+                                checked={carryOver}
+                                onChange={e => setCarryOver(e.target.checked)}
+                                className="w-3.5 h-3.5 text-primary rounded cursor-pointer border-gray-300 dark:border-gray-650 focus:ring-primary"
+                            />
+                            <label htmlFor="carryover-balance-chk" className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer select-none">
+                                Carry Over
+                            </label>
+                            <div className="relative group/tooltip">
+                                <Icon name="Info" size={12} className="text-gray-450 dark:text-gray-555 hover:text-primary dark:hover:text-indigo-400 cursor-pointer" />
+                                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-[10px] rounded-lg shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-205 z-50 leading-normal">
+                                    Includes your savings/expenses from previous months in the starting balance.
+                                </div>
+                            </div>
                         </div>
 
                         <button
-                            onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
-                            className="btn btn-secondary flex items-center gap-1.5 py-1.5 px-3.5 text-sm"
+                            onClick={() => setIsImportModalOpen(true)}
+                            className="btn btn-primary flex items-center gap-1.5 py-2 px-3.5 text-xs font-bold"
                         >
-                            <Icon name="SlidersHorizontal" size={16} />
-                            <span>{isFilterCollapsed ? 'Show Filters' : 'Hide Filters'}</span>
+                            <Icon name="Upload" size={14} />
+                            Import Transactions
                         </button>
-
-                        <ExportButton />
                     </div>
                 </div>
 
-                {!isFilterCollapsed && (
-                    <div className="p-4 mb-6 bg-gray-50 dark:bg-gray-800/40 rounded-xl border border-gray-150 dark:border-gray-700 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div className="flex items-center gap-3 flex-wrap">
-                            <div className="flex items-center gap-2">
-                                <label htmlFor="start-date" className="text-sm font-medium text-gray-medium dark:text-gray-400">From</label>
-                                <input
-                                    type="text"
-                                    id="start-date"
-                                    value={startDate}
-                                    onChange={e => setStartDate(e.target.value)}
-                                    placeholder="DD-MM-YYYY"
-                                    inputMode="numeric"
-                                    className="input text-sm w-28 bg-white dark:bg-gray-700"
-                                />
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <label htmlFor="end-date" className="text-sm font-medium text-gray-medium dark:text-gray-400">To</label>
-                                <input
-                                    type="text"
-                                    id="end-date"
-                                    value={endDate}
-                                    onChange={e => setEndDate(e.target.value)}
-                                    placeholder="DD-MM-YYYY"
-                                    inputMode="numeric"
-                                    className="input text-sm w-28 bg-white dark:bg-gray-700"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="flex flex-col gap-1 max-w-md">
-                            <label className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-gray-700 dark:text-gray-200 select-none">
-                                <input
-                                    type="checkbox"
-                                    checked={carryOver}
-                                    onChange={e => setCarryOver(e.target.checked)}
-                                    className="w-4 h-4 rounded text-primary focus:ring-primary border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 cursor-pointer"
-                                />
-                                <span>Carry Over Balance</span>
-                            </label>
-                            <span className="text-[11px] text-gray-400 dark:text-gray-500">
-                                Factors in the cumulative net balance prior to the start date plus initial balances of all accounts.
-                            </span>
-                        </div>
-                    </div>
-                )}
-
-                {/* Stylized summary bar */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 p-4 bg-gray-50 dark:bg-gray-800/50 border border-gray-150 dark:border-gray-700 rounded-xl">
+                {/* 
+                  Summary Stats cards row
+                */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-6 p-4 bg-gray-50 dark:bg-gray-800/40 border border-gray-150 dark:border-gray-700 rounded-xl shadow-sm">
+                    {/* Expense Card */}
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-green-100 dark:bg-emerald-950/40 flex items-center justify-center text-success dark:text-emerald-400">
-                            <Icon name="TrendingUp" size={20} />
-                        </div>
-                        <div>
-                            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Income</p>
-                            <p className="text-lg font-bold text-success dark:text-emerald-400">{formatCurrency(rangeIncome, currency)}</p>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-red-100 dark:bg-rose-950/40 flex items-center justify-center text-danger dark:text-rose-400">
+                        <div className="w-10 h-10 rounded-lg bg-red-50 dark:bg-rose-955/30 flex items-center justify-center text-danger dark:text-rose-400">
                             <Icon name="TrendingDown" size={20} />
                         </div>
                         <div>
-                            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Expense</p>
-                            <p className="text-lg font-bold text-danger dark:text-rose-400">{formatCurrency(rangeExpense, currency)}</p>
+                            <p className="text-[10px] font-bold text-gray-450 dark:text-gray-550 uppercase tracking-wider">Expense</p>
+                            <p className="text-base font-bold text-danger dark:text-rose-455">{formatCurrency(rangeExpense, currency)}</p>
                         </div>
                     </div>
+
+                    {/* Income Card */}
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-green-50 dark:bg-emerald-950/30 flex items-center justify-center text-success dark:text-emerald-400">
+                            <Icon name="TrendingUp" size={20} />
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-bold text-gray-450 dark:text-gray-550 uppercase tracking-wider">Income</p>
+                            <p className="text-base font-bold text-success dark:text-emerald-405">{formatCurrency(rangeIncome, currency)}</p>
+                        </div>
+                    </div>
+
+                    {/* Balance Card */}
                     <div className="flex items-center gap-3 border-t sm:border-t-0 sm:border-l border-gray-200 dark:border-gray-700 pt-3 sm:pt-0 sm:pl-4">
-                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${displayBalance >= 0 ? 'bg-primary-light dark:bg-primary/20 text-primary dark:text-indigo-400' : 'bg-red-100 dark:bg-rose-950/40 text-danger dark:text-rose-400'}`}>
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${displayBalance >= 0 ? 'bg-primary-light/50 dark:bg-primary/20 text-primary dark:text-indigo-400' : 'bg-red-50 dark:bg-rose-955/30 text-danger dark:text-rose-400'}`}>
                             <Icon name="CircleDollarSign" size={20} />
                         </div>
                         <div>
-                            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            <p className="text-[10px] font-bold text-gray-450 dark:text-gray-550 uppercase tracking-wider">
                                 {carryOver ? 'Balance (with Carry Over)' : 'Net Balance'}
                             </p>
-                            <p className={`text-lg font-bold ${displayBalance >= 0 ? 'text-gray-darkest dark:text-gray-50' : 'text-danger'}`}>
+                            <p className={`text-base font-bold mt-0.5 ${displayBalance >= 0 ? 'text-gray-900 dark:text-gray-105' : 'text-danger'}`}>
                                 {formatCurrency(displayBalance, currency)}
                             </p>
                         </div>
                     </div>
                 </div>
 
-                <div className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                    {startDate && endDate ? (
-                        <>Showing transactions from {startDate} to {endDate}</>
-                    ) : (
-                        <>Showing all transactions</>
-                    )}
+                {/* 
+                  Banner row (under stats):
+                  Left: [Filter Toggle Button] [Apply columns check]
+                  Right: [Deselect/Delete Panel] [Showing Date Badge]
+                */}
+                <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+                    <div className="flex items-center gap-3.5 flex-wrap">
+                        {/* Highlighted Filter Button */}
+                        <button
+                            onClick={() => setShowTableFilters(!showTableFilters)}
+                            className={`flex items-center gap-1.5 py-1.5 px-3.5 rounded-xl text-xs font-bold transition-all border shadow-sm ${
+                                showTableFilters
+                                    ? 'bg-primary-dark border-primary-dark text-white'
+                                    : 'bg-primary border-primary text-white hover:bg-primary-hover'
+                            }`}
+                        >
+                            <Icon name="SlidersHorizontal" size={14} />
+                            <span>Filter</span>
+                        </button>
+
+                        {/* Apply filters to stats directly behind filter button on left side */}
+                        <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-gray-650 dark:text-gray-300 select-none bg-gray-50 dark:bg-gray-800/80 px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-700">
+                            <input
+                                type="checkbox"
+                                checked={applyFiltersToSummary}
+                                onChange={e => setApplyFiltersToSummary(e.target.checked)}
+                                className="w-4 h-4 rounded text-primary focus:ring-primary border-gray-300 dark:border-gray-650 focus:ring-2 cursor-pointer"
+                            />
+                            <span>Apply filters to stats</span>
+                        </label>
+                    </div>
+
+                    <div className="flex items-center gap-4 flex-wrap">
+                        {selectedIds.length > 0 && (
+                            <div className="flex items-center gap-2 bg-rose-50 dark:bg-rose-955/20 border border-rose-200 dark:border-rose-900/50 px-3 py-1 rounded-lg text-[10px]">
+                                <span className="font-extrabold text-rose-650 dark:text-rose-400">{selectedIds.length} selected</span>
+                                <button
+                                    onClick={() => setIsBulkDeleteConfirmOpen(true)}
+                                    className="px-2 py-0.5 bg-rose-600 hover:bg-rose-700 text-white rounded font-bold transition-colors"
+                                >
+                                    Delete
+                                </button>
+                                <button
+                                    onClick={() => setSelectedIds([])}
+                                    className="px-2 py-0.5 bg-gray-200 hover:bg-gray-300 text-gray-700 dark:bg-gray-700 dark:hover:bg-gray-650 dark:text-gray-300 rounded font-bold transition-colors"
+                                    title="Deselect all rows"
+                                >
+                                    Deselect
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Showing transactions badge moved to right side */}
+                        <span className="text-xs font-bold text-primary bg-primary-light/60 dark:bg-primary/20 dark:text-indigo-300 border border-primary-light px-3 py-1.5 rounded-lg inline-block shadow-sm">
+                            Showing transactions from <span className="font-extrabold">{isoDateToDisplay(startDate)}</span> to <span className="font-extrabold">{isoDateToDisplay(endDate)}</span>
+                        </span>
+                    </div>
                 </div>
-                <div className="overflow-x-auto">
+
+                <div className="overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-xl">
                     <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                        <thead className="bg-gray-50 dark:bg-gray-700/50">
+                        <thead className="bg-gray-50 dark:bg-gray-805/80">
+                            {/* Table Column Order: Date, Note, Amount, Account, Type, Category, Transfer To, Actions */}
                             <tr>
-                                <SortableHeader columnKey="date" title="Date" className="text-left" />
-                                <SortableHeader columnKey="note" title="Note" className="text-left" />
-                                <SortableHeader columnKey="accountId" title="Account" className="text-left" />
-                                <SortableHeader columnKey="type" title="Type" className="text-left" />
-                                <SortableHeader columnKey="amount" title="Amount" className="text-right" />
-                                <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider text-right">
+                                <th scope="col" className="px-4 py-3 text-center w-[4%]">
+                                    <input
+                                        type="checkbox"
+                                        checked={filteredAndSortedTransactions.length > 0 && selectedIds.length === filteredAndSortedTransactions.length}
+                                        onChange={toggleSelectAll}
+                                        className="w-4 h-4 rounded text-primary focus:ring-primary border-gray-300 dark:border-gray-650 focus:ring-2 cursor-pointer"
+                                    />
+                                </th>
+                                <SortableHeader columnKey="date" title="Date" className="text-left w-[12%]" />
+                                <SortableHeader columnKey="note" title="Note" className="text-left w-[24%]" />
+                                <SortableHeader columnKey="amount" title="Amount" className="text-left w-[12%]" />
+                                <SortableHeader columnKey="accountId" title="Account" className="text-left w-[14%]" />
+                                <SortableHeader columnKey="type" title="Type" className="text-left w-[10%]" />
+                                <SortableHeader columnKey="categoryId" title="Category" className="text-left w-[14%]" />
+                                <th scope="col" className="px-6 py-3 text-xs font-semibold text-gray-550 dark:text-gray-300 uppercase tracking-wider text-left w-[14%]">
+                                    Transfer To
+                                </th>
+                                <th scope="col" className="px-6 py-3 text-xs font-semibold text-gray-550 dark:text-gray-300 uppercase tracking-wider text-right w-[6%]">
                                     Actions
                                 </th>
                             </tr>
+                            {/* Excel-like Inline Columns Filter Row */}
+                            {showTableFilters && (
+                                <tr className="bg-gray-50/50 dark:bg-gray-800/40 border-t border-gray-100 dark:border-gray-750">
+                                    <th className="px-4 py-1.5"></th>
+                                    <th className="px-4 py-1.5"></th>
+                                    <th className="px-4 py-1.5">
+                                        <input
+                                            type="text"
+                                            placeholder="Filter Note..."
+                                            value={colFilters.note}
+                                            onChange={e => setColFilters(prev => ({ ...prev, note: e.target.value }))}
+                                            className="input text-xs py-1 px-2 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md outline-none focus:ring-1 focus:ring-primary"
+                                        />
+                                    </th>
+                                    <th className="px-4 py-1.5">
+                                        <div className="flex gap-1 items-center">
+                                            <input
+                                                type="number"
+                                                placeholder="Min"
+                                                value={colFilters.minAmount}
+                                                onChange={e => setColFilters(prev => ({ ...prev, minAmount: e.target.value }))}
+                                                className="input text-[10px] py-0.5 px-1.5 w-1/2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md outline-none focus:ring-1 focus:ring-primary text-right"
+                                            />
+                                            <input
+                                                type="number"
+                                                placeholder="Max"
+                                                value={colFilters.maxAmount}
+                                                onChange={e => setColFilters(prev => ({ ...prev, maxAmount: e.target.value }))}
+                                                className="input text-[10px] py-0.5 px-1.5 w-1/2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md outline-none focus:ring-1 focus:ring-primary text-right"
+                                            />
+                                        </div>
+                                    </th>
+                                    <th className="px-4 py-1.5">
+                                        <select
+                                            value={colFilters.account}
+                                            onChange={e => setColFilters(prev => ({ ...prev, account: e.target.value }))}
+                                            className="input text-xs py-1 px-2 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-650 rounded-md outline-none cursor-pointer focus:ring-1 focus:ring-primary font-medium"
+                                        >
+                                            <option value="">All Accounts</option>
+                                            {accounts.map(a => (
+                                                <option key={a.id} value={a.name}>{a.name}</option>
+                                            ))}
+                                        </select>
+                                    </th>
+                                    <th className="px-4 py-1.5">
+                                        <select
+                                            value={colFilters.type}
+                                            onChange={e => setColFilters(prev => ({ ...prev, type: e.target.value }))}
+                                            className="input text-xs py-1 px-2 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-650 rounded-md outline-none cursor-pointer focus:ring-1 focus:ring-primary font-medium"
+                                        >
+                                            <option value="">All Types</option>
+                                            <option value="income">Income</option>
+                                            <option value="expense">Expense</option>
+                                            <option value="transfer">Transfer</option>
+                                        </select>
+                                    </th>
+                                    <th className="px-4 py-1.5">
+                                        <select
+                                            value={colFilters.category}
+                                            onChange={e => setColFilters(prev => ({ ...prev, category: e.target.value }))}
+                                            className="input text-xs py-1 px-2 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-650 rounded-md outline-none cursor-pointer focus:ring-1 focus:ring-primary font-medium"
+                                        >
+                                            <option value="">All Categories</option>
+                                            <option value="Transfer">Transfer</option>
+                                            {categories.map(c => (
+                                                <option key={c.id} value={c.name}>{c.name}</option>
+                                            ))}
+                                        </select>
+                                    </th>
+                                    <th className="px-4 py-1.5"></th>
+                                    <th className="px-4 py-1.5 text-right">
+                                        {(colFilters.note || colFilters.category || colFilters.account || colFilters.type || colFilters.minAmount || colFilters.maxAmount) && (
+                                            <button
+                                                onClick={() => setColFilters({ note: '', category: '', account: '', type: '', minAmount: '', maxAmount: '' })}
+                                                className="text-xs text-rose-500 hover:text-rose-700 dark:text-rose-400 font-bold hover:underline transition-colors"
+                                                title="Clear column filters"
+                                            >
+                                                Clear
+                                            </button>
+                                        )}
+                                    </th>
+                                </tr>
+                            )}
                         </thead>
-                        <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
+                        <tbody className="bg-white divide-y divide-gray-250 dark:bg-gray-800 dark:divide-gray-700">
                             {filteredAndSortedTransactions.length === 0 ? (
                                 <tr>
-                                    <td colSpan={6} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
-                                        No transactions found for the selected date range
+                                    <td colSpan={9} className="px-6 py-8 text-center text-gray-500 dark:text-gray-450">
+                                        No transactions found matching the selected filters
                                     </td>
                                 </tr>
                             ) : (
@@ -392,6 +753,8 @@ export const TransactionsPage: React.FC = () => {
                                         key={transaction.id}
                                         transaction={transaction}
                                         onEdit={() => handleEdit(transaction)}
+                                        isSelected={selectedIds.includes(transaction.id)}
+                                        onToggleSelect={() => toggleSelectRow(transaction.id)}
                                     />
                                 ))
                             )}
@@ -408,6 +771,22 @@ export const TransactionsPage: React.FC = () => {
                     onDelete={handleDelete}
                 />
             )}
+
+            <ConfirmDialog
+                isOpen={isBulkDeleteConfirmOpen}
+                onClose={() => setIsBulkDeleteConfirmOpen(false)}
+                onConfirm={handleBulkDelete}
+                title="Bulk Delete Transactions"
+                message={`Are you sure you want to delete the ${selectedIds.length} selected transactions? This will reverse their account balances and cannot be undone.`}
+                confirmText="Delete Selected"
+                cancelText="Cancel"
+                variant="danger"
+            />
+
+            <ImportTransactionsModal
+                isOpen={isImportModalOpen}
+                onClose={() => setIsImportModalOpen(false)}
+            />
         </>
     );
 };

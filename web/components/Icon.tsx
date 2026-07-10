@@ -74,7 +74,9 @@ import {
   Star,
   Key,
   RefreshCw,
-  UserCheck
+  UserCheck,
+  Filter,
+  SlidersHorizontal
 } from 'lucide-react';
 
 export type IconName = string;
@@ -159,7 +161,9 @@ const iconComponents: { [key: string]: React.ComponentType<any> } = {
   Star,
   Key,
   RefreshCw,
-  UserCheck
+  UserCheck,
+  Filter,
+  SlidersHorizontal
 };
 
 export const iconList = Object.keys(iconComponents);

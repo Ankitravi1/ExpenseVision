@@ -113,6 +113,14 @@ export const api = {
         if (res.status === 204) return null;
         return res.json();
     },
+    bulkDeleteTransactions: async (ids: string[]) => {
+        const res = await api.fetch('/transactions/bulk-delete', {
+            method: 'POST',
+            body: JSON.stringify({ ids }),
+        });
+        if (!res.ok) throw new Error('Failed to bulk delete transactions');
+        return res.json();
+    },
     importTransactions: async (data: any[]) => {
         const res = await api.fetch('/transactions/bulk', {
             method: 'POST',
@@ -270,6 +278,27 @@ export const api = {
             throw new Error(error.error || 'Failed to delete recurring rule');
         }
         if (res.status === 204) return null;
+        return res.json();
+    },
+    runRecurring: async (id: string) => {
+        const res = await api.fetch(`/recurring/${id}/run`, {
+            method: 'POST',
+        });
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({}));
+            throw new Error(error.error || 'Failed to manually run recurring rule');
+        }
+        return res.json();
+    },
+    parseStatement: async (text: string) => {
+        const res = await api.fetch('/transactions/parse-statement', {
+            method: 'POST',
+            body: JSON.stringify({ text }),
+        });
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({}));
+            throw new Error(error.error || 'Failed to parse statement text');
+        }
         return res.json();
     },
 

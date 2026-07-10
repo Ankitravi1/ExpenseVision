@@ -222,4 +222,61 @@ router.delete('/:id', async (req, res, next) => {
     }
 });
 
+// POST /api/recurring/:id/run - manually run rule once immediately
+router.post('/:id/run', async (req, res, next) => {
+    try {
+        const prisma = (req as any).prisma;
+        const userId = (req as any).userId;
+        const { id } = req.params;
+
+        const rule = await prisma.recurringRule.findFirst({ where: { id, userId } });
+        if (!rule) {
+            return res.status(404).json({ error: 'Recurring rule not found' });
+        }
+
+        await prisma.$transaction(async (tx: any) => {
+            // Create transaction
+            await tx.transaction.create({
+                data: {
+                    userId,
+                    accountId: rule.accountId,
+                    transferToAccountId: rule.type === 'transfer' ? rule.transferToAccountId : null,
+                    categoryId: rule.type === 'transfer' ? null : rule.categoryId,
+                    amount: rule.amount,
+                    type: rule.type,
+                    date: rule.nextRun,
+                    note: rule.note ? `${rule.note}, recurring` : 'recurring'
+                }
+            });
+
+            // Update source account balance
+            const delta = rule.type === 'income' ? rule.amount : -rule.amount;
+            await tx.account.update({
+                where: { id: rule.accountId },
+                data: { balance: { increment: delta } }
+            });
+
+            // Update transfer destination account balance
+            if (rule.type === 'transfer' && rule.transferToAccountId) {
+                await tx.account.update({
+                    where: { id: rule.transferToAccountId },
+                    data: { balance: { increment: rule.amount } }
+                });
+            }
+
+            // Advance scheduling
+            const nextRun = advanceDate(rule.nextRun, rule.frequency, rule.dayAnchor);
+            const expired = Boolean(rule.endDate && nextRun > rule.endDate);
+            await tx.recurringRule.update({
+                where: { id: rule.id },
+                data: { nextRun, ...(expired ? { active: false } : {}) }
+            });
+        });
+
+        res.json({ message: 'Rule executed manually successfully' });
+    } catch (error) {
+        next(error);
+    }
+});
+
 export default router;
