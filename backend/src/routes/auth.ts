@@ -478,8 +478,15 @@ router.post('/verify-email', async (req, res) => {
 
 // POST /api/auth/forgot-password
 router.post('/forgot-password', async (req, res) => {
+    const genericMessage = 'If an account exists, a password reset email has been sent.';
     try {
-        const { email } = req.body;
+        // Validate the email shape. On invalid/missing input return the SAME generic
+        // response so callers cannot enumerate accounts (and we never 500 on junk input).
+        const parsed = z.object({ email: z.string().email() }).safeParse(req.body);
+        if (!parsed.success) {
+            return res.json({ message: genericMessage });
+        }
+        const { email } = parsed.data;
 
         const user = await prisma.user.findUnique({
             where: { email },
@@ -487,7 +494,7 @@ router.post('/forgot-password', async (req, res) => {
 
         if (!user) {
             // Don't reveal if user exists
-            return res.json({ message: 'If an account exists, a password reset email has been sent.' });
+            return res.json({ message: genericMessage });
         }
 
         const resetToken = crypto.randomBytes(32).toString('hex');
@@ -504,7 +511,7 @@ router.post('/forgot-password', async (req, res) => {
         // Send email
         await sendPasswordResetEmail(user.email, resetToken);
 
-        res.json({ message: 'If an account exists, a password reset email has been sent.' });
+        res.json({ message: genericMessage });
     } catch (error) {
         console.error('Forgot password error:', error);
         res.status(500).json({ error: 'Internal server error' });
@@ -514,7 +521,14 @@ router.post('/forgot-password', async (req, res) => {
 // POST /api/auth/reset-password
 router.post('/reset-password', async (req, res) => {
     try {
-        const { token, password } = req.body;
+        const parsed = z.object({
+            token: z.string().min(1),
+            password: z.string().min(8),
+        }).safeParse(req.body);
+        if (!parsed.success) {
+            return res.status(400).json({ error: 'Password must be at least 8 characters' });
+        }
+        const { token, password } = parsed.data;
 
         const user = await prisma.user.findFirst({
             where: {
@@ -697,7 +711,21 @@ router.post('/refresh-token', async (req, res) => {
             include: { user: true },
         });
 
-        if (!storedToken || storedToken.revoked || new Date() > storedToken.expiresAt) {
+        if (!storedToken) {
+            return res.status(401).json({ error: 'Invalid or expired refresh token' });
+        }
+
+        // A presented-but-already-revoked token means the token was reused after
+        // rotation — treat it as theft and revoke every active token for the user.
+        if (storedToken.revoked) {
+            await prisma.refreshToken.updateMany({
+                where: { userId: storedToken.userId, revoked: false },
+                data: { revoked: true },
+            });
+            return res.status(401).json({ error: 'Invalid or expired refresh token' });
+        }
+
+        if (new Date() > storedToken.expiresAt) {
             return res.status(401).json({ error: 'Invalid or expired refresh token' });
         }
 

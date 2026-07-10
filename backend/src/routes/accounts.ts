@@ -103,12 +103,17 @@ router.put('/:id', async (req, res, next) => {
 
         const data = accountSchema.partial().parse(req.body);
 
-        // Fetch old account to calculate balance adjustment if initialBalance changed
-        const oldAccount = await prisma.account.findUnique({
-            where: { id }
+        // Fetch old account (scoped to the caller) to calculate balance adjustment
+        // if initialBalance changed, and to reject updates to accounts they don't own.
+        const oldAccount = await prisma.account.findFirst({
+            where: { id, userId }
         });
 
-        if (data.initialBalance !== undefined && oldAccount) {
+        if (!oldAccount) {
+            return res.status(404).json({ error: 'Account not found' });
+        }
+
+        if (data.initialBalance !== undefined) {
             const diff = data.initialBalance - oldAccount.initialBalance;
             (data as any).balance = oldAccount.balance + diff;
         }

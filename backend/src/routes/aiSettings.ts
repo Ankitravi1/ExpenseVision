@@ -258,7 +258,13 @@ router.post('/test', async (req, res, next) => {
         const reply = responseData.choices?.[0]?.message?.content || 'Connection successful!';
         res.json({ success: true, message: reply });
     } catch (error: any) {
-        res.status(500).json({ error: error.message || 'Internal test error' });
+        // Provider feedback (bad model, invalid key) is already surfaced above via the
+        // 502 branch. Anything reaching here is an internal/network fault — return a
+        // generic message so we don't leak stack traces or connection details.
+        if (error && typeof error.status === 'number') {
+            return res.status(error.status).json({ error: error.message || 'Connection test failed' });
+        }
+        return res.status(500).json({ error: 'Connection test failed' });
     }
 });
 

@@ -57,16 +57,36 @@ export const materializeRecurringRules = async (prisma: any, userId: string): Pr
 
     let created = 0;
     for (const rule of rules) {
+        // Compute the due occurrence dates and the resulting nextRun BEFORE claiming
+        // the rule, so the claim can advance nextRun in a single atomic write.
+        const occurrences: string[] = [];
         let nextRun: string = rule.nextRun;
-        let occurrences = 0;
+        while (nextRun <= today && occurrences.length < 100) {
+            if (rule.endDate && nextRun > rule.endDate) break;
+            occurrences.push(nextRun);
+            nextRun = advanceDate(nextRun, rule.frequency, rule.dayAnchor);
+        }
 
-        await prisma.$transaction(async (tx: any) => {
-            while (nextRun <= today && occurrences < 100) {
-                if (rule.endDate && nextRun > rule.endDate) break;
+        const expired = Boolean(rule.endDate && nextRun > rule.endDate);
 
-                const account = await tx.account.findUnique({ where: { id: rule.accountId } });
-                if (!account) break; // account gone — rule will be deactivated below
+        const ruleCreated: number = await prisma.$transaction(async (tx: any) => {
+            // Optimistic lock: only the caller that flips nextRun off its current
+            // value wins. A concurrent request (e.g. a second device hitting
+            // /initial-data) sees count 0 and skips, so occurrences never double-fire.
+            const claim = await tx.recurringRule.updateMany({
+                where: { id: rule.id, nextRun: rule.nextRun, active: true },
+                data: { nextRun, ...(expired ? { active: false } : {}) }
+            });
+            if (claim.count === 0) {
+                return 0;
+            }
 
+            // The account is fixed per rule, so check it once.
+            const account = await tx.account.findUnique({ where: { id: rule.accountId } });
+            if (!account) return 0; // account gone — nextRun already advanced past these
+
+            let localCreated = 0;
+            for (const occurrence of occurrences) {
                 await tx.transaction.create({
                     data: {
                         userId,
@@ -75,7 +95,7 @@ export const materializeRecurringRules = async (prisma: any, userId: string): Pr
                         categoryId: rule.type === 'transfer' ? null : rule.categoryId,
                         amount: rule.amount,
                         type: rule.type,
-                        date: nextRun,
+                        date: occurrence,
                         note: rule.note ? `${rule.note}, recurring` : 'recurring'
                     }
                 });
@@ -93,18 +113,12 @@ export const materializeRecurringRules = async (prisma: any, userId: string): Pr
                     });
                 }
 
-                occurrences++;
-                nextRun = advanceDate(nextRun, rule.frequency, rule.dayAnchor);
+                localCreated++;
             }
-
-            const expired = Boolean(rule.endDate && nextRun > rule.endDate);
-            await tx.recurringRule.update({
-                where: { id: rule.id },
-                data: { nextRun, ...(expired ? { active: false } : {}) }
-            });
+            return localCreated;
         });
 
-        created += occurrences;
+        created += ruleCreated;
     }
     return created;
 };
@@ -136,6 +150,24 @@ router.post('/', async (req, res, next) => {
         }
         if (data.endDate && data.endDate < data.startDate) {
             return res.status(400).json({ error: 'End date must be after start date' });
+        }
+
+        // Ownership checks: a rule must only reference the caller's own resources
+        const ownedAccount = await prisma.account.findFirst({ where: { id: data.accountId, userId } });
+        if (!ownedAccount) {
+            return res.status(403).json({ error: 'Account does not belong to you' });
+        }
+        if (data.type === 'transfer' && data.transferToAccountId) {
+            const ownedTransferTo = await prisma.account.findFirst({ where: { id: data.transferToAccountId, userId } });
+            if (!ownedTransferTo) {
+                return res.status(403).json({ error: 'Transfer destination account does not belong to you' });
+            }
+        }
+        if (data.type !== 'transfer' && data.categoryId) {
+            const ownedCategory = await prisma.category.findFirst({ where: { id: data.categoryId, userId } });
+            if (!ownedCategory) {
+                return res.status(403).json({ error: 'Category does not belong to you' });
+            }
         }
 
         const dayAnchor = Number(data.startDate.split('-')[2]);
@@ -178,6 +210,43 @@ router.put('/:id', async (req, res, next) => {
         }
 
         const data = ruleSchema.partial().parse(req.body);
+
+        // Ownership checks — only for the fields actually being changed
+        if (data.accountId !== undefined) {
+            const ownedAccount = await prisma.account.findFirst({ where: { id: data.accountId, userId } });
+            if (!ownedAccount) {
+                return res.status(403).json({ error: 'Account does not belong to you' });
+            }
+        }
+        if (data.transferToAccountId) {
+            const ownedTransferTo = await prisma.account.findFirst({ where: { id: data.transferToAccountId, userId } });
+            if (!ownedTransferTo) {
+                return res.status(403).json({ error: 'Transfer destination account does not belong to you' });
+            }
+        }
+        if (data.categoryId) {
+            const ownedCategory = await prisma.category.findFirst({ where: { id: data.categoryId, userId } });
+            if (!ownedCategory) {
+                return res.status(403).json({ error: 'Category does not belong to you' });
+            }
+        }
+
+        // When startDate changes, advance nextRun forward to today so past
+        // occurrences are never re-materialized (a past startDate must not re-fire).
+        let scheduleUpdate: any = {};
+        if (data.startDate !== undefined) {
+            const dayAnchor = Number(data.startDate.split('-')[2]);
+            const frequency = data.frequency ?? existing.frequency;
+            const today = todayStr();
+            let nextRun = data.startDate;
+            let iterations = 0;
+            while (nextRun < today && iterations < 1000) {
+                nextRun = advanceDate(nextRun, frequency, dayAnchor);
+                iterations++;
+            }
+            scheduleUpdate = { nextRun, dayAnchor };
+        }
+
         const updated = await prisma.recurringRule.update({
             where: { id },
             data: {
@@ -188,9 +257,7 @@ router.put('/:id', async (req, res, next) => {
                 ...(data.transferToAccountId !== undefined ? { transferToAccountId: data.transferToAccountId ?? null } : {}),
                 ...(data.categoryId !== undefined ? { categoryId: data.categoryId ?? null } : {}),
                 ...(data.frequency !== undefined ? { frequency: data.frequency } : {}),
-                ...(data.startDate !== undefined
-                    ? { nextRun: data.startDate, dayAnchor: Number(data.startDate.split('-')[2]) }
-                    : {}),
+                ...scheduleUpdate,
                 ...(data.endDate !== undefined ? { endDate: data.endDate ?? null } : {}),
                 ...(data.active !== undefined ? { active: data.active } : {})
             }

@@ -13,6 +13,17 @@ const nextMonthStart = (month: string): string => {
     return `${next}-01`;
 };
 
+// Exclusive upper bound: midnight starting the day AFTER `endDate`. Dates can be
+// stored as 'YYYY-MM-DDThh:mm', which sort after the plain 'YYYY-MM-DD', so a
+// `lte: endDate` filter would drop same-day timestamped rows. `lt: nextDayStart`
+// includes them regardless of the time component.
+const nextDayStart = (value: string): string => {
+    const datePart = String(value).split('T')[0];
+    const [y, m, d] = datePart.split('-').map(Number);
+    const next = new Date(y, m - 1, d + 1);
+    return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`;
+};
+
 // Fires a push notification when an expense pushes a category over budget.
 // Called after the DB transaction commits.
 const checkBudgetAlert = async (prisma: any, userId: string, categoryId: string, dateStr: string) => {
@@ -66,7 +77,7 @@ const checkBudgetAlert = async (prisma: any, userId: string, categoryId: string,
 };
 
 // Validation schema (nullish: both clients send explicit null for unused fields)
-const transactionSchema = z.object({
+const transactionBaseSchema = z.object({
     accountId: z.string(),
     transferToAccountId: z.string().nullish(),
     categoryId: z.string().nullish(),
@@ -75,6 +86,13 @@ const transactionSchema = z.object({
     date: z.string(),
     note: z.string(),
 });
+
+// A transfer moves money to another account, so it must name a destination —
+// otherwise the source is debited and nothing is credited (money vanishes).
+const transactionSchema = transactionBaseSchema.refine(
+    (d) => d.type !== 'transfer' || !!d.transferToAccountId,
+    { message: 'Transfer transactions require a destination account', path: ['transferToAccountId'] }
+);
 
 const parseTextSchema = z.object({
     text: z.string().min(3),
@@ -229,7 +247,7 @@ router.get('/', async (req, res, next) => {
         const where: any = { userId };
 
         if (startDate) where.date = { ...where.date, gte: startDate };
-        if (endDate) where.date = { ...where.date, lte: endDate };
+        if (endDate) where.date = { ...where.date, lt: nextDayStart(endDate as string) };
         if (type) where.type = type;
         if (categoryId) where.categoryId = categoryId;
         if (accountId) where.accountId = accountId;
@@ -553,7 +571,12 @@ router.post('/parse-statement', async (req, res, next) => {
 
         res.json({ drafts });
     } catch (error: any) {
-        res.status(500).json({ error: error.message || 'Failed to parse statement text' });
+        // Only surface a status/message when the error deliberately carries one;
+        // never leak raw internal error text (stack, driver details) to the client.
+        if (error && typeof error.status === 'number') {
+            return res.status(error.status).json({ error: error.message || 'Failed to parse statement text' });
+        }
+        return res.status(500).json({ error: 'Failed to parse statement text' });
     }
 });
 
@@ -572,53 +595,84 @@ router.post('/bulk', async (req, res, next) => {
             return res.status(400).json({ error: 'Bulk import limited to 500 transactions per batch.' });
         }
 
+        // Validate every item up front; reject the whole batch on the first bad row
+        // (prevents mass-assignment: only schema-known fields survive parsing).
+        const validated: any[] = [];
+        for (let i = 0; i < transactions.length; i++) {
+            const parsed = transactionSchema.safeParse(transactions[i]);
+            if (!parsed.success) {
+                return res.status(400).json({
+                    error: `Invalid transaction at row ${i}`,
+                    details: parsed.error.errors
+                });
+            }
+            validated.push({
+                ...parsed.data,
+                date: normalizeTransactionDate(parsed.data.date) as string
+            });
+        }
+
+        // Verify every referenced account/category belongs to the caller (prevents
+        // mutating other users' balances via forged ids).
+        const accountIds = new Set<string>();
+        const categoryIds = new Set<string>();
+        for (const item of validated) {
+            accountIds.add(item.accountId);
+            if (item.transferToAccountId) accountIds.add(item.transferToAccountId);
+            if (item.categoryId) categoryIds.add(item.categoryId);
+        }
+
+        const ownedAccounts = await prisma.account.findMany({
+            where: { id: { in: [...accountIds] }, userId },
+            select: { id: true }
+        });
+        if (ownedAccounts.length !== accountIds.size) {
+            return res.status(403).json({ error: 'One or more accounts do not belong to you' });
+        }
+
+        if (categoryIds.size > 0) {
+            const ownedCategories = await prisma.category.findMany({
+                where: { id: { in: [...categoryIds] }, userId },
+                select: { id: true }
+            });
+            if (ownedCategories.length !== categoryIds.size) {
+                return res.status(403).json({ error: 'One or more categories do not belong to you' });
+            }
+        }
+
         const result = await prisma.$transaction(async (tx: any) => {
             let createdCount = 0;
 
-            for (const rawData of transactions) {
-                const data = {
-                    ...rawData,
-                    date: normalizeTransactionDate(rawData.date)
-                };
-                // Create transaction
+            for (const item of validated) {
+                const isTransfer = item.type === 'transfer';
+
+                // Whitelisted fields only — never spread the raw request object
                 await tx.transaction.create({
                     data: {
-                        ...data,
-                        userId
+                        userId,
+                        accountId: item.accountId,
+                        transferToAccountId: isTransfer ? (item.transferToAccountId ?? null) : null,
+                        categoryId: isTransfer ? null : (item.categoryId ?? null),
+                        amount: item.amount,
+                        type: item.type,
+                        date: item.date,
+                        note: item.note
                     }
                 });
 
-                // Update source account balance
-                const sourceAccount = await tx.account.findUnique({
-                    where: { id: data.accountId }
+                // Update source account balance atomically
+                const delta = item.type === 'income' ? item.amount : -item.amount;
+                await tx.account.update({
+                    where: { id: item.accountId },
+                    data: { balance: { increment: delta } }
                 });
-
-                if (sourceAccount) {
-                    let newSourceBalance = sourceAccount.balance;
-                    if (data.type === 'expense' || data.type === 'transfer') {
-                        newSourceBalance -= data.amount;
-                    } else if (data.type === 'income') {
-                        newSourceBalance += data.amount;
-                    }
-
-                    await tx.account.update({
-                        where: { id: data.accountId },
-                        data: { balance: newSourceBalance }
-                    });
-                }
 
                 // Update destination account for transfers
-                if (data.type === 'transfer' && data.transferToAccountId) {
-                    const destAccount = await tx.account.findUnique({
-                        where: { id: data.transferToAccountId }
+                if (isTransfer && item.transferToAccountId) {
+                    await tx.account.update({
+                        where: { id: item.transferToAccountId },
+                        data: { balance: { increment: item.amount } }
                     });
-
-                    if (destAccount) {
-                        await tx.account.update({
-                            where: { id: data.transferToAccountId },
-                            data: { balance: destAccount.balance + data.amount }
-                        });
-                    }
                 }
                 createdCount++;
             }
@@ -673,7 +727,7 @@ router.post('/', async (req, res, next) => {
                 }
             });
 
-            // Update source account balance
+            // Update source account balance atomically
             const sourceAccount = await tx.account.findUnique({
                 where: { id: data.accountId }
             });
@@ -682,16 +736,10 @@ router.post('/', async (req, res, next) => {
                 throw new Error('Source account not found');
             }
 
-            let newSourceBalance = sourceAccount.balance;
-            if (data.type === 'expense' || data.type === 'transfer') {
-                newSourceBalance -= data.amount;
-            } else if (data.type === 'income') {
-                newSourceBalance += data.amount;
-            }
-
+            const delta = data.type === 'income' ? data.amount : -data.amount;
             await tx.account.update({
                 where: { id: data.accountId },
-                data: { balance: newSourceBalance }
+                data: { balance: { increment: delta } }
             });
 
             // Update destination account for transfers
@@ -706,7 +754,7 @@ router.post('/', async (req, res, next) => {
 
                 await tx.account.update({
                     where: { id: data.transferToAccountId },
-                    data: { balance: destAccount.balance + data.amount }
+                    data: { balance: { increment: data.amount } }
                 });
             }
 
@@ -736,12 +784,25 @@ router.put('/:id', async (req, res, next) => {
         const userId = (req as any).userId;
         const { id } = req.params;
 
-        // Validate request body
-        const parsedData = transactionSchema.partial().parse(req.body);
-        const data = {
-            ...parsedData,
-            ...(parsedData.date ? { date: normalizeTransactionDate(parsedData.date) as string } : {})
-        };
+        // Validate request body (partial: only the fields being changed)
+        const parsedData = transactionBaseSchema.partial().parse(req.body);
+
+        // Load the existing row up front so we can validate the MERGED result and
+        // enforce field conventions before touching balances.
+        const existing = await prisma.transaction.findFirst({ where: { id, userId } });
+        if (!existing) {
+            return res.status(404).json({ error: 'Transaction not found' });
+        }
+
+        const mergedType = parsedData.type ?? existing.type;
+        const mergedTransferTo = parsedData.transferToAccountId !== undefined
+            ? parsedData.transferToAccountId
+            : existing.transferToAccountId;
+
+        // A transfer must always have a destination (money would otherwise vanish)
+        if (mergedType === 'transfer' && !mergedTransferTo) {
+            return res.status(400).json({ error: 'Transfer transactions require a destination account' });
+        }
 
         // Ownership checks before entering the DB transaction
         if (parsedData.accountId) {
@@ -765,6 +826,18 @@ router.put('/:id', async (req, res, next) => {
             }
         }
 
+        // Build the persisted patch, clearing fields that no longer apply to the
+        // resulting type (stale transferToAccountId / categoryId otherwise linger).
+        const data: any = {
+            ...parsedData,
+            ...(parsedData.date ? { date: normalizeTransactionDate(parsedData.date) as string } : {})
+        };
+        if (mergedType === 'transfer') {
+            data.categoryId = null;
+        } else {
+            data.transferToAccountId = null;
+        }
+
         const result = await prisma.$transaction(async (tx: any) => {
             // Get old transaction
             const oldTransaction = await tx.transaction.findUnique({
@@ -775,7 +848,7 @@ router.put('/:id', async (req, res, next) => {
                 throw new Error('Transaction not found');
             }
 
-            // Reverse old transaction effects
+            // Reverse old transaction effects atomically
             const oldSourceAccount = await tx.account.findUnique({
                 where: { id: oldTransaction.accountId }
             });
@@ -784,16 +857,10 @@ router.put('/:id', async (req, res, next) => {
                 throw new Error('Source account not found');
             }
 
-            let reversedBalance = oldSourceAccount.balance;
-            if (oldTransaction.type === 'expense' || oldTransaction.type === 'transfer') {
-                reversedBalance += oldTransaction.amount;
-            } else if (oldTransaction.type === 'income') {
-                reversedBalance -= oldTransaction.amount;
-            }
-
+            const oldDelta = oldTransaction.type === 'income' ? -oldTransaction.amount : oldTransaction.amount;
             await tx.account.update({
                 where: { id: oldTransaction.accountId },
-                data: { balance: reversedBalance }
+                data: { balance: { increment: oldDelta } }
             });
 
             if (oldTransaction.type === 'transfer' && oldTransaction.transferToAccountId) {
@@ -803,7 +870,7 @@ router.put('/:id', async (req, res, next) => {
                 if (oldDestAccount) {
                     await tx.account.update({
                         where: { id: oldTransaction.transferToAccountId },
-                        data: { balance: oldDestAccount.balance - oldTransaction.amount }
+                        data: { balance: { increment: -oldTransaction.amount } }
                     });
                 }
             }
@@ -814,7 +881,7 @@ router.put('/:id', async (req, res, next) => {
                 data
             });
 
-            // Apply new transaction effects
+            // Apply new transaction effects atomically
             const newSourceAccount = await tx.account.findUnique({
                 where: { id: newTransaction.accountId }
             });
@@ -823,16 +890,10 @@ router.put('/:id', async (req, res, next) => {
                 throw new Error('Source account not found');
             }
 
-            let newBalance = newSourceAccount.balance;
-            if (newTransaction.type === 'expense' || newTransaction.type === 'transfer') {
-                newBalance -= newTransaction.amount;
-            } else if (newTransaction.type === 'income') {
-                newBalance += newTransaction.amount;
-            }
-
+            const newDelta = newTransaction.type === 'income' ? newTransaction.amount : -newTransaction.amount;
             await tx.account.update({
                 where: { id: newTransaction.accountId },
-                data: { balance: newBalance }
+                data: { balance: { increment: newDelta } }
             });
 
             if (newTransaction.type === 'transfer' && newTransaction.transferToAccountId) {
@@ -844,7 +905,7 @@ router.put('/:id', async (req, res, next) => {
                 }
                 await tx.account.update({
                     where: { id: newTransaction.transferToAccountId },
-                    data: { balance: newDestAccount.balance + newTransaction.amount }
+                    data: { balance: { increment: newTransaction.amount } }
                 });
             }
 
