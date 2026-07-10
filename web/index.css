@@ -649,3 +649,12 @@ body {
     animation: none;
   }
 }
+
+/* Hide native Chrome/Safari date input calendar and clear icons */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="date"]::-webkit-inner-spin-button,
+input[type="date"]::-webkit-clear-button {
+  display: none !important;
+  -webkit-appearance: none !important;
+  margin: 0 !important;
+}

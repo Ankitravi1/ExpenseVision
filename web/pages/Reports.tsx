@@ -37,7 +37,7 @@ const CategoryDetailRow: React.FC<{
 
 export const Reports: React.FC = () => {
     const context = useContext(AppContext)!;
-    const { transactions, categories, budgets, currency, accounts } = context;
+    const { transactions, categories, budgets, currency, accounts, theme } = context;
 
     const startDateRef = useRef<HTMLInputElement>(null);
     const endDateRef = useRef<HTMLInputElement>(null);
@@ -372,8 +372,8 @@ export const Reports: React.FC = () => {
                                     setStartDate(e.target.value);
                                     setViewMode('Custom');
                                 }}
-                                className="bg-transparent border-none text-xs text-gray-800 dark:text-gray-100 outline-none w-28 py-0.5 font-semibold dark:[color-scheme:dark]"
-                                style={{ colorScheme: 'dark' }}
+                                className="bg-transparent border-none text-xs text-gray-900 dark:text-white outline-none w-28 py-0.5 font-semibold dark:[color-scheme:dark]"
+                                style={{ colorScheme: theme }}
                             />
                             <button
                                 type="button"
@@ -395,8 +395,8 @@ export const Reports: React.FC = () => {
                                     setEndDate(e.target.value);
                                     setViewMode('Custom');
                                 }}
-                                className="bg-transparent border-none text-xs text-gray-800 dark:text-gray-100 outline-none w-28 py-0.5 font-semibold dark:[color-scheme:dark]"
-                                style={{ colorScheme: 'dark' }}
+                                className="bg-transparent border-none text-xs text-gray-900 dark:text-white outline-none w-28 py-0.5 font-semibold dark:[color-scheme:dark]"
+                                style={{ colorScheme: theme }}
                             />
                             <button
                                 type="button"
@@ -449,43 +449,39 @@ export const Reports: React.FC = () => {
 
             {/* Stats row with Expense card first */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Total Expense - Plain design matching layout */}
-                <Card className="flex items-center p-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm">
-                    <div className="w-12 h-12 rounded-xl bg-red-50 dark:bg-rose-955/30 flex items-center justify-center mr-4">
+                {/* Total Expense - Rose Gradient styled matching dashboard */}
+                <Card className="flex items-center p-6 bg-gradient-to-br from-rose-50 to-rose-100/50 dark:from-rose-950/20 dark:to-gray-800/40 border border-rose-150 dark:border-rose-900/30 shadow-sm rounded-xl">
+                    <div className="w-12 h-12 rounded-xl bg-red-100/80 dark:bg-rose-955/40 flex items-center justify-center mr-4">
                         <Icon name="TrendingDown" className="text-danger dark:text-rose-400" size={24} />
                     </div>
                     <div>
-                        <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Expense</h4>
+                        <h4 className="text-sm font-medium text-rose-700 dark:text-gray-300">Total Expense</h4>
                         <p className="text-2xl font-bold mt-1 text-danger dark:text-rose-455">
                             -{formatCurrency(totalExpenses, currency)}
                         </p>
                     </div>
                 </Card>
 
-                {/* Total Income - Plain design matching layout */}
-                <Card className="flex items-center p-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm">
-                    <div className="w-12 h-12 rounded-xl bg-green-50 dark:bg-emerald-950/30 flex items-center justify-center mr-4">
+                {/* Total Income - Emerald Gradient styled matching dashboard */}
+                <Card className="flex items-center p-6 bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-950/20 dark:to-gray-800/40 border border-emerald-150 dark:border-emerald-900/30 shadow-sm rounded-xl">
+                    <div className="w-12 h-12 rounded-xl bg-green-100/80 dark:bg-emerald-955/40 flex items-center justify-center mr-4">
                         <Icon name="TrendingUp" className="text-success dark:text-emerald-400" size={24} />
                     </div>
                     <div>
-                        <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Income</h4>
+                        <h4 className="text-sm font-medium text-emerald-700 dark:text-gray-300">Total Income</h4>
                         <p className="text-2xl font-bold mt-1 text-success dark:text-emerald-405">
                             +{formatCurrency(totalIncome, currency)}
                         </p>
                     </div>
                 </Card>
 
-                {/* Balance (with Carry Over) - Nice gradient background */}
-                <Card className="flex items-center p-6 bg-gradient-to-br from-primary-light/50 to-indigo-50/20 dark:from-indigo-950/30 dark:to-gray-800/40 border border-gray-200 dark:border-gray-700/80 shadow-sm">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center mr-4 ${
-                        carryOver
-                            ? 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
-                            : 'bg-primary-light dark:bg-primary/20 text-primary dark:text-indigo-300'
-                    }`}>
+                {/* Balance Card - Blue/Indigo Gradient matching dashboard */}
+                <Card className="flex items-center p-6 bg-gradient-to-br from-blue-50 to-indigo-50/50 dark:from-indigo-950/20 dark:to-gray-800/40 border border-blue-150 dark:border-indigo-900/30 shadow-sm rounded-xl">
+                    <div className="w-12 h-12 rounded-xl bg-primary-light dark:bg-primary/20 text-primary dark:text-indigo-300 flex items-center justify-center mr-4">
                         <Icon name="CircleDollarSign" size={24} />
                     </div>
                     <div>
-                        <h4 className="text-sm font-medium text-gray-600 dark:text-gray-305">
+                        <h4 className="text-sm font-medium text-blue-700 dark:text-gray-300">
                             {carryOver ? 'Balance (with Carry Over)' : 'Net Balance'}
                         </h4>
                         <p className={`text-2xl font-bold mt-1 ${

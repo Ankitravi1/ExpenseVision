@@ -112,7 +112,7 @@ const TransactionRow: React.FC<{
 };
 
 export const TransactionsPage: React.FC = () => {
-    const { transactions, deleteTransaction, bulkDeleteTransactions, accounts, categories, currency } = useContext(AppContext)!;
+    const { transactions, deleteTransaction, bulkDeleteTransactions, accounts, categories, currency, theme } = useContext(AppContext)!;
 
     const startDateRef = useRef<HTMLInputElement>(null);
     const endDateRef = useRef<HTMLInputElement>(null);
@@ -152,8 +152,8 @@ export const TransactionsPage: React.FC = () => {
         category: '',
         account: '',
         type: '',
-        minAmount: '',
-        maxAmount: ''
+        amountType: 'expense' as 'expense' | 'income',
+        amountLimit: ''
     });
 
     const updateDatesForViewMode = (mode: string) => {
@@ -312,12 +312,10 @@ export const TransactionsPage: React.FC = () => {
             if (colFilters.type) {
                 if (t.type !== colFilters.type) return false;
             }
-            const signedAmount = t.type === 'expense' ? -t.amount : t.amount;
-            if (colFilters.minAmount) {
-                if (signedAmount < parseFloat(colFilters.minAmount)) return false;
-            }
-            if (colFilters.maxAmount) {
-                if (signedAmount > parseFloat(colFilters.maxAmount)) return false;
+            if (colFilters.amountLimit) {
+                const limit = parseFloat(colFilters.amountLimit);
+                if (t.type !== colFilters.amountType) return false;
+                if (t.amount > limit) return false;
             }
 
             return true;
@@ -464,8 +462,8 @@ export const TransactionsPage: React.FC = () => {
                                         setStartDate(e.target.value);
                                         setViewMode('Custom');
                                     }}
-                                    className="bg-transparent border-none text-xs text-gray-800 dark:text-gray-150 outline-none w-28 py-0.5 font-semibold dark:[color-scheme:dark]"
-                                    style={{ colorScheme: 'dark' }}
+                                    className="bg-transparent border-none text-xs text-gray-900 dark:text-white outline-none w-28 py-0.5 font-semibold dark:[color-scheme:dark]"
+                                    style={{ colorScheme: theme }}
                                 />
                                 <button
                                     type="button"
@@ -487,8 +485,8 @@ export const TransactionsPage: React.FC = () => {
                                         setEndDate(e.target.value);
                                         setViewMode('Custom');
                                     }}
-                                    className="bg-transparent border-none text-xs text-gray-800 dark:text-gray-150 outline-none w-28 py-0.5 font-semibold dark:[color-scheme:dark]"
-                                    style={{ colorScheme: 'dark' }}
+                                    className="bg-transparent border-none text-xs text-gray-900 dark:text-white outline-none w-28 py-0.5 font-semibold dark:[color-scheme:dark]"
+                                    style={{ colorScheme: theme }}
                                 />
                                 <button
                                     type="button"
@@ -536,47 +534,39 @@ export const TransactionsPage: React.FC = () => {
                   Summary Stats cards row - redesigned as separate cards to match Reports and Accounts pages
                 */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                    {/* Expense Card - Plain design matching layout */}
-                    <Card className="flex items-center p-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm">
-                        <div className="w-12 h-12 rounded-xl bg-red-50 dark:bg-rose-955/30 flex items-center justify-center mr-4">
+                    {/* Expense Card - Rose Gradient styled matching dashboard */}
+                    <Card className="flex items-center p-6 bg-gradient-to-br from-rose-50 to-rose-100/50 dark:from-rose-950/20 dark:to-gray-800/40 border border-rose-150 dark:border-rose-900/30 shadow-sm rounded-xl">
+                        <div className="w-12 h-12 rounded-xl bg-red-100/80 dark:bg-rose-955/40 flex items-center justify-center mr-4">
                             <Icon name="TrendingDown" className="text-danger dark:text-rose-400" size={24} />
                         </div>
                         <div>
-                            <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Total Expense</p>
+                            <p className="text-xs font-medium text-rose-700 dark:text-gray-300">Total Expense</p>
                             <p className="text-2xl font-bold mt-1 text-danger dark:text-rose-455">
                                 -{formatCurrency(rangeExpense, currency)}
                             </p>
                         </div>
                     </Card>
 
-                    {/* Income Card - Plain design matching layout */}
-                    <Card className="flex items-center p-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm">
-                        <div className="w-12 h-12 rounded-xl bg-green-50 dark:bg-emerald-950/30 flex items-center justify-center mr-4">
+                    {/* Income Card - Emerald Gradient styled matching dashboard */}
+                    <Card className="flex items-center p-6 bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-950/20 dark:to-gray-800/40 border border-emerald-150 dark:border-emerald-900/30 shadow-sm rounded-xl">
+                        <div className="w-12 h-12 rounded-xl bg-green-100/80 dark:bg-emerald-955/40 flex items-center justify-center mr-4">
                             <Icon name="TrendingUp" className="text-success dark:text-emerald-405" size={24} />
                         </div>
                         <div>
-                            <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Total Income</p>
+                            <p className="text-xs font-medium text-emerald-700 dark:text-gray-300">Total Income</p>
                             <p className="text-2xl font-bold mt-1 text-success dark:text-emerald-405">
                                 +{formatCurrency(rangeIncome, currency)}
                             </p>
                         </div>
                     </Card>
 
-                    {/* Balance Card - Conditional gradient balance */}
-                    <Card className={`flex items-center p-6 border shadow-sm transition-all duration-300 ${
-                        carryOver
-                            ? 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
-                            : 'bg-gradient-to-br from-primary-light/50 to-indigo-50/20 dark:from-indigo-950/30 dark:to-gray-800/40 border-gray-200 dark:border-gray-700/80'
-                    }`}>
-                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center mr-4 transition-colors ${
-                            carryOver
-                                ? 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
-                                : 'bg-primary-light dark:bg-primary/20 text-primary dark:text-indigo-300'
-                        }`}>
+                    {/* Balance Card - Blue/Indigo Gradient matching dashboard */}
+                    <Card className="flex items-center p-6 bg-gradient-to-br from-blue-50 to-indigo-50/50 dark:from-indigo-950/20 dark:to-gray-800/40 border border-blue-150 dark:border-indigo-900/30 shadow-sm rounded-xl">
+                        <div className="w-12 h-12 rounded-xl bg-primary-light dark:bg-primary/20 text-primary dark:text-indigo-300 flex items-center justify-center mr-4">
                             <Icon name="CircleDollarSign" size={24} />
                         </div>
                         <div>
-                            <p className="text-xs font-medium text-gray-650 dark:text-gray-305">
+                            <p className="text-xs font-medium text-blue-700 dark:text-gray-300">
                                 {carryOver ? 'Balance (with Carry Over)' : 'Net Balance'}
                             </p>
                             <p className={`text-2xl font-bold mt-1 ${
@@ -694,43 +684,62 @@ export const TransactionsPage: React.FC = () => {
                                              type="button"
                                              onClick={() => setShowAmountFilterPopup(!showAmountFilterPopup)}
                                              className={`flex items-center justify-between text-xs py-1 px-2 w-full bg-white dark:bg-gray-700 border rounded-md outline-none text-left font-medium transition-all ${
-                                                 (colFilters.minAmount || colFilters.maxAmount)
+                                                 colFilters.amountLimit
                                                      ? 'text-primary dark:text-indigo-400 border-primary dark:border-indigo-500 bg-primary-light/30 dark:bg-primary/10'
                                                      : 'text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-600'
                                              }`}
                                          >
                                              <span className="truncate">
-                                                 {colFilters.minAmount || colFilters.maxAmount
-                                                     ? `${colFilters.minAmount || '0'} to ${colFilters.maxAmount || '∞'}`
+                                                 {colFilters.amountLimit
+                                                     ? `${colFilters.amountType === 'expense' ? 'Exp' : 'Inc'} ≤ ${colFilters.amountLimit}`
                                                      : 'Filter...'}
                                              </span>
                                              <Icon name="ChevronDown" size={12} className="ml-1 flex-shrink-0" />
                                          </button>
                                          {showAmountFilterPopup && (
-                                             <div className="absolute top-full right-0 mt-1 w-52 p-3 bg-white dark:bg-gray-800 border border-gray-250 dark:border-gray-700 rounded-lg shadow-xl z-50 flex flex-col gap-2">
-                                                 <div className="text-[10px] font-bold text-gray-450 dark:text-gray-400 uppercase tracking-wider">Amount Range</div>
-                                                 <div className="flex gap-2 items-center">
+                                             <div className="absolute top-full right-0 mt-1 w-56 p-3 bg-white dark:bg-gray-800 border border-gray-255 dark:border-gray-700 rounded-lg shadow-xl z-50 flex flex-col gap-3">
+                                                 <div className="text-[10px] font-bold text-gray-450 dark:text-gray-400 uppercase tracking-wider">Amount Filter</div>
+                                                 <div className="grid grid-cols-2 gap-1 bg-gray-100 dark:bg-gray-900 p-0.5 rounded-lg">
+                                                     <button
+                                                         type="button"
+                                                         onClick={() => setColFilters(prev => ({ ...prev, amountType: 'expense' }))}
+                                                         className={`py-1 text-xs font-semibold rounded-md transition-all ${
+                                                             colFilters.amountType === 'expense'
+                                                                 ? 'bg-rose-500 text-white shadow-sm'
+                                                                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
+                                                         }`}
+                                                     >
+                                                         Expense
+                                                     </button>
+                                                     <button
+                                                         type="button"
+                                                         onClick={() => setColFilters(prev => ({ ...prev, amountType: 'income' }))}
+                                                         className={`py-1 text-xs font-semibold rounded-md transition-all ${
+                                                             colFilters.amountType === 'income'
+                                                                 ? 'bg-emerald-500 text-white shadow-sm'
+                                                                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
+                                                         }`}
+                                                     >
+                                                         Income
+                                                     </button>
+                                                 </div>
+
+                                                 <div className="flex flex-col gap-1">
+                                                     <label className="text-[10px] font-semibold text-gray-400 dark:text-gray-550">Up to Limit (0 to value):</label>
                                                      <input
                                                          type="number"
-                                                         placeholder="Min"
-                                                         value={colFilters.minAmount}
-                                                         onChange={e => setColFilters(prev => ({ ...prev, minAmount: e.target.value }))}
-                                                         className="input text-xs py-1 px-2 w-1/2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md outline-none text-right text-gray-900 dark:text-gray-100"
-                                                     />
-                                                     <span className="text-gray-400">-</span>
-                                                     <input
-                                                         type="number"
-                                                         placeholder="Max"
-                                                         value={colFilters.maxAmount}
-                                                         onChange={e => setColFilters(prev => ({ ...prev, maxAmount: e.target.value }))}
-                                                         className="input text-xs py-1 px-2 w-1/2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md outline-none text-right text-gray-900 dark:text-gray-100"
+                                                         placeholder="Enter limit..."
+                                                         value={colFilters.amountLimit}
+                                                         onChange={e => setColFilters(prev => ({ ...prev, amountLimit: e.target.value }))}
+                                                         className="input text-xs py-1 px-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md outline-none text-gray-900 dark:text-gray-100 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                      />
                                                  </div>
+
                                                  <div className="flex justify-end gap-2 mt-1 border-t border-gray-105 dark:border-gray-700 pt-2">
                                                      <button
                                                          type="button"
                                                          onClick={() => {
-                                                             setColFilters(prev => ({ ...prev, minAmount: '', maxAmount: '' }));
+                                                             setColFilters(prev => ({ ...prev, amountLimit: '' }));
                                                              setShowAmountFilterPopup(false);
                                                          }}
                                                          className="text-[10px] font-bold text-rose-500 hover:text-rose-750"

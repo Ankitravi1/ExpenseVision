@@ -289,7 +289,7 @@ export const Recurring: React.FC = () => {
     <div className="space-y-6">
       {form.id && (
         <div className="flex justify-end">
-          <button onClick={resetForm} className="btn btn-secondary flex items-center gap-2">
+          <button onClick={resetForm} className="btn flex items-center gap-2 bg-primary hover:bg-primary-hover text-white font-bold px-4 py-2 rounded-xl transition-all shadow-sm">
             <Icon name="Plus" size={18} />
             New Rule
           </button>
@@ -299,7 +299,7 @@ export const Recurring: React.FC = () => {
       <div className="grid grid-cols-1 xl:grid-cols-[380px,1fr] gap-8">
         {/* Form card on left */}
         <Card className={`self-start transition-all border ${form.id ? 'border-amber-300 dark:border-amber-900 bg-amber-50/5 dark:bg-amber-950/5 shadow-md' : 'border-gray-200 dark:border-gray-700'}`}>
-          <h3 className="font-semibold text-lg text-gray-darkest dark:text-gray-5; flex items-center gap-2 mb-4">
+          <h3 className="font-semibold text-lg text-gray-darkest dark:text-gray-100 flex items-center gap-2 mb-4">
             {form.id ? (
               <>
                 <Icon name="Pencil" className="text-amber-500" size={18} />
@@ -483,17 +483,33 @@ export const Recurring: React.FC = () => {
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Active</span>
             </label>
 
-            <button 
-              type="submit" 
-              className={`btn w-full flex items-center justify-center gap-2 font-bold py-2.5 transition-all duration-300 text-white rounded-xl ${
-                form.id 
-                  ? 'bg-amber-500 hover:bg-amber-600 hover:shadow-md' 
-                  : 'bg-primary hover:bg-primary-hover shadow-sm'
-              }`}
-            >
-              <Icon name={form.id ? 'Save' : 'Plus'} size={18} />
-              {form.id ? 'Update Rule Settings' : 'Add Rule Template'}
-            </button>
+            {form.id ? (
+              <div className="flex gap-3">
+                <button 
+                  type="submit" 
+                  className="btn flex-1 flex items-center justify-center gap-2 font-bold py-2.5 transition-all duration-300 text-white rounded-xl bg-amber-500 hover:bg-amber-600 hover:shadow-md"
+                >
+                  <Icon name="Save" size={18} />
+                  Update Rule
+                </button>
+                <button 
+                  type="button" 
+                  onClick={resetForm}
+                  className="btn flex-1 flex items-center justify-center gap-2 font-bold py-2.5 transition-all duration-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 rounded-xl"
+                >
+                  <Icon name="X" size={18} />
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button 
+                type="submit" 
+                className="btn w-full flex items-center justify-center gap-2 font-bold py-2.5 transition-all duration-300 text-white rounded-xl bg-primary hover:bg-primary-hover shadow-sm"
+              >
+                <Icon name="Plus" size={18} />
+                Add Rule Template
+              </button>
+            )}
           </form>
         </Card>
 
