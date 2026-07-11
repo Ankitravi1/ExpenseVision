@@ -46,6 +46,7 @@ export interface Account {
   icon?: string; // Added icon support
   logo?: string;
   frozen?: boolean;
+  sortOrder?: number;
 }
 
 export interface Budget {

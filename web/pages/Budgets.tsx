@@ -176,7 +176,8 @@ export const Budgets: React.FC = () => {
         return { over, warning, healthy };
     }, [filteredBudgets]);
 
-    // Compute budgets list to display based on activeTab
+    // Compute budgets list to display based on activeTab. "All" sorts by
+    // urgency (over budget first) rather than arbitrary insertion order.
     const budgetsToDisplay = useMemo(() => {
         switch (activeTab) {
             case 'Over':
@@ -186,9 +187,9 @@ export const Budgets: React.FC = () => {
             case 'Healthy':
                 return groupedBudgets.healthy;
             default:
-                return filteredBudgets;
+                return [...groupedBudgets.over, ...groupedBudgets.warning, ...groupedBudgets.healthy];
         }
-    }, [activeTab, groupedBudgets, filteredBudgets]);
+    }, [activeTab, groupedBudgets]);
 
     return (
         <>

@@ -17,6 +17,7 @@ export interface AppContextValue {
   bulkDeleteTransactions: (ids: string[]) => Promise<boolean>;
   addAccount: (account: Omit<Account, 'id'>) => Promise<boolean>;
   updateAccount: (id: string, account: Partial<Account>) => Promise<boolean>;
+  reorderAccounts: (orderedIds: string[]) => Promise<boolean>;
   deleteAccount: (id: string) => Promise<boolean>;
   addCategory: (category: Omit<Category, 'id'>) => Promise<boolean>;
   updateCategory: (id: string, category: Partial<Category>) => Promise<boolean>;

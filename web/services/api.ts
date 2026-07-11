@@ -174,6 +174,14 @@ export const api = {
         if (!res.ok) throw new Error('Failed to update account');
         return res.json();
     },
+    reorderAccounts: async (orderedIds: string[]) => {
+        const res = await api.fetch('/accounts/reorder', {
+            method: 'PUT',
+            body: JSON.stringify({ orderedIds }),
+        });
+        if (!res.ok) throw new Error('Failed to save account order');
+        return res.json();
+    },
     deleteAccount: async (id: string) => {
         const res = await api.fetch(`/accounts/${id}`, {
             method: 'DELETE',

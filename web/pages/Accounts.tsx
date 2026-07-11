@@ -1,4 +1,4 @@
-﻿import React, { useContext, useMemo, useState } from 'react';
+﻿import React, { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AppContext } from '../App';
 import { Card } from '../components/Card';
 import { Icon } from '../components/Icon';
@@ -313,8 +313,15 @@ const AccountCard: React.FC<{
     );
 };
 
+// Long-press-then-drag reordering: a plain click must keep working, so a
+// drag only "arms" after the pointer has been held (without moving much)
+// for DRAG_ACTIVATE_MS. Moving too far before that fires cancels the arm
+// entirely, so normal clicks/scrolling are never mistaken for drag intent.
+const DRAG_ACTIVATE_MS = 550;
+const DRAG_MOVE_THRESHOLD = 6;
+
 export const Accounts: React.FC = () => {
-    const { accounts, deleteAccount, updateAccount, transactions, categories, currency } = useContext(AppContext)!;
+    const { accounts, deleteAccount, updateAccount, reorderAccounts, transactions, categories, currency } = useContext(AppContext)!;
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editAccount, setEditAccount] = useState<Account | null>(null);
     const [selectedDetailAccount, setSelectedDetailAccount] = useState<Account | null>(null);
@@ -331,6 +338,85 @@ export const Accounts: React.FC = () => {
     // unfreeze one.
     const activeAccounts = useMemo(() => accounts.filter(a => !a.frozen), [accounts]);
     const frozenAccounts = useMemo(() => accounts.filter(a => a.frozen), [accounts]);
+
+    // --- Drag-to-reorder (active accounts grid only) ---
+    const [orderedAccounts, setOrderedAccounts] = useState<Account[]>(activeAccounts);
+    const [draggingId, setDraggingId] = useState<string | null>(null);
+    const [dragOverId, setDragOverId] = useState<string | null>(null);
+    const isDraggingRef = useRef(false);
+    const longPressTimerRef = useRef<number | null>(null);
+    const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
+    const suppressClickRef = useRef(false);
+
+    // Mirror activeAccounts into local state whenever it changes (new/edited/
+    // frozen accounts, or a server-confirmed reorder) — but never mid-drag,
+    // or the live drag preview would be clobbered by a stale prop update.
+    useEffect(() => {
+        if (!isDraggingRef.current) setOrderedAccounts(activeAccounts);
+    }, [activeAccounts]);
+
+    const clearLongPressTimer = () => {
+        if (longPressTimerRef.current !== null) {
+            window.clearTimeout(longPressTimerRef.current);
+            longPressTimerRef.current = null;
+        }
+    };
+
+    const handleCardPointerDown = (e: React.PointerEvent<HTMLDivElement>, accountId: string) => {
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        // Buttons (Freeze/Edit) inside the card keep working exactly as before —
+        // never arm a drag from a press that started on one of them.
+        if ((e.target as HTMLElement).closest('button')) return;
+
+        pointerStartRef.current = { x: e.clientX, y: e.clientY };
+        clearLongPressTimer();
+        longPressTimerRef.current = window.setTimeout(() => {
+            isDraggingRef.current = true;
+            suppressClickRef.current = true;
+            setDraggingId(accountId);
+            (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+        }, DRAG_ACTIVATE_MS);
+    };
+
+    const handleCardPointerMove = (e: React.PointerEvent<HTMLDivElement>, accountId: string) => {
+        if (!isDraggingRef.current) {
+            const start = pointerStartRef.current;
+            if (start && (Math.abs(e.clientX - start.x) > DRAG_MOVE_THRESHOLD || Math.abs(e.clientY - start.y) > DRAG_MOVE_THRESHOLD)) {
+                clearLongPressTimer();
+            }
+            return;
+        }
+
+        const target = document.elementFromPoint(e.clientX, e.clientY)?.closest<HTMLElement>('[data-account-id]');
+        const targetId = target?.dataset.accountId;
+        setDragOverId(targetId || null);
+        if (!targetId || targetId === accountId) return;
+
+        setOrderedAccounts(prev => {
+            const fromIndex = prev.findIndex(a => a.id === accountId);
+            const toIndex = prev.findIndex(a => a.id === targetId);
+            if (fromIndex === -1 || toIndex === -1) return prev;
+            const next = [...prev];
+            const [moved] = next.splice(fromIndex, 1);
+            next.splice(toIndex, 0, moved);
+            return next;
+        });
+    };
+
+    const endDrag = () => {
+        clearLongPressTimer();
+        if (isDraggingRef.current) {
+            isDraggingRef.current = false;
+            setDraggingId(null);
+            setDragOverId(null);
+            reorderAccounts(orderedAccounts.map(a => a.id));
+            // The click that natively follows pointerup after a drag must not
+            // reopen the account details modal — swallow just that one click.
+            setTimeout(() => { suppressClickRef.current = false; }, 0);
+        } else {
+            suppressClickRef.current = false;
+        }
+    };
 
     const totalBalance = useMemo(() => activeAccounts.reduce((sum, acc) => sum + acc.balance, 0), [activeAccounts]);
 
@@ -446,15 +532,33 @@ export const Accounts: React.FC = () => {
                         </Card>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {activeAccounts.map(account => (
-                                <AccountCard
+                            {orderedAccounts.map(account => (
+                                <div
                                     key={account.id}
-                                    account={account}
-                                    onEdit={() => handleEdit(account)}
-                                    onClick={() => setSelectedDetailAccount(account)}
-                                    onFreeze={() => setFreezeTarget(account)}
-                                    onUnfreeze={() => handleUnfreeze(account)}
-                                />
+                                    data-account-id={account.id}
+                                    title="Press and hold, then drag to reorder"
+                                    onPointerDown={e => handleCardPointerDown(e, account.id)}
+                                    onPointerMove={e => handleCardPointerMove(e, account.id)}
+                                    onPointerUp={endDrag}
+                                    onPointerCancel={endDrag}
+                                    style={{ touchAction: draggingId ? 'none' : undefined }}
+                                    className={`transition-transform duration-150 select-none ${
+                                        draggingId === account.id ? 'scale-[1.03] shadow-2xl z-10 cursor-grabbing' : ''
+                                    } ${
+                                        dragOverId === account.id && draggingId !== account.id ? 'ring-2 ring-primary ring-offset-2 dark:ring-offset-gray-900 rounded-2xl' : ''
+                                    }`}
+                                >
+                                    <AccountCard
+                                        account={account}
+                                        onEdit={() => handleEdit(account)}
+                                        onClick={() => {
+                                            if (suppressClickRef.current) return;
+                                            setSelectedDetailAccount(account);
+                                        }}
+                                        onFreeze={() => setFreezeTarget(account)}
+                                        onUnfreeze={() => handleUnfreeze(account)}
+                                    />
+                                </div>
                             ))}
                         </div>
                     )}

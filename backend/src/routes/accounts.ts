@@ -60,7 +60,7 @@ router.get('/', async (req, res, next) => {
 
         const accounts = await prisma.account.findMany({
             where: { userId },
-            orderBy: { createdAt: 'desc' }
+            orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }]
         });
 
         res.json(accounts);
@@ -77,15 +77,61 @@ router.post('/', async (req, res, next) => {
 
         const data = accountSchema.parse(req.body);
 
+        // New accounts land at the end of the user's custom order.
+        const maxOrder = await prisma.account.aggregate({
+            where: { userId },
+            _max: { sortOrder: true }
+        });
+        const sortOrder = (maxOrder._max.sortOrder ?? -1) + 1;
+
         const account = await prisma.account.create({
             data: {
                 ...data,
                 balance: data.initialBalance, // Current balance starts at initial balance
-                userId
+                userId,
+                sortOrder
             }
         });
 
         res.status(201).json(account);
+    } catch (error) {
+        if (error instanceof z.ZodError) {
+            res.status(400).json({ error: 'Validation error', details: error.errors });
+        } else {
+            next(error);
+        }
+    }
+});
+
+// PUT /api/accounts/reorder - Persist a custom drag-and-drop order.
+// Declared before PUT /:id so "reorder" is never swallowed as an :id value.
+router.put('/reorder', async (req, res, next) => {
+    try {
+        const prisma = (req as any).prisma;
+        const userId = (req as any).userId;
+
+        const schema = z.object({ orderedIds: z.array(z.string()).min(1) });
+        const { orderedIds } = schema.parse(req.body);
+
+        const owned = await prisma.account.findMany({
+            where: { userId, id: { in: orderedIds } },
+            select: { id: true }
+        });
+        if (owned.length !== orderedIds.length) {
+            return res.status(403).json({ error: 'One or more accounts do not belong to you' });
+        }
+
+        await prisma.$transaction(
+            orderedIds.map((id: string, index: number) =>
+                prisma.account.update({ where: { id }, data: { sortOrder: index } })
+            )
+        );
+
+        const accounts = await prisma.account.findMany({
+            where: { userId },
+            orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }]
+        });
+        res.json(accounts);
     } catch (error) {
         if (error instanceof z.ZodError) {
             res.status(400).json({ error: 'Validation error', details: error.errors });

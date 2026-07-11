@@ -294,6 +294,24 @@ const App: React.FC = () => {
     }
   }, [showToast]);
 
+  // Optimistically reorders accounts by id (drag-and-drop on the Accounts
+  // page), then persists the order to the backend; reverts on failure.
+  const reorderAccounts = useCallback(async (orderedIds: string[]): Promise<boolean> => {
+    const previous = accounts;
+    const byId = new Map(previous.map(a => [a.id, a]));
+    const reordered = orderedIds.map(id => byId.get(id)).filter((a): a is Account => !!a);
+    setAccounts(reordered);
+    try {
+      await api.reorderAccounts(orderedIds);
+      return true;
+    } catch (err: any) {
+      console.error('Failed to save account order:', err);
+      setAccounts(previous);
+      showToast(err.message || 'Failed to save account order', 'error');
+      return false;
+    }
+  }, [accounts, showToast]);
+
   const deleteAccount = useCallback(async (id: string): Promise<boolean> => {
     try {
       await api.deleteAccount(id);
@@ -454,6 +472,7 @@ const App: React.FC = () => {
     bulkDeleteTransactions,
     addAccount,
     updateAccount,
+    reorderAccounts,
     deleteAccount,
     addCategory,
     updateCategory,
@@ -469,7 +488,7 @@ const App: React.FC = () => {
     refreshData: fetchData,
     user,
     updateUser,
-  }), [accounts, categories, transactions, budgets, recurring, currency, setCurrency, theme, setTheme, addTransaction, updateTransaction, deleteTransaction, bulkDeleteTransactions, clearAllTransactions, addAccount, updateAccount, deleteAccount, addCategory, updateCategory, deleteCategory, setBudget, deleteBudget, addRecurring, updateRecurring, deleteRecurring, runRecurring, setActivePage, fetchData, user, updateUser]);
+  }), [accounts, categories, transactions, budgets, recurring, currency, setCurrency, theme, setTheme, addTransaction, updateTransaction, deleteTransaction, bulkDeleteTransactions, clearAllTransactions, addAccount, updateAccount, reorderAccounts, deleteAccount, addCategory, updateCategory, deleteCategory, setBudget, deleteBudget, addRecurring, updateRecurring, deleteRecurring, runRecurring, setActivePage, fetchData, user, updateUser]);
 
   // Auth handlers
   const handleAuthSuccess = () => {
