@@ -35,6 +35,7 @@ export const ImportWizard: React.FC = () => {
     const [pastedText, setPastedText] = useState('');
     const [extractedText, setExtractedText] = useState('');
     const [bankName, setBankName] = useState('');
+    const [statementDetails, setStatementDetails] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
     const [processStatus, setProcessStatus] = useState('');
     const [errorMsg, setErrorMsg] = useState('');
@@ -43,7 +44,7 @@ export const ImportWizard: React.FC = () => {
     const [isSettingsLoading, setIsSettingsLoading] = useState(true);
 
     const [drafts, setDrafts] = useState<DraftRow[]>([]);
-    const [detectDuplicates, setDetectDuplicates] = useState(true);
+    const [duplicatesChecked, setDuplicatesChecked] = useState(false);
     const [colFilters, setColFilters] = useState({ note: '', account: '', type: '', category: '' });
     const [isImporting, setIsImporting] = useState(false);
     const [importedCount, setImportedCount] = useState(0);
@@ -101,11 +102,12 @@ export const ImportWizard: React.FC = () => {
         setPastedText('');
         setExtractedText('');
         setBankName('');
+        setStatementDetails('');
         setIsProcessing(false);
         setProcessStatus('');
         setErrorMsg('');
         setDrafts([]);
-        setDetectDuplicates(true);
+        setDuplicatesChecked(false);
         setColFilters({ note: '', account: '', type: '', category: '' });
         setIsImporting(false);
         setImportedCount(0);
@@ -207,11 +209,18 @@ export const ImportWizard: React.FC = () => {
         setErrorMsg('');
 
         try {
-            const textForAi = bankName.trim()
-                ? `Bank / card issuer: ${bankName.trim()}\n\n${extractedText}`
+            const contextLines = [
+                bankName.trim() ? `Bank / card issuer: ${bankName.trim()}` : '',
+                statementDetails.trim() ? `Additional details from the user: ${statementDetails.trim()}` : '',
+            ].filter(Boolean);
+            const textForAi = contextLines.length > 0
+                ? `${contextLines.join('\n')}\n\n${extractedText}`
                 : extractedText;
             const result = await api.parseStatement(textForAi);
             const rawDrafts = result.drafts || [];
+            // Duplicate detection is a separate, on-demand step (the "Detect
+            // Duplicates" button below) — freshly parsed rows are never
+            // auto-flagged or auto-unchecked.
             const mapped: DraftRow[] = rawDrafts.map((d: any) => ({
                 localId: genId(),
                 date: d.date || '',
@@ -224,10 +233,9 @@ export const ImportWizard: React.FC = () => {
                 transferToAccountId: d.type === 'transfer' ? (d.transferToAccountId || '') : '',
                 included: true,
                 isDuplicate: false,
-            })).map((row: DraftRow) => {
-                const dup = detectDuplicates && checkIsDuplicate(row);
-                return { ...row, isDuplicate: dup, included: !dup };
-            });
+            }));
+
+            setDuplicatesChecked(false);
 
             if (mapped.length === 0) {
                 setErrorMsg('AI did not find any transactions in this statement.');
@@ -261,12 +269,23 @@ export const ImportWizard: React.FC = () => {
         setDrafts(prev => prev.map(r => ({ ...r, included: !allIncluded })));
     };
 
-    const applyDuplicateDetection = (enabled: boolean) => {
-        setDetectDuplicates(enabled);
-        setDrafts(prev => prev.map(r => {
-            const dup = enabled && checkIsDuplicate(r);
+    // On-demand duplicate check: important (it prevents double-importing
+    // statement lines that already exist) but optional — nothing runs it
+    // automatically. Matches on the same date (ignoring time) + amount.
+    const runDuplicateDetection = () => {
+        const updated = drafts.map(r => {
+            const dup = checkIsDuplicate(r);
             return { ...r, isDuplicate: dup, included: dup ? false : r.included };
-        }));
+        });
+        const dupCount = updated.filter(r => r.isDuplicate).length;
+        setDrafts(updated);
+        setDuplicatesChecked(true);
+        showToast(
+            dupCount > 0
+                ? `Found ${dupCount} possible duplicate${dupCount === 1 ? '' : 's'} — unchecked below for review.`
+                : 'No possible duplicates found.',
+            dupCount > 0 ? 'info' : 'success'
+        );
     };
 
     const filteredDrafts = drafts.filter(r => {
@@ -295,6 +314,7 @@ export const ImportWizard: React.FC = () => {
     };
 
     const includedCount = drafts.filter(r => r.included).length;
+    const duplicateCount = drafts.filter(r => r.isDuplicate).length;
 
     const handleCommitImport = async () => {
         const rowsToImport = drafts.filter(r => r.included);
@@ -352,7 +372,7 @@ export const ImportWizard: React.FC = () => {
             <div className="flex items-center gap-3 sm:gap-6 flex-wrap border-b border-gray-100 dark:border-gray-800 pb-4">
                 <StepBadge n={1} label="File to Text" />
                 <Icon name="ChevronRight" size={14} className="text-gray-300 dark:text-gray-700" />
-                <StepBadge n={2} label="Bank Details" />
+                <StepBadge n={2} label="Statement Details" />
                 <Icon name="ChevronRight" size={14} className="text-gray-300 dark:text-gray-700" />
                 <StepBadge n={3} label="AI Formatting" />
                 <Icon name="ChevronRight" size={14} className="text-gray-300 dark:text-gray-700" />
@@ -512,7 +532,21 @@ export const ImportWizard: React.FC = () => {
                             placeholder="e.g. HDFC Bank, Chase, American Express..."
                             className="input w-full rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-3 text-sm outline-none focus:ring-1 focus:ring-primary focus:border-primary"
                         />
-                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Passed to the AI as extra context. Leaving this blank won't block the import.</p>
+                    </div>
+
+                    <div>
+                        <label htmlFor="statement-details" className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1.5 uppercase">Anything else the AI should know (optional)</label>
+                        <textarea
+                            id="statement-details"
+                            value={statementDetails}
+                            onChange={e => setStatementDetails(e.target.value)}
+                            placeholder="e.g. This statement covers two accounts — only import the Rewards Credit Card (ending 4821), not the Savings account. Or: amounts in parentheses are refunds/credits."
+                            rows={3}
+                            className="input w-full rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-3 text-sm outline-none focus:ring-1 focus:ring-primary focus:border-primary resize-none"
+                        />
+                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                            If this statement lists <strong className="font-semibold text-gray-500 dark:text-gray-400">multiple accounts or card numbers</strong>, say which one to use here — otherwise the AI may mix transactions from all of them together. Both fields above are optional context for the AI and won't block the import if left blank.
+                        </p>
                     </div>
 
                     <div className="bg-gray-50 dark:bg-gray-800/40 border border-gray-200 dark:border-gray-700 rounded-xl p-4 space-y-1.5">
@@ -524,6 +558,7 @@ export const ImportWizard: React.FC = () => {
                             <li><strong className="text-gray-800 dark:text-gray-200">Note</strong> = transaction detail / summary line</li>
                             <li><strong className="text-gray-800 dark:text-gray-200">Date</strong> = transaction date</li>
                             <li><strong className="text-gray-800 dark:text-gray-200">Time</strong> = AI-extracted if present, otherwise defaults to 12:00</li>
+                            <li><strong className="text-gray-800 dark:text-gray-200">Account</strong> = matched to one of your existing accounts by name, or the one you specify above</li>
                         </ul>
                     </div>
 
@@ -558,32 +593,73 @@ export const ImportWizard: React.FC = () => {
             {/* STEP 4: preview / edit / commit */}
             {step === 'preview' && (
                 <div className="space-y-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
+                    {/* Primary actions up top: Start Over / Import, plus the live count */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 bg-gray-50 dark:bg-gray-800/40 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
                         <div>
                             <h4 className="font-bold text-sm dark:text-white flex items-center gap-1.5">
                                 <Icon name="Sparkles" size={16} className="text-amber-500" />
                                 Review Extracted Transactions ({drafts.length})
                             </h4>
-                            <p className="text-xs text-gray-400 mt-0.5">Nothing is saved yet — edit, filter, or remove rows below before importing.</p>
+                            <p className="text-xs text-gray-400 mt-0.5">
+                                {includedCount} of {drafts.length} selected for import. Nothing is saved yet — edit, filter, or remove rows below first.
+                            </p>
                         </div>
-                        <div className="flex items-center gap-3 flex-wrap">
-                            <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-gray-600 dark:text-gray-400 select-none bg-gray-100 dark:bg-gray-800 px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700">
-                                <input
-                                    type="checkbox"
-                                    checked={detectDuplicates}
-                                    onChange={e => applyDuplicateDetection(e.target.checked)}
-                                    className="w-4 h-4 rounded text-primary focus:ring-primary border-gray-300 dark:border-gray-600 focus:ring-2 cursor-pointer"
-                                />
-                                <span>Detect duplicates</span>
-                            </label>
+                        <div className="flex items-center gap-3">
                             <button
-                                onClick={() => setIsRemoveConfirmOpen(true)}
-                                disabled={includedCount === 0}
-                                className="px-3 py-1.5 bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/50 text-rose-600 dark:text-rose-400 rounded-lg text-xs font-bold hover:bg-rose-100 dark:hover:bg-rose-950/40 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                onClick={() => setIsResetConfirmOpen(true)}
+                                className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 font-bold hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900"
                             >
-                                Remove Selected
+                                Start Over
+                            </button>
+                            <button
+                                onClick={handleCommitImport}
+                                disabled={includedCount === 0 || isImporting}
+                                className="btn btn-primary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {isImporting ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                        <span>Importing...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Icon name="Check" size={16} />
+                                        <span>Import {includedCount} Transaction{includedCount === 1 ? '' : 's'}</span>
+                                    </>
+                                )}
                             </button>
                         </div>
+                    </div>
+
+                    {/* Toolbar: duplicate detection (important, optional) + remove selected */}
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <button
+                                onClick={runDuplicateDetection}
+                                className="px-3.5 py-2 bg-amber-50 dark:bg-amber-950/20 border-2 border-amber-300 dark:border-amber-800/60 text-amber-700 dark:text-amber-400 rounded-lg text-xs font-bold hover:bg-amber-100 dark:hover:bg-amber-950/40 transition-colors flex items-center gap-1.5 shadow-sm"
+                                title="Optional — checks the rows below against your existing transactions by date and amount"
+                            >
+                                <Icon name="AlertTriangle" size={14} />
+                                Detect Duplicates
+                            </button>
+                            {duplicatesChecked && (
+                                <span className={`text-xs font-bold px-2.5 py-1.5 rounded-lg ${
+                                    duplicateCount > 0
+                                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300'
+                                        : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400'
+                                }`}>
+                                    {duplicateCount > 0 ? `⚠️ ${duplicateCount} possible duplicate${duplicateCount === 1 ? '' : 's'}` : '✓ No duplicates found'}
+                                </span>
+                            )}
+                        </div>
+                        <button
+                            onClick={() => setIsRemoveConfirmOpen(true)}
+                            disabled={includedCount === 0}
+                            className="px-3 py-1.5 bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/50 text-rose-600 dark:text-rose-400 rounded-lg text-xs font-bold hover:bg-rose-100 dark:hover:bg-rose-950/40 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            title="Removes the checked rows from this preview only"
+                        >
+                            Remove Selected
+                        </button>
                     </div>
 
                     <div className="overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-xl">
@@ -770,35 +846,6 @@ export const ImportWizard: React.FC = () => {
                                 ))}
                             </tbody>
                         </table>
-                    </div>
-
-                    <div className="flex items-center justify-between flex-wrap gap-3 pt-2">
-                        <span className="text-xs font-bold text-gray-500 dark:text-gray-400">{includedCount} of {drafts.length} rows selected for import</span>
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => setIsResetConfirmOpen(true)}
-                                className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 font-bold hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-200 dark:border-gray-700"
-                            >
-                                Start Over
-                            </button>
-                            <button
-                                onClick={handleCommitImport}
-                                disabled={includedCount === 0 || isImporting}
-                                className="btn btn-primary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {isImporting ? (
-                                    <>
-                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                        <span>Importing...</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        <Icon name="Check" size={16} />
-                                        <span>Import {includedCount} Transaction{includedCount === 1 ? '' : 's'}</span>
-                                    </>
-                                )}
-                            </button>
-                        </div>
                     </div>
                 </div>
             )}

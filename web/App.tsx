@@ -41,6 +41,7 @@ const PAGE_PATHS: Record<Page, string> = {
   Accounts: '/accounts',
   Categories: '/categories',
   Reports: '/reports',
+  ImportExport: '/import-export',
   Profile: '/profile',
   Settings: '/settings',
   Admin: '/admin',

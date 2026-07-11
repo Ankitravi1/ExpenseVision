@@ -24,6 +24,11 @@ interface NavItemProps {
   isCollapsed: boolean;
 }
 
+// A few Page values need friendlier, spaced-out sidebar text.
+const NAV_LABELS: Partial<Record<Page, string>> = {
+  ImportExport: 'Import / Export',
+};
+
 const NavItem: React.FC<NavItemProps> = ({ icon, label, isActive, onClick, isCollapsed }) => (
   <li>
     <a
@@ -61,6 +66,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activePage, setActivePage, isC
       { icon: 'Tags', label: 'Categories' },
       { icon: 'RefreshCw', label: 'Recurring' },
       { icon: 'PieChart', label: 'Reports' },
+      { icon: 'Upload', label: 'ImportExport' },
     ];
     if (user?.role === 'superadmin') {
       items.push({ icon: 'UserCheck', label: 'Admin' });
@@ -127,7 +133,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activePage, setActivePage, isC
                   } ${isCollapsed ? 'justify-center' : ''}`}
               >
                 <Icon name={item.icon} size={20} />
-                {!isCollapsed && <span className="ml-3 font-medium">{item.label}</span>}
+                {!isCollapsed && <span className="ml-3 font-medium">{NAV_LABELS[item.label] || item.label}</span>}
               </button>
             ))}
           </div>

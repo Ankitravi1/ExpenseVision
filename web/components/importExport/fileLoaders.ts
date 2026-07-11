@@ -65,7 +65,10 @@ export const extractTextFromPdf = async (
 
     while (attempts < 3) {
         try {
-            pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer, password }).promise;
+            // pdf.js transfers `data` to its worker, detaching the ArrayBuffer after
+            // use — pass a fresh copy on every attempt or the retry (e.g. with the
+            // correct password) fails on a zero-length buffer with a confusing error.
+            pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer.slice(0), password }).promise;
             break;
         } catch (err: any) {
             if (err.name === 'PasswordException' || String(err.message || '').toLowerCase().includes('password')) {

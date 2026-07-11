@@ -26,6 +26,8 @@ const getPageSubtitle = (title: string) => {
       return 'Configure API keys and preferences';
     case 'admin':
       return 'Super admin console';
+    case 'importexport':
+      return 'Import statements with AI, or export your filtered data';
     default:
       return 'Track and optimize your finances';
   }
@@ -36,15 +38,19 @@ export const Header: React.FC<HeaderProps> = ({ pageTitle, onNewTransaction, onM
   const accounts = context?.accounts || [];
   const currency = context?.currency || 'INR';
 
-  const netWorth = accounts.reduce((sum, acc) => sum + acc.balance, 0);
+  // Frozen accounts are paused everywhere — excluded here too, so this
+  // matches the Dashboard/Accounts totals instead of showing a third number.
+  const netWorth = accounts.filter(acc => !acc.frozen).reduce((sum, acc) => sum + acc.balance, 0);
 
-  const displayTitle = pageTitle === 'Budgets' 
-    ? 'Budget Management' 
-    : pageTitle === 'Recurring' 
-      ? 'Recurring Transactions' 
-      : pageTitle === 'Transactions' 
-        ? 'All Transactions' 
-        : pageTitle;
+  const displayTitle = pageTitle === 'Budgets'
+    ? 'Budget Management'
+    : pageTitle === 'Recurring'
+      ? 'Recurring Transactions'
+      : pageTitle === 'Transactions'
+        ? 'All Transactions'
+        : pageTitle === 'ImportExport'
+          ? 'Import / Export'
+          : pageTitle;
 
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-gray-300 p-4 sm:px-6 lg:px-8 flex items-center justify-between dark:bg-gray-800 dark:border-gray-700 backdrop-blur-sm bg-opacity-95 dark:bg-opacity-95 shadow-sm">
