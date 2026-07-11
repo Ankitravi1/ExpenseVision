@@ -222,7 +222,7 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
     return (
         <>
             <div
-                className={`fixed inset-0 bg-black bg-opacity-50 z-40 transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                className={`fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-40 transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
                 onClick={onClose}
                 aria-hidden="true"
             />
@@ -231,18 +231,27 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
                 aria-modal="true"
                 className={`fixed top-0 right-0 h-full bg-white shadow-2xl w-full max-w-md transform transition-transform duration-300 z-50 flex flex-col dark:bg-gray-800 ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
             >
-                <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-                    <h3 className="text-xl font-bold dark:text-gray-50">{transaction ? 'Edit Transaction' : 'New Transaction'}</h3>
-                    <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700">
-                        <Icon name="X" size={24} />
+                <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gradient-to-r from-primary-light/40 to-transparent dark:from-primary/10 dark:to-transparent">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-primary/10 dark:bg-primary/20 flex items-center justify-center flex-shrink-0">
+                            <Icon name={transaction ? 'Pencil' : 'Plus'} size={20} className="text-primary dark:text-indigo-300" />
+                        </div>
+                        <h3 className="text-xl font-bold dark:text-gray-50">{transaction ? 'Edit Transaction' : 'New Transaction'}</h3>
+                    </div>
+                    <button onClick={onClose} className="p-1.5 rounded-full hover:bg-white/60 dark:hover:bg-gray-700 transition-colors">
+                        <Icon name="X" size={22} />
                     </button>
                 </div>
                 <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
                     <fieldset disabled={isParsingVoiceText} className="p-6 space-y-6 flex-1 overflow-y-auto disabled:opacity-70">
 
                         {/* Type Toggle */}
-                        <div className="grid grid-cols-3 gap-1 bg-gray-100 dark:bg-gray-900 p-1.5 rounded-xl border border-dashed border-primary/30">
-                            {(['expense', 'income', 'transfer'] as TransactionType[]).map((t) => (
+                        <div className="grid grid-cols-3 gap-1.5 bg-gray-100 dark:bg-gray-900 p-1.5 rounded-xl">
+                            {([
+                                { t: 'expense' as TransactionType, icon: 'TrendingDown', active: 'bg-white dark:bg-gray-700 shadow-sm text-danger dark:text-rose-400 ring-1 ring-rose-200 dark:ring-rose-900/50' },
+                                { t: 'income' as TransactionType, icon: 'TrendingUp', active: 'bg-white dark:bg-gray-700 shadow-sm text-success dark:text-emerald-400 ring-1 ring-emerald-200 dark:ring-emerald-900/50' },
+                                { t: 'transfer' as TransactionType, icon: 'ArrowLeftRight', active: 'bg-white dark:bg-gray-700 shadow-sm text-blue-600 dark:text-blue-400 ring-1 ring-blue-200 dark:ring-blue-900/50' },
+                            ]).map(({ t, icon, active }) => (
                                 <button
                                     key={t}
                                     type="button"
@@ -255,11 +264,12 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
                                         }
                                     }}
                                     disabled={isParsingVoiceText}
-                                    className={`px-3 py-2 text-sm font-semibold rounded-lg capitalize transition-all ${type === t
-                                        ? 'bg-white dark:bg-gray-700 shadow-sm text-primary dark:text-primary-light'
-                                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                                    className={`flex items-center justify-center gap-1.5 px-3 py-2.5 text-sm font-semibold rounded-lg capitalize transition-all ${type === t
+                                        ? active
+                                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-white/50 dark:hover:bg-gray-800/60'
                                         }`}
                                 >
+                                    <Icon name={icon} size={15} />
                                     {t}
                                 </button>
                             ))}
@@ -408,12 +418,13 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
                             </>
                         )}
                     </fieldset>
-                    <div className="mt-8">
+                    <div className="p-6 pt-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-[0_-4px_12px_-4px_rgba(0,0,0,0.06)]">
                         <button
                             type="submit"
                             disabled={isParsingVoiceText}
-                            className="w-full bg-primary text-white font-semibold px-4 py-3 rounded-lg shadow-sm hover:bg-primary-dark transition-colors disabled:opacity-70 flex justify-center items-center"
+                            className="w-full bg-primary text-white font-semibold px-4 py-3 rounded-lg shadow-sm hover:bg-primary-hover transition-colors disabled:opacity-70 flex justify-center items-center gap-2"
                         >
+                            <Icon name={transaction ? 'Check' : 'Plus'} size={18} />
                             {transaction ? 'Save Changes' : 'Add Transaction'}
                         </button>
                         {transaction && onDelete && (
