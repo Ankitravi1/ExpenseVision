@@ -242,6 +242,15 @@ This document tracks what has been built, what is in progress, and what is plann
 - **Export**: Transactions-style period/filter/calendar/carry-forward controls over a live-filtered table, exported as CSV or Excel (PDF marked "coming soon" — no PDF library in the project yet, see 7.4)
 - Transactions page's Import button and Reports' Export button now deep-link into this page instead of opening the old modal; the old `ImportTransactionsModal` component was removed as fully unreferenced
 
+### 5.6 Account Drag-Reorder & Web Polish (Completed)
+- Accounts page: press-and-hold-then-drag reordering of account cards (native pointer events, no new dependency), persisted via a new `Account.sortOrder` field + `PUT /accounts/reorder` endpoint
+- Budgets "All Budgets" tab sorts by urgency (Over Budget → Near Limit → On Track) instead of insertion order
+- New Transaction side panel: color-coded type toggle, tinted header, backdrop blur, anchored footer — plus a fix for an inert `hover:bg-primary-dark` class (undefined in the Tailwind config)
+
+### 5.7 Second-Round Mobile Audit & Web↔Mobile UI Mirror (Completed)
+- Mobile header reordered (Net Worth moved to the rightmost position, next to the notification bell; Reports icon removed) and Dashboard reorganized (Net Worth card removed in favor of a header pointer, a Report shortcut added to the Expense Distribution card, Recent Transactions moved below Accounts Summary) to mirror equivalent web adjustments
+- Full mobile audit across every screen surfaced ~20 real issues, all fixed: a budget-cache collision when a category has both a recurring and a month-specific override, month-navigation day-overflow on Budgets, frozen-account balance figures that disagreed across Transactions/Dashboard/Accounts, Money Calendar's Income tab silently showing expense data, an AI-import gating race, duplicate detection that missed repeats within the same pasted batch, a Monday/Sunday week-definition mismatch between Reports and Import/Export, several missing pull-to-refresh/empty-states, and a handful of hardcoded colors that broke dark-mode theming
+
 ---
 
 ## 📋 Phase 6 — Stability, Performance & Production Readiness
