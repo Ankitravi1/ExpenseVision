@@ -80,6 +80,7 @@ model Account {
   color     String?
   icon      String?
   logo      String?
+  frozen    Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

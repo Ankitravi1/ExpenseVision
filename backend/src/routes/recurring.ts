@@ -55,8 +55,19 @@ export const materializeRecurringRules = async (prisma: any, userId: string): Pr
         where: { userId, active: true, nextRun: { lte: today } }
     });
 
+    const frozenAccountIds = new Set<string>(
+        (await prisma.account.findMany({ where: { userId, frozen: true }, select: { id: true } }))
+            .map((a: any) => a.id)
+    );
+
     let created = 0;
     for (const rule of rules) {
+        // A frozen account is paused entirely — skip materialization without
+        // advancing nextRun, so occurrences resume from where they left off once unfrozen.
+        if (frozenAccountIds.has(rule.accountId) || (rule.type === 'transfer' && rule.transferToAccountId && frozenAccountIds.has(rule.transferToAccountId))) {
+            continue;
+        }
+
         // Compute the due occurrence dates and the resulting nextRun BEFORE claiming
         // the rule, so the claim can advance nextRun in a single atomic write.
         const occurrences: string[] = [];
@@ -157,10 +168,16 @@ router.post('/', async (req, res, next) => {
         if (!ownedAccount) {
             return res.status(403).json({ error: 'Account does not belong to you' });
         }
+        if (ownedAccount.frozen) {
+            return res.status(400).json({ error: 'This account is frozen. Unfreeze it before creating a recurring rule against it.' });
+        }
         if (data.type === 'transfer' && data.transferToAccountId) {
             const ownedTransferTo = await prisma.account.findFirst({ where: { id: data.transferToAccountId, userId } });
             if (!ownedTransferTo) {
                 return res.status(403).json({ error: 'Transfer destination account does not belong to you' });
+            }
+            if (ownedTransferTo.frozen) {
+                return res.status(400).json({ error: 'The destination account is frozen. Unfreeze it before creating a recurring rule against it.' });
             }
         }
         if (data.type !== 'transfer' && data.categoryId) {
@@ -217,11 +234,17 @@ router.put('/:id', async (req, res, next) => {
             if (!ownedAccount) {
                 return res.status(403).json({ error: 'Account does not belong to you' });
             }
+            if (ownedAccount.frozen && data.accountId !== existing.accountId) {
+                return res.status(400).json({ error: 'This account is frozen. Unfreeze it before assigning a recurring rule to it.' });
+            }
         }
         if (data.transferToAccountId) {
             const ownedTransferTo = await prisma.account.findFirst({ where: { id: data.transferToAccountId, userId } });
             if (!ownedTransferTo) {
                 return res.status(403).json({ error: 'Transfer destination account does not belong to you' });
+            }
+            if (ownedTransferTo.frozen && data.transferToAccountId !== existing.transferToAccountId) {
+                return res.status(400).json({ error: 'The destination account is frozen. Unfreeze it before assigning a recurring rule to it.' });
             }
         }
         if (data.categoryId) {
@@ -299,6 +322,12 @@ router.post('/:id/run', async (req, res, next) => {
         const rule = await prisma.recurringRule.findFirst({ where: { id, userId } });
         if (!rule) {
             return res.status(404).json({ error: 'Recurring rule not found' });
+        }
+
+        const accountIdsToCheck = [rule.accountId, ...(rule.type === 'transfer' && rule.transferToAccountId ? [rule.transferToAccountId] : [])];
+        const frozenAccount = await prisma.account.findFirst({ where: { id: { in: accountIdsToCheck }, frozen: true } });
+        if (frozenAccount) {
+            return res.status(400).json({ error: 'This rule references a frozen account. Unfreeze it before running the rule.' });
         }
 
         await prisma.$transaction(async (tx: any) => {

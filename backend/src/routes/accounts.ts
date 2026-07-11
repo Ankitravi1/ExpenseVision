@@ -10,7 +10,8 @@ const accountSchema = z.object({
     initialBalance: z.number().default(0),
     color: z.string().optional(),
     icon: z.string().optional(),
-    logo: z.string().optional()
+    logo: z.string().optional(),
+    frozen: z.boolean().optional()
 });
 
 export const syncAccountBalances = async (prisma: any, userId: string) => {

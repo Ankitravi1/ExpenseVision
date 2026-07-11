@@ -624,10 +624,13 @@ router.post('/bulk', async (req, res, next) => {
 
         const ownedAccounts = await prisma.account.findMany({
             where: { id: { in: [...accountIds] }, userId },
-            select: { id: true }
+            select: { id: true, frozen: true }
         });
         if (ownedAccounts.length !== accountIds.size) {
             return res.status(403).json({ error: 'One or more accounts do not belong to you' });
+        }
+        if (ownedAccounts.some((a: any) => a.frozen)) {
+            return res.status(400).json({ error: 'One or more accounts are frozen. Unfreeze them before adding transactions.' });
         }
 
         if (categoryIds.size > 0) {
@@ -702,11 +705,17 @@ router.post('/', async (req, res, next) => {
         if (!ownedAccount) {
             return res.status(403).json({ error: 'Account does not belong to you' });
         }
+        if (ownedAccount.frozen) {
+            return res.status(400).json({ error: 'This account is frozen. Unfreeze it before adding transactions.' });
+        }
 
         if (data.transferToAccountId) {
             const ownedTransferTo = await prisma.account.findFirst({ where: { id: data.transferToAccountId, userId } });
             if (!ownedTransferTo) {
                 return res.status(403).json({ error: 'Transfer destination account does not belong to you' });
+            }
+            if (ownedTransferTo.frozen) {
+                return res.status(400).json({ error: 'The destination account is frozen. Unfreeze it before adding transactions.' });
             }
         }
 
@@ -810,12 +819,18 @@ router.put('/:id', async (req, res, next) => {
             if (!ownedAccount) {
                 return res.status(403).json({ error: 'Account does not belong to you' });
             }
+            if (ownedAccount.frozen && parsedData.accountId !== existing.accountId) {
+                return res.status(400).json({ error: 'This account is frozen. Unfreeze it before moving transactions into it.' });
+            }
         }
 
         if (parsedData.transferToAccountId) {
             const ownedTransferTo = await prisma.account.findFirst({ where: { id: parsedData.transferToAccountId, userId } });
             if (!ownedTransferTo) {
                 return res.status(403).json({ error: 'Transfer destination account does not belong to you' });
+            }
+            if (ownedTransferTo.frozen && parsedData.transferToAccountId !== existing.transferToAccountId) {
+                return res.status(400).json({ error: 'The destination account is frozen. Unfreeze it before moving transactions into it.' });
             }
         }
 
