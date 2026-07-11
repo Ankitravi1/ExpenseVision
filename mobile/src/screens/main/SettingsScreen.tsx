@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Switch } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Switch, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
@@ -61,7 +61,7 @@ export default function SettingsScreen() {
                         granted = newSettings.status === 'granted' || newSettings.granted;
                     }
                     if (!granted) {
-                        Alert.alert('Permission Denied', 'Please enable notifications in Android Settings.');
+                        Alert.alert('Permission Denied', `Please enable notifications in ${Platform.OS === 'ios' ? 'iOS' : 'Android'} Settings.`);
                         setNotificationsEnabled(false);
                         return;
                     }
@@ -585,7 +585,7 @@ export default function SettingsScreen() {
                             <MaterialCommunityIcons
                                 name={idx === 0 ? 'star' : 'star-outline'}
                                 size={22}
-                                color={idx === 0 ? '#f59e0b' : '#9ca3af'}
+                                color={idx === 0 ? theme.colors.warning : theme.colors.textTertiary}
                             />
                         </TouchableOpacity>
                         <Input

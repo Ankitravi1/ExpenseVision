@@ -90,10 +90,16 @@ export default function DashboardScreen() {
         const currentMonthKey = monthKey(currentDate);
         const lastMonthKey = monthKey(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
 
+        // Frozen accounts are excluded from Accounts screen's all-time totals —
+        // match that here too, so this month's stats reconcile with that screen
+        // instead of silently including activity from a paused account.
+        const frozenAccountIds = new Set(accounts.filter(a => a.frozen).map(a => a.id));
+        const isActiveAccountTx = (t: (typeof transactions)[number]) => !frozenAccountIds.has(t.accountId);
+
         // Compare by the YYYY-MM prefix of the date-only portion (never new Date()).
         const inMonth = (t: (typeof transactions)[number], key: string) => t.date.substring(0, 10).slice(0, 7) === key;
         const sumType = (key: string, type: 'income' | 'expense') =>
-            transactions.filter(t => t.type === type && inMonth(t, key)).reduce((s, t) => s + t.amount, 0);
+            transactions.filter(t => t.type === type && inMonth(t, key) && isActiveAccountTx(t)).reduce((s, t) => s + t.amount, 0);
 
         const totalIncome = sumType(currentMonthKey, 'income');
         const totalExpenses = sumType(currentMonthKey, 'expense');
@@ -114,7 +120,7 @@ export default function DashboardScreen() {
 
         const byCat: Record<string, number> = {};
         for (const t of transactions) {
-            if (t.type !== 'expense' || !inMonth(t, currentMonthKey)) continue;
+            if (t.type !== 'expense' || !inMonth(t, currentMonthKey) || !isActiveAccountTx(t)) continue;
             const name = categories.find(c => c.id === t.categoryId)?.name || 'Uncategorized';
             byCat[name] = (byCat[name] || 0) + t.amount;
         }
@@ -129,7 +135,7 @@ export default function DashboardScreen() {
             netFlowChange: calcChange(netFlow, lastNet),
             recent, expenseByCategory,
         };
-    }, [transactions, categories, currentDate]);
+    }, [transactions, categories, currentDate, accounts]);
 
     const chartWidth = Dimensions.get('window').width - spacing.md * 4;
     const donutSize = 130;

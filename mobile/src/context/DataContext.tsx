@@ -159,7 +159,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const setBudget = useCallback(async (b: { id?: string; categoryId: string; amount: number; month?: string | null; rollover?: boolean; alertThreshold?: number; spent?: number }) => {
         const saved = await api.setBudget(b);
         setBudgets(prev => {
-            const existing = prev.find(x => x.id === saved.id || x.categoryId === saved.categoryId);
+            // A category can have both a recurring budget (month: null) and a
+            // separate this-month-only override — match on categoryId AND month
+            // together, or the two would collide and one would silently vanish
+            // from local state until the next full refresh.
+            const existing = prev.find(x => x.id === saved.id || (x.categoryId === saved.categoryId && (x.month ?? null) === (saved.month ?? null)));
             if (existing) return prev.map(x => (x.id === existing.id ? saved : x));
             return [...prev, saved];
         });

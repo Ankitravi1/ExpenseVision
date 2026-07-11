@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
@@ -171,7 +171,7 @@ const RuleCard: React.FC<{
 
 export default function RecurringScreen() {
     const { user } = useAuth();
-    const { recurring, transactions, deleteRecurring } = useData();
+    const { recurring, transactions, deleteRecurring, isLoading, refresh } = useData();
     const { theme } = useTheme();
     const [showRecurringForm, setShowRecurringForm] = useState(false);
     const [editingRule, setEditingRule] = useState<RecurringRule | null>(null);
@@ -196,7 +196,10 @@ export default function RecurringScreen() {
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top']}>
             <ScreenHeader title="Recurring" />
-            <ScrollView contentContainerStyle={{ padding: spacing.md }}>
+            <ScrollView
+                contentContainerStyle={{ padding: spacing.md }}
+                refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refresh} tintColor={theme.colors.primary} />}
+            >
                 <Button
                     title="+ New Recurring"
                     variant="secondary"

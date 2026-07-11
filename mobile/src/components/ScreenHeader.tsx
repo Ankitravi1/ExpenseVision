@@ -64,7 +64,7 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({ title }) => {
                 >
                     <MaterialCommunityIcons name="bell-outline" size={22} color={theme.colors.textSecondary} />
                     {unreadCount > 0 && (
-                        <View style={styles.badge}>
+                        <View style={[styles.badge, { backgroundColor: theme.colors.danger }]}>
                             <Text style={styles.badgeText}>{unreadCount}</Text>
                         </View>
                     )}
@@ -132,7 +132,6 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: -2,
         right: -2,
-        backgroundColor: 'red',
         minWidth: 16,
         height: 16,
         borderRadius: 8,

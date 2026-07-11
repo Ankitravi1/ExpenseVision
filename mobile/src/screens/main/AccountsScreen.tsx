@@ -62,8 +62,9 @@ export default function AccountsScreen() {
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
+                    // Freezing is reversible (one-tap unfreeze) — not the same
+                    // irreversible-destructive class as confirmDelete above it.
                     text: 'Freeze',
-                    style: 'destructive',
                     onPress: () => updateAccount(a.id, { frozen: true }).catch(err => Alert.alert('Error', err.message || 'Failed to freeze account')),
                 },
             ]

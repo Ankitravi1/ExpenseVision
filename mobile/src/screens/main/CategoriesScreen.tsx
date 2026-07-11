@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useData } from '../../context/DataContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useNavigation } from '@react-navigation/native';
-import { Button } from '../../components/ui';
+import { Button, EmptyState } from '../../components/ui';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { CategoryIcon } from '../../components/CategoryIcon';
 import { CategoryForm } from '../../components/CategoryForm';
@@ -13,7 +13,7 @@ import { Category } from '../../types';
 
 export default function CategoriesScreen() {
     const navigation = useNavigation();
-    const { categories, deleteCategory } = useData();
+    const { categories, deleteCategory, isLoading, refresh } = useData();
     const { theme } = useTheme();
     const [showCategoryForm, setShowCategoryForm] = useState(false);
     const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -32,7 +32,10 @@ export default function CategoriesScreen() {
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top']}>
             <ScreenHeader title="Categories" />
-            <ScrollView contentContainerStyle={{ padding: spacing.md }}>
+            <ScrollView
+                contentContainerStyle={{ padding: spacing.md }}
+                refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refresh} tintColor={theme.colors.primary} />}
+            >
                 <Button
                     title="+ New Category"
                     variant="secondary"
@@ -43,27 +46,33 @@ export default function CategoriesScreen() {
                     style={{ marginBottom: spacing.md }}
                 />
 
-                {categories.map(c => (
-                    <TouchableOpacity
-                        key={c.id}
-                        onPress={() => {
-                            setEditingCategory(c);
-                            setShowCategoryForm(true);
-                        }}
-                        onLongPress={() => confirmDeleteCategory(c)}
-                        style={[styles.categoryRow, { borderBottomColor: theme.colors.separator }]}
-                    >
-                        <CategoryIcon name={c.icon} size={14} />
-                        <Text style={{ color: theme.colors.text, flex: 1, marginLeft: spacing.sm, fontWeight: '500' }}>{c.name}</Text>
-                        <Text style={{ color: c.type === 'income' ? theme.colors.success : theme.colors.danger, fontSize: 12 }}>
-                            {c.type}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
+                {categories.length === 0 ? (
+                    <EmptyState icon="tag-multiple-outline" title="No categories yet" subtitle="Tap + New Category to add your first one" />
+                ) : (
+                    <>
+                        {categories.map(c => (
+                            <TouchableOpacity
+                                key={c.id}
+                                onPress={() => {
+                                    setEditingCategory(c);
+                                    setShowCategoryForm(true);
+                                }}
+                                onLongPress={() => confirmDeleteCategory(c)}
+                                style={[styles.categoryRow, { borderBottomColor: theme.colors.separator }]}
+                            >
+                                <CategoryIcon name={c.icon} size={14} />
+                                <Text style={{ color: theme.colors.text, flex: 1, marginLeft: spacing.sm, fontWeight: '500' }}>{c.name}</Text>
+                                <Text style={{ color: c.type === 'income' ? theme.colors.success : theme.colors.danger, fontSize: 12 }}>
+                                    {c.type}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
 
-                <Text style={{ color: theme.colors.textTertiary, fontSize: 12, marginTop: spacing.sm, textAlign: 'center' }}>
-                    Tap to edit · long-press to delete
-                </Text>
+                        <Text style={{ color: theme.colors.textTertiary, fontSize: 12, marginTop: spacing.sm, textAlign: 'center' }}>
+                            Tap to edit · long-press to delete
+                        </Text>
+                    </>
+                )}
             </ScrollView>
 
             <CategoryForm

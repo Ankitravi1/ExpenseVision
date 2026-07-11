@@ -146,9 +146,8 @@ export default function BudgetsScreen() {
             <View style={[styles.periodNavigator, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder }]}>
                 <TouchableOpacity
                     onPress={() => {
-                        const prev = new Date(currentDate);
-                        prev.setMonth(prev.getMonth() - 1);
-                        setCurrentDate(prev);
+                        // Anchor to the 1st so month arithmetic never overflows month-end.
+                        setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
                     }}
                     style={styles.navButton}
                 >
@@ -159,9 +158,7 @@ export default function BudgetsScreen() {
                 </Text>
                 <TouchableOpacity
                     onPress={() => {
-                        const next = new Date(currentDate);
-                        next.setMonth(next.getMonth() + 1);
-                        setCurrentDate(next);
+                        setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
                     }}
                     style={styles.navButton}
                 >

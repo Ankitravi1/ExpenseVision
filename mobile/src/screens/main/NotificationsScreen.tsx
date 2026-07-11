@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
@@ -30,6 +30,29 @@ export default function NotificationsScreen({ navigation }: any) {
             fetchNotifications();
         }, [])
     );
+
+    const [refreshing, setRefreshing] = useState(false);
+    const onRefresh = async () => {
+        setRefreshing(true);
+        await fetchNotifications();
+        setRefreshing(false);
+    };
+
+    // Mirrors web's NotificationCenter: route to the screen the notification
+    // is most likely about, based on simple keyword matching.
+    const handlePress = async (item: any) => {
+        if (!item.read) await markAsRead(item.id);
+        const titleText = String(item.title || '').toLowerCase();
+        const msgText = String(item.message || '').toLowerCase();
+
+        if (titleText.includes('budget') || msgText.includes('budget') || titleText.includes('limit') || msgText.includes('limit')) {
+            navigation.navigate('Main', { screen: 'Budgets' });
+        } else if (titleText.includes('recurring') || msgText.includes('recurring') || msgText.includes('emi') || msgText.includes('rent')) {
+            navigation.navigate('Recurring');
+        } else {
+            navigation.navigate('Main', { screen: 'Transactions' });
+        }
+    };
 
     const markAsRead = async (id: string) => {
         try {
@@ -93,6 +116,7 @@ export default function NotificationsScreen({ navigation }: any) {
                 <FlatList
                     data={notifications}
                     keyExtractor={(item) => item.id}
+                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />}
                     renderItem={({ item }) => (
                         <View
                             style={[
@@ -105,10 +129,10 @@ export default function NotificationsScreen({ navigation }: any) {
                             ]}
                         >
                             <View style={[styles.dot, { backgroundColor: item.read ? 'transparent' : '#3b82f6' }]} />
-                            <TouchableOpacity 
+                            <TouchableOpacity
                                 style={styles.content}
-                                activeOpacity={item.read ? 1 : 0.7}
-                                onPress={() => !item.read && markAsRead(item.id)}
+                                activeOpacity={0.7}
+                                onPress={() => handlePress(item)}
                             >
                                 <Text style={[styles.itemTitle, { color: item.read ? theme.colors.textSecondary : theme.colors.text }]}>
                                     {item.title}

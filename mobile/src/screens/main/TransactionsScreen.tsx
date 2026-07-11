@@ -183,8 +183,18 @@ export default function TransactionsScreen() {
     }, [range.start, range.end, viewMode]);
 
     const preRangeBalance = useMemo(() => {
-        const accountsInitialBalanceSum = accounts.reduce((sum, acc) => sum + (acc.initialBalance ?? acc.balance ?? 0), 0);
-        const preTxs = transactions.filter(t => t.date.substring(0, 10) < range.start);
+        // Frozen accounts are excluded from balance totals everywhere else
+        // (header net worth, Accounts screen) — match that here too, or this
+        // banner shows a different, unreconciled number for the same data.
+        const frozenAccountIds = new Set(accounts.filter(a => a.frozen).map(a => a.id));
+        const accountsInitialBalanceSum = accounts
+            .filter(a => !a.frozen)
+            .reduce((sum, acc) => sum + (acc.initialBalance ?? acc.balance ?? 0), 0);
+        const preTxs = transactions.filter(t =>
+            t.date.substring(0, 10) < range.start &&
+            !frozenAccountIds.has(t.accountId) &&
+            !(t.transferToAccountId && frozenAccountIds.has(t.transferToAccountId))
+        );
         let incomeAndTransfersIn = 0;
         let expenseAndTransfersOut = 0;
         for (const t of preTxs) {

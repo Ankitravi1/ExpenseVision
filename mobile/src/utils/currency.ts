@@ -24,16 +24,19 @@ export const getCurrencySymbol = (currencyCode: string = 'INR'): string => {
 };
 
 export const formatCurrency = (amount: number, currencyCode: string = 'INR'): string => {
-    const code = LOCALES[currencyCode] ? currencyCode : 'INR';
+    // LOCALES only pins a specific locale for our 7 known codes; any other
+    // valid ISO 4217 code still formats correctly with locale left undefined
+    // (Intl resolves a sensible default) instead of silently rendering as INR.
+    const locale = LOCALES[currencyCode];
     try {
-        return new Intl.NumberFormat(LOCALES[code], {
+        return new Intl.NumberFormat(locale, {
             style: 'currency',
-            currency: code,
+            currency: currencyCode,
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
         }).format(amount);
     } catch {
-        return `${getCurrencySymbol(code)}${amount.toFixed(2)}`;
+        return `${getCurrencySymbol(currencyCode)}${amount.toFixed(2)}`;
     }
 };
 
