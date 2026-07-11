@@ -12,13 +12,10 @@ import { CategoryForm } from '../../components/CategoryForm';
 import { RecurringForm } from '../../components/RecurringForm';
 import { formatCurrency } from '../../utils/currency';
 import { isoDateToDisplay } from '../../utils/date';
-import { shareTransactionsCsv } from '../../utils/exportCsv';
 import { spacing } from '../../theme';
 import { Category, RecurringRule } from '../../types';
 import { apiFetch } from '../../services/api';
 
-import * as LegacyFS from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
@@ -29,7 +26,6 @@ export default function SettingsScreen() {
     const { user } = useAuth();
     const { categories, recurring, deleteCategory, deleteRecurring, transactions, refresh } = useData();
     const { theme } = useTheme();
-    const [exporting, setExporting] = useState(false);
     const [showAiSettings, setShowAiSettings] = useState(false);
     const [aiSettings, setAiSettings] = useState<AiSettings>(defaultAiSettings);
     const [savingAiSettings, setSavingAiSettings] = useState(false);
@@ -248,38 +244,6 @@ export default function SettingsScreen() {
     };
 
 
-    const handleExport = async () => {
-        setExporting(true);
-        try {
-            await shareTransactionsCsv();
-        } catch (err: any) {
-            Alert.alert('Export failed', err.message || 'Could not export transactions');
-        } finally {
-            setExporting(false);
-        }
-    };
-
-    const handleDownloadTemplate = async () => {
-        try {
-            const csvContent = 'Date,Note,Amount,Type,Category,Account,Transfer to Account\n' +
-                '2025-01-01,Groceries at Whole Foods,125.50,expense,Groceries,Checking Account,\n' +
-                '02-01-2025,Salary January,4500.00,income,Salary,Savings Account,\n' +
-                '03-01-2025,Credit card bill payment,1000.00,transfer,,Checking Account,Credit Card\n';
-
-            const fileUri = (LegacyFS.documentDirectory || '') + 'transaction_import_template.csv';
-            await LegacyFS.writeAsStringAsync(fileUri, csvContent, {
-                encoding: LegacyFS.EncodingType.UTF8,
-            });
-            if (await Sharing.isAvailableAsync()) {
-                await Sharing.shareAsync(fileUri, { mimeType: 'text/csv', dialogTitle: 'Download CSV Template' });
-            } else {
-                Alert.alert('Error', 'Sharing is not available on this device');
-            }
-        } catch (err: any) {
-            Alert.alert('Error', 'Could not create template file');
-        }
-    };
-
     const confirmClearData = () => {
         warningHaptic();
         setShowClearData(true);
@@ -465,8 +429,7 @@ export default function SettingsScreen() {
                 </Card>
 
                 <Card style={{ marginBottom: spacing.md, paddingVertical: 0 }}>
-                    <Row icon="file-download-outline" label="Download CSV template" onPress={handleDownloadTemplate} />
-                    <Row icon="export-variant" label={exporting ? 'Exporting…' : 'Export transactions (CSV)'} onPress={exporting ? undefined : handleExport} />
+                    <Row icon="swap-horizontal-bold" label="Import / Export transactions" onPress={() => navigation.navigate('ImportExport' as never)} />
                     <Row icon="delete-sweep" label="Clear / Reset Data" onPress={confirmClearData} danger />
                 </Card>
 

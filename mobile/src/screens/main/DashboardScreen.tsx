@@ -80,7 +80,10 @@ export default function DashboardScreen() {
         });
     };
 
-    const netWorth = useMemo(() => accounts.reduce((sum, a) => sum + a.balance, 0), [accounts]);
+    // Frozen accounts are excluded from account-level aggregates (net worth,
+    // accounts summary) — transaction-level lists/charts below are untouched.
+    const activeAccounts = useMemo(() => accounts.filter(a => !a.frozen), [accounts]);
+    const netWorth = useMemo(() => activeAccounts.reduce((sum, a) => sum + a.balance, 0), [activeAccounts]);
 
     const { totalIncome, totalExpenses, netFlow, incomeChange, expenseChange, netFlowChange, recent, expenseByCategory } = useMemo(() => {
         const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -168,7 +171,7 @@ export default function DashboardScreen() {
                     <Text style={[styles.cardLabel, { color: theme.colors.textSecondary }]}>Net Worth</Text>
                     <Text style={[styles.netWorth, { color: theme.colors.text }]}>{formatCurrency(netWorth, currency)}</Text>
                     <Text style={{ color: theme.colors.textTertiary, fontSize: 12 }}>
-                        Across {accounts.length} account{accounts.length === 1 ? '' : 's'}
+                        Across {activeAccounts.length} account{activeAccounts.length === 1 ? '' : 's'}
                     </Text>
                 </Card>
 
@@ -290,10 +293,10 @@ export default function DashboardScreen() {
                             <Text style={{ color: theme.colors.primary, fontWeight: '600', fontSize: 13 }}>Manage</Text>
                         </TouchableOpacity>
                     </View>
-                    {accounts.length === 0 ? (
+                    {activeAccounts.length === 0 ? (
                         <EmptyState icon="wallet-outline" title="No accounts yet" />
                     ) : (
-                        accounts.map(acc => {
+                        activeAccounts.map(acc => {
                             let accIcon: keyof typeof MaterialCommunityIcons.glyphMap = 'wallet-outline';
                             const type = acc.type.toLowerCase();
                             if (type.includes('savings') || type.includes('piggy')) accIcon = 'piggy-bank-outline';

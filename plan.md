@@ -157,43 +157,98 @@ This document tracks what has been built, what is in progress, and what is plann
 
 ---
 
-## 🔄 Phase 4 — Mobile Feature Parity (In Progress / Partially Done)
+## ✅ Phase 4 — Mobile Feature Parity (Completed)
 
 *Goal: Bring web-level quality and features to the Expo mobile app.*
 
 ### 4.1 Reports Screen (Completed)
-- Pie chart using `react-native-chart-kit` + `react-native-svg`
+- Full period navigation (Daily/Weekly/Monthly/3-Month/Yearly/Custom) with carry-over toggle
+- Expense + Income category donuts, money calendar heatmap, daily flow chart, accounts summary
+- Daily Burn Rate / Top Category / Savings Rate / Unbudgeted insight tiles, CSV export via share sheet
 
 ### 4.2 Push Notifications on Mobile (Completed)
 - `expo-notifications` integrated
 - Push token registered to backend
 - Foreground notification handler set
 - Guarded against running in Expo Go (requires dev build or physical device)
+- Tap-to-navigate (budget/recurring/transaction keyword routing) + pull-to-refresh
 
 ### 4.3 Mobile AI Settings (Completed)
-- Multiple API keys per provider
-- Reveal/delete individual keys
-- Custom model addition
+- Multiple API keys per provider, reveal/delete individual keys, custom model addition
+- Split AI toggles (Statement Imports vs Auto-Parsing) matching web
 
-### ⬜ 4.4 Advanced Date Navigator on Mobile (Planned)
-- Port the period shift arrows [◀][Monthly▼][▶] to the mobile transaction list
-- **Why**: Users expect the same navigation convenience on mobile as web
+### 4.4 Advanced Date Navigator on Mobile (Completed)
+- Period shift arrows [◀][Monthly▼][▶] plus 3-Month and Custom view modes on Transactions
+- End-of-range transactions no longer dropped (date compares fixed to ignore time component)
 
-### ⬜ 4.5 Bulk Actions on Mobile (Planned)
-- Floating action footer for bulk delete/move on the transactions list
-- **Why**: Power users need batch operations on mobile too
+### 4.5 Bulk Actions on Mobile (Completed)
+- Long-press selection mode, select-all, floating action bar, bulk delete on Transactions
+- Amount range filter and "apply filters to stats" toggle
 
-### ⬜ 4.6 Account Gradient Cards on Mobile (Planned)
-- Port predefined account type gradients from web to mobile account cards
-- **Why**: Visual parity and a more premium look
+### 4.6 Account Gradient Cards on Mobile (Completed)
+- Predefined account type gradients ported from web; account type list aligned with web's
+- Tap-to-edit from account history
+
+### 4.7 Accounts / Budgets / Dashboard / Recurring / Admin Parity (Completed)
+- Budgets: status filter tabs (All/Over/Near Limit/On Track) + overall progress card
+- Dashboard: month navigation, % change vs previous month, accounts summary
+- Recurring: pause/resume, run-now, execution history expander, end-date display
+- Admin: password reset, signup-method badge, superadmin protection
+
+### 4.8 Mobile Core Services Hardening (Completed)
+- Single-flight token refresh (was causing random forced logouts under concurrent 401s)
+- Production API URL via `EXPO_PUBLIC_API_URL`
+- iOS date/time pickers no longer close mid-scroll
+- Session restore fetches/refreshes the cached user instead of trusting a stale copy
 
 ---
 
-## 📋 Phase 5 — Stability, Performance & Production Readiness
+## ✅ Phase 5 — Full Audit, Account Freeze & Import/Export Redesign (Completed)
+
+*Goal: Full UI/UX/functionality audit of web + mobile, fix what's broken, and rebuild import/export as a dedicated flow.*
+
+### 5.1 Backend Security & Correctness Audit Fixes (Completed)
+- Closed two IDOR holes: bulk transaction import (mass assignment + unscoped account lookups) and recurring-rule create/update could mutate another user's account balances via forged ids
+- Recurring rule materialization: optimistic-lock claim prevents double-firing when two devices load `/initial-data` concurrently; a past `startDate` on edit no longer re-fires historical occurrences
+- Balance mutations converted from read-then-write (lost-update risk under concurrency) to atomic `increment`/`decrement` on create, update, and bulk
+- Transfers now require a destination account at the schema level (previously could debit the source and credit nothing)
+- Date-range filters use an exclusive next-day bound so same-day timestamped transactions aren't dropped
+- `reset-password` enforces the 8-char minimum; `forgot-password` returns a generic response regardless of whether the email exists
+- Refresh-token reuse (a revoked token presented again) now revokes the user's entire token family
+
+### 5.2 Web Frontend Audit Fixes (Completed)
+- Icon registry: 13 icons used across the app were missing and silently rendered a fallback glyph (reveal/eye, loader spinners, run-now, etc.)
+- Responsive navigation: sidebar becomes a hamburger-triggered overlay drawer below the `lg` breakpoint (previously unusable on phone-width viewports)
+- Import duplicate detection was comparing a date-only string against a date+time string and never matched; the import modal also didn't reset state after a successful import, allowing accidental re-import
+- Local-date parsing fixes UTC off-by-one bugs in period navigation on Reports and Transactions; 3-Month view corrected to span exactly 3 calendar months
+- Bulk-delete selection now clears when filters/period change (previously could delete rows no longer visible)
+- Context data-mutators (`addTransaction`, `updateAccount`, `addRecurring`, etc.) now return `Promise<boolean>` so forms only clear on confirmed success
+- ~45 invalid Tailwind color-shade classes (silently produced no CSS) corrected across Reports, Transactions, Budgets, Recurring, Accounts, Settings, Admin
+- Rules-of-Hooks violations fixed in Profile/Settings/AddCategoryModal; various dark-mode contrast and empty-state gaps closed
+
+### 5.3 Mobile Audit Fixes (Completed)
+- Token-refresh race: concurrent 401s each rotated the single-use refresh token, randomly forcing logout — now single-flighted
+- End-of-range transactions were dropped in Transactions/Reports due to the same date-only-vs-timestamp comparison bug as web
+- iOS date/time pickers closed after the first scroll tick; session restore now fetches/refreshes the cached user instead of trusting a stale copy
+- Settings' CSV import pointed at a non-existent backend route and called an undefined method — removed and replaced by the new Import/Export screen
+
+### 5.4 Account Freeze / Disable (Completed)
+- `Account.frozen` boolean; freezing pauses the account everywhere money moves — new/updated transactions, bulk import, and recurring rules (create, update, run-now, auto-materialization) are all blocked or skipped against a frozen account, while historical data and edits to already-existing transactions are untouched
+- Web + mobile: freeze via confirm, unfreeze in one tap; frozen accounts get a badge, are hidden from the main list behind a "Show frozen" toggle, and are excluded from balance totals and from account pickers in New Transaction / Recurring (with a labeled exception so editing a rule/transaction already pointing at a newly-frozen account doesn't blank the field)
+
+### 5.5 Dedicated Import / Export Page (Completed)
+- Replaces the import/export UI previously scattered across Settings, Transactions, and Reports with one page (`/import-export` on web, a drawer screen on mobile), Import section first by default
+- **Import** (6-step wizard): file/paste → text extraction (CSV/XLSX/PDF w/ password retry, OCR for receipt images on web; paste-text only on mobile) → bank name + AI field-mapping guidance (Expense=Debit, Income=Credit, Category=AI-decided, Note=summary, Date=date, Time=AI-extracted or defaults to 12:00) → AI-structured preview → editable, filterable preview table (Excel-style inline edit, not yet committed to real transactions) → optional duplicate detection (date+amount match) with multi-select delete from the preview → commit to real transactions via bulk import
+- **Export**: Transactions-style period/filter/calendar/carry-forward controls over a live-filtered table, exported as CSV or Excel (PDF marked "coming soon" — no PDF library in the project yet, see 7.4)
+- Transactions page's Import button and Reports' Export button now deep-link into this page instead of opening the old modal; the old `ImportTransactionsModal` component was removed as fully unreferenced
+
+---
+
+## 📋 Phase 6 — Stability, Performance & Production Readiness
 
 *Goal: Make the main branch a stable, deployable release.*
 
-### 5.1 Git Branching Strategy (Priority)
+### 6.1 Git Branching Strategy (Priority)
 
 **Recommended approach for stable `main`:**
 
@@ -210,43 +265,43 @@ Steps:
 4. Tag releases: `git tag v1.0.0 -m "First stable release"`
 5. Protect `main` on GitHub: require PR + review before merge
 
-### 5.2 Build & Production Deployment (Planned)
+### 6.2 Build & Production Deployment (Planned)
 - `npm run build` in web/ → static files served by Express or a CDN
 - Backend deployed to a VPS / Railway / Render with env vars set
 - PostgreSQL hosted (Railway Postgres, Supabase, or self-hosted)
 - HTTPS via reverse proxy (nginx / Caddy)
 
-### 5.3 Paginated Transaction API (Planned)
+### 6.3 Paginated Transaction API (Planned)
 - Add `?page=1&limit=50` query params to `GET /api/transactions`
 - **Why**: Users with 1,000+ transactions will see slow loads on current full-list fetch
 
-### 5.4 Automated Database Backups (Planned)
+### 6.4 Automated Database Backups (Planned)
 - Daily `pg_dump` to a local or S3 backup
 - **Why**: PostgreSQL in Docker can lose data if the volume is deleted — backups are essential for production
 
 ---
 
-## 📋 Phase 6 — Future Enhancements
+## 📋 Phase 7 — Future Enhancements
 
 *Ideas validated by usage — not yet scheduled.*
 
-### 6.1 AI Parser Improvements
+### 7.1 AI Parser Improvements
 - Pre-baked regex templates for major banks (HDFC, SBI, Chase, BOA) to handle structured statements without AI
 - **Why**: Reduces AI API cost for users with compatible bank statements
 
-### 6.2 Category Rule Fine-Tuning
+### 7.2 Category Rule Fine-Tuning
 - Let users define keyword→category mappings ("Swiggy" → Food)
 - **Why**: Reduces manual categorization after AI imports
 
-### 6.3 Multi-Currency Support
+### 7.3 Multi-Currency Support
 - Per-transaction currency with live exchange rate conversion in reports
 - **Why**: Users who travel or have accounts in multiple currencies currently can't track accurately
 
-### 6.4 Data Export Formats
-- Export to PDF (monthly statement), XLSX (Excel), or QIF (for accounting software)
+### 7.4 Remaining Export Formats
+- PDF (monthly statement) and QIF (accounting software) export — CSV and Excel are done (Phase 5.5); no PDF-generation library is in the project yet, so PDF export currently shows "coming soon" on web and isn't offered on mobile
 - **Why**: Power users and accountants need richer export options
 
-### 6.5 Shared Household Budgets
+### 7.5 Shared Household Budgets
 - Multiple users sharing a household budget/account pool
 - **Why**: Couples and families want joint tracking without separate apps
 
@@ -260,6 +315,7 @@ Steps:
 - All superadmin actions guarded server-side (not just frontend)
 - Single superadmin email hardcoded in backend (`ankitravione@gmail.com`)
 - Google OAuth users can have a password set by admin for emergency access
+- Account ownership enforced on every transaction/recurring-rule endpoint (bulk import and recurring create/update were the two gaps closed in Phase 5.1); balance mutations are atomic to avoid lost updates under concurrent requests
 
 ---
 
@@ -267,10 +323,12 @@ Steps:
 
 | Area | Status |
 |---|---|
-| Backend API | ✅ Stable — all CRUD, auth, AI, admin endpoints |
-| Web App | ✅ Feature-complete — dashboard, transactions, reports, import, admin |
-| Mobile App | 🔄 Feature parity in progress — AI settings done, date nav & bulk actions pending |
+| Backend API | ✅ Stable — all CRUD, auth, AI, admin endpoints; audited for IDOR/concurrency (Phase 5.1) |
+| Web App | ✅ Feature-complete — dashboard, transactions, reports, import/export page, account freeze, admin |
+| Mobile App | ✅ Feature parity reached with web (Phase 4), including account freeze + Import/Export screen (Phase 5.4–5.5) |
 | Database | ✅ PostgreSQL via Docker — all users migrated from SQLite |
-| AI Integration | ✅ Per-user keys, two independent toggles, import pipeline |
-| Admin Panel | ✅ Single superadmin, password reset, user list with auth badges |
-| Stable Branch | 📋 Planned — need `dev` branch workflow (see Phase 5.1) |
+| AI Integration | ✅ Per-user keys, two independent toggles, import pipeline (web + mobile) |
+| Admin Panel | ✅ Single superadmin, password reset, user list with auth badges (web + mobile) |
+| Account Freeze | ✅ Freeze/unfreeze on web + mobile, enforced server-side everywhere money moves |
+| Import / Export | ✅ Dedicated page/screen on web + mobile, replacing the old scattered UI |
+| Stable Branch | 📋 Planned — need `dev` branch workflow (see Phase 6.1) |

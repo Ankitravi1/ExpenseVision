@@ -132,11 +132,15 @@ export const AccountForm: React.FC<Props> = ({ visible, onClose, editing }) => {
         setSaving(true);
         try {
             if (editing) {
+                // Freeze/unfreeze is owned by the AccountsScreen action, not this form.
+                // Merge the existing `frozen` value so saving edits never silently
+                // un-freezes (or re-freezes) the account.
                 await updateAccount(editing.id, {
                     name: name.trim(),
                     type: finalType,
                     initialBalance: initBal,
                     icon: finalIcon,
+                    frozen: !!editing.frozen,
                 });
             } else {
                 await addAccount({

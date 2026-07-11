@@ -18,6 +18,7 @@ import ReportsScreen from '../screens/main/ReportsScreen';
 import SettingsScreen from '../screens/main/SettingsScreen';
 import CategoriesScreen from '../screens/main/CategoriesScreen';
 import RecurringScreen from '../screens/main/RecurringScreen';
+import ImportExportScreen from '../screens/main/ImportExportScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
 import NotificationsScreen from '../screens/main/NotificationsScreen';
 import AdminScreen from '../screens/main/AdminScreen';
@@ -121,6 +122,7 @@ function DrawerContentComponent({ navigation }: any) {
                 <DrawerItem icon="chart-pie" label="Reports" onPress={() => goToDrawerScreen('Reports')} />
                 <DrawerItem icon="tag-multiple" label="Categories" badge={`${categories.length}`} onPress={() => goToDrawerScreen('Categories')} />
                 <DrawerItem icon="repeat" label="Recurring" badge={`${recurring.length}`} onPress={() => goToDrawerScreen('Recurring')} />
+                <DrawerItem icon="swap-horizontal-bold" label="Import / Export" onPress={() => goToDrawerScreen('ImportExport')} />
                 {user?.role === 'superadmin' && (
                     <DrawerItem icon="shield-outline" label="Admin" onPress={() => goToDrawerScreen('Admin')} />
                 )}
@@ -232,6 +234,7 @@ function MainDrawer() {
             <Drawer.Screen name="Reports" component={ReportsScreen} />
             <Drawer.Screen name="Categories" component={CategoriesScreen} />
             <Drawer.Screen name="Recurring" component={RecurringScreen} />
+            <Drawer.Screen name="ImportExport" component={ImportExportScreen} />
             <Drawer.Screen name="Settings" component={SettingsScreen} />
             <Drawer.Screen name="Profile" component={ProfileScreen} />
             <Drawer.Screen name="Notifications" component={NotificationsScreen} />

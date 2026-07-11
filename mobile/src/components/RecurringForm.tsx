@@ -47,7 +47,7 @@ export const RecurringForm: React.FC<Props> = ({ visible, onClose, editing }) =>
                 setType('expense');
                 setNote('');
                 setAmount('');
-                setAccountId(accounts[0]?.id || null);
+                setAccountId(accounts.find(a => !a.frozen)?.id || null);
                 setTransferToAccountId(null);
                 setCategoryId(null);
                 setFrequency('monthly');
@@ -65,12 +65,23 @@ export const RecurringForm: React.FC<Props> = ({ visible, onClose, editing }) =>
             setAccountId(null);
             setTransferToAccountId(null);
             setCategoryId(null);
-        } else if (!accountId && accounts[0]) {
-            setAccountId(accounts[0].id);
+        } else if (!accountId) {
+            const firstActive = accounts.find(a => !a.frozen);
+            if (firstActive) setAccountId(firstActive.id);
         }
     }, [type, visible, editing, accounts, accountId]);
 
     const typeCategories = categories.filter(c => c.type === type);
+
+    // Same treatment as TransactionForm: exclude frozen accounts from selection,
+    // except the one an existing rule already points at (kept, labeled "(frozen)").
+    const selectableAccounts = accounts.filter(a => !a.frozen || (editing && a.id === editing.accountId));
+    const selectableTransferAccounts = accounts.filter(a => {
+        if (a.id === accountId) return false;
+        if (!a.frozen) return true;
+        return !!editing && a.id === editing.transferToAccountId;
+    });
+    const allAccountsFrozen = accounts.length > 0 && accounts.every(a => a.frozen);
 
     const handleSave = async () => {
         const value = parseFloat(amount);
@@ -154,15 +165,21 @@ export const RecurringForm: React.FC<Props> = ({ visible, onClose, editing }) =>
 
             <OptionSheet
                 label={type === 'transfer' ? 'From account' : 'Account'}
-                options={accounts.map(a => ({ value: a.id, label: a.name, sublabel: a.type }))}
+                options={selectableAccounts.map(a => ({ value: a.id, label: a.frozen ? `${a.name} (frozen)` : a.name, sublabel: a.type }))}
                 value={accountId}
                 onChange={setAccountId}
             />
 
+            {allAccountsFrozen ? (
+                <Text style={{ color: theme.colors.warning, fontSize: 12, marginTop: -8, marginBottom: spacing.md }}>
+                    All accounts are frozen. Unfreeze one in Accounts to add a recurring rule.
+                </Text>
+            ) : null}
+
             {type === 'transfer' ? (
                 <OptionSheet
                     label="To account"
-                    options={accounts.filter(a => a.id !== accountId).map(a => ({ value: a.id, label: a.name, sublabel: a.type }))}
+                    options={selectableTransferAccounts.map(a => ({ value: a.id, label: a.frozen ? `${a.name} (frozen)` : a.name, sublabel: a.type }))}
                     value={transferToAccountId}
                     onChange={setTransferToAccountId}
                 />

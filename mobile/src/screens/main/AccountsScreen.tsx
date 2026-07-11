@@ -16,7 +16,7 @@ import { spacing, radius } from '../../theme';
 import { Account, Transaction } from '../../types';
 
 export default function AccountsScreen() {
-    const { accounts, deleteAccount, isLoading, refresh, transactions } = useData();
+    const { accounts, deleteAccount, updateAccount, isLoading, refresh, transactions } = useData();
     const { user } = useAuth();
     const { theme } = useTheme();
     const [showForm, setShowForm] = useState(false);
@@ -25,15 +25,23 @@ export default function AccountsScreen() {
     const [editTx, setEditTx] = useState<Transaction | null>(null);
     const [showTxForm, setShowTxForm] = useState(false);
     const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
+    const [showFrozen, setShowFrozen] = useState(false);
     const currency = user?.currency || 'INR';
 
-    const total = accounts.reduce((sum, a) => sum + a.balance, 0);
+    // Frozen accounts are paused everywhere: hidden from the main list and
+    // excluded from the summary stat cards below. They only reappear via the
+    // "Show frozen" toggle, which is also the only way to unfreeze one.
+    const activeAccounts = accounts.filter(a => !a.frozen);
+    const frozenAccounts = accounts.filter(a => a.frozen);
+    const activeAccountIds = new Set(activeAccounts.map(a => a.id));
+
+    const total = activeAccounts.reduce((sum, a) => sum + a.balance, 0);
 
     const totalExpensesAllTime = transactions
-        .filter(t => t.type === 'expense')
+        .filter(t => t.type === 'expense' && activeAccountIds.has(t.accountId))
         .reduce((sum, t) => sum + t.amount, 0);
     const totalIncomeAllTime = transactions
-        .filter(t => t.type === 'income')
+        .filter(t => t.type === 'income' && activeAccountIds.has(t.accountId))
         .reduce((sum, t) => sum + t.amount, 0);
 
     const confirmDelete = (a: Account) => {
@@ -45,6 +53,25 @@ export default function AccountsScreen() {
                 onPress: () => deleteAccount(a.id).catch(err => Alert.alert('Cannot delete', err.message)),
             },
         ]);
+    };
+
+    const confirmFreeze = (a: Account) => {
+        Alert.alert(
+            'Freeze account',
+            `Freeze "${a.name}"? While frozen, it won't accept new transactions or recurring rules, and it will be excluded from balance totals until you unfreeze it.`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Freeze',
+                    style: 'destructive',
+                    onPress: () => updateAccount(a.id, { frozen: true }).catch(err => Alert.alert('Error', err.message || 'Failed to freeze account')),
+                },
+            ]
+        );
+    };
+
+    const handleUnfreeze = (a: Account) => {
+        updateAccount(a.id, { frozen: false }).catch(err => Alert.alert('Error', err.message || 'Failed to unfreeze account'));
     };
 
     const getAccountTransactions = (accountId: string) => {
@@ -267,6 +294,81 @@ export default function AccountsScreen() {
         );
     };
 
+    const renderAccountCard = (a: Account) => {
+        const { gradient, icon } = getAccountVisual(a.type, a.icon);
+        const isFrozen = !!a.frozen;
+        return (
+            <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => setSelectedAccount(a)}
+                onLongPress={() => confirmDelete(a)}
+                style={isFrozen ? { opacity: 0.6 } : undefined}
+            >
+                <LinearGradient
+                    colors={gradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.accountCard}
+                >
+                    {isFrozen && (
+                        <View style={styles.frozenBadge}>
+                            <MaterialCommunityIcons name="snowflake" size={11} color="#fff" />
+                            <Text style={styles.frozenBadgeText}>Frozen</Text>
+                        </View>
+                    )}
+                    <View style={styles.accountCardTop}>
+                        <View style={{ flex: 1, marginRight: spacing.sm }}>
+                            <Text style={styles.accountName} numberOfLines={1}>{a.name}</Text>
+                            <Text style={styles.accountType} numberOfLines={1}>{a.type}</Text>
+                        </View>
+                        <CategoryIcon
+                            name={icon}
+                            size={20}
+                            color="#ffffff"
+                            backgroundColor="rgba(255,255,255,0.18)"
+                        />
+                    </View>
+                    <View style={styles.accountCardDivider} />
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                        <View>
+                            <Text style={styles.accountBalanceLabel}>Current Balance</Text>
+                            <Text style={styles.accountBalance}>{formatCurrency(a.balance, currency)}</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', gap: spacing.xs }}>
+                            {isFrozen ? (
+                                <TouchableOpacity
+                                    onPress={() => handleUnfreeze(a)}
+                                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                    style={styles.accountEditBtn}
+                                >
+                                    <MaterialCommunityIcons name="snowflake-off" size={18} color="rgba(255,255,255,0.9)" />
+                                </TouchableOpacity>
+                            ) : (
+                                <TouchableOpacity
+                                    onPress={() => confirmFreeze(a)}
+                                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                    style={styles.accountEditBtn}
+                                >
+                                    <MaterialCommunityIcons name="snowflake" size={18} color="rgba(255,255,255,0.9)" />
+                                </TouchableOpacity>
+                            )}
+                            <TouchableOpacity
+                                onPress={() => {
+                                    setEditing(a);
+                                    setShowForm(true);
+                                }}
+                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                style={styles.accountEditBtn}
+                            >
+                                <MaterialCommunityIcons name="cog-outline" size={18} color="rgba(255,255,255,0.9)" />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </LinearGradient>
+            </TouchableOpacity>
+        );
+    };
+
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top']}>
             <ScreenHeader title="Accounts" />
@@ -300,59 +402,43 @@ export default function AccountsScreen() {
             </View>
 
             <FlatList
-                data={accounts}
+                data={activeAccounts}
                 keyExtractor={a => a.id}
                 contentContainerStyle={{ padding: spacing.md, paddingTop: 0, gap: spacing.sm }}
                 refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refresh} tintColor={theme.colors.primary} />}
-                renderItem={({ item: a }) => {
-                    const { gradient, icon } = getAccountVisual(a.type, a.icon);
-                    return (
-                        <TouchableOpacity
-                            activeOpacity={0.85}
-                            onPress={() => setSelectedAccount(a)}
-                            onLongPress={() => confirmDelete(a)}
-                        >
-                            <LinearGradient
-                                colors={gradient}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 1 }}
-                                style={styles.accountCard}
-                            >
-                                <View style={styles.accountCardTop}>
-                                    <View style={{ flex: 1, marginRight: spacing.sm }}>
-                                        <Text style={styles.accountName} numberOfLines={1}>{a.name}</Text>
-                                        <Text style={styles.accountType} numberOfLines={1}>{a.type}</Text>
-                                    </View>
-                                    <CategoryIcon
-                                        name={icon}
-                                        size={20}
-                                        color="#ffffff"
-                                        backgroundColor="rgba(255,255,255,0.18)"
-                                    />
-                                </View>
-                                <View style={styles.accountCardDivider} />
-                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-                                    <View>
-                                        <Text style={styles.accountBalanceLabel}>Current Balance</Text>
-                                        <Text style={styles.accountBalance}>{formatCurrency(a.balance, currency)}</Text>
-                                    </View>
-                                    <TouchableOpacity
-                                        onPress={() => {
-                                            setEditing(a);
-                                            setShowForm(true);
-                                        }}
-                                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                                        style={styles.accountEditBtn}
-                                    >
-                                        <MaterialCommunityIcons name="cog-outline" size={18} color="rgba(255,255,255,0.9)" />
-                                    </TouchableOpacity>
-                                </View>
-                            </LinearGradient>
-                        </TouchableOpacity>
-                    );
-                }}
+                renderItem={({ item: a }) => renderAccountCard(a)}
                 ListEmptyComponent={
-                    <EmptyState icon="wallet-outline" title="No accounts yet" subtitle="Tap + to add your first account. Tap an account to view details, long-press to delete." />
+                    accounts.length === 0 ? (
+                        <EmptyState icon="wallet-outline" title="No accounts yet" subtitle="Tap + to add your first account. Tap an account to view details, long-press to delete." />
+                    ) : (
+                        <EmptyState icon="snowflake" title="All accounts are frozen" subtitle={'Use "Show frozen" below to unfreeze one.'} />
+                    )
+                }
+                ListFooterComponent={
+                    frozenAccounts.length > 0 ? (
+                        <View style={{ marginTop: spacing.xs }}>
+                            <TouchableOpacity
+                                onPress={() => setShowFrozen(v => !v)}
+                                style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: spacing.sm }}
+                            >
+                                <MaterialCommunityIcons
+                                    name={showFrozen ? 'chevron-up' : 'chevron-down'}
+                                    size={18}
+                                    color={theme.colors.primary}
+                                />
+                                <Text style={{ color: theme.colors.primary, fontWeight: '700', fontSize: 13 }}>
+                                    {showFrozen ? 'Hide' : 'Show'} frozen ({frozenAccounts.length})
+                                </Text>
+                            </TouchableOpacity>
+                            {showFrozen && (
+                                <View style={{ gap: spacing.sm, marginTop: spacing.xs }}>
+                                    {frozenAccounts.map(a => (
+                                        <View key={a.id}>{renderAccountCard(a)}</View>
+                                    ))}
+                                </View>
+                            )}
+                        </View>
+                    ) : null
                 }
             />
 
@@ -428,6 +514,24 @@ const styles = StyleSheet.create({
     accountCard: {
         borderRadius: radius.lg,
         padding: spacing.md,
+    },
+    frozenBadge: {
+        position: 'absolute',
+        top: spacing.sm,
+        right: spacing.sm,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: 'rgba(0,0,0,0.35)',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 999,
+        zIndex: 1,
+    },
+    frozenBadgeText: {
+        color: '#fff',
+        fontSize: 10,
+        fontWeight: '800',
     },
     accountCardTop: {
         flexDirection: 'row',

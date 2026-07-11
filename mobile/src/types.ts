@@ -43,6 +43,7 @@ export interface Account {
     color?: string | null;
     icon?: string | null;
     logo?: string | null;
+    frozen?: boolean;
 }
 
 export interface Budget {
