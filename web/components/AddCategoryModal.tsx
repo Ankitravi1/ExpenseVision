@@ -18,9 +18,6 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({ isOpen, onCl
     const [selectedIcon, setSelectedIcon] = useState('Tags');
     const [showIconPicker, setShowIconPicker] = useState(false);
 
-    if (!context) return null;
-    const { addCategory, updateCategory } = context;
-
     // Populate form when editing
     useEffect(() => {
         if (editingCategory) {
@@ -33,6 +30,9 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({ isOpen, onCl
             setSelectedIcon('Tags');
         }
     }, [editingCategory, isOpen]);
+
+    if (!context) return null;
+    const { addCategory, updateCategory } = context;
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();

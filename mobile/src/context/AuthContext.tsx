@@ -31,25 +31,58 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsAuthenticated(false);
     }, []);
 
+    // Pull the latest user from the server and update the cache. Used on restore so
+    // profile edits made on web propagate. Silent on failure — apiFetch already
+    // forces a logout if the session is truly dead; transient/network errors keep
+    // the current cached user.
+    const refreshUserFromServer = useCallback(async () => {
+        try {
+            const { user: fresh } = await api.getProfile();
+            await storage.setUser(fresh);
+            setUser(fresh);
+        } catch {
+            // ignore
+        }
+    }, []);
+
     // Restore session on app start
     useEffect(() => {
+        // Register before any request fires so a dead session during restore logs out.
+        setOnUnauthorized(() => {
+            logout();
+        });
+
         (async () => {
             try {
                 const token = await storage.getToken();
-                if (token) {
-                    const storedUser = await storage.getUser();
-                    if (storedUser) setUser(storedUser);
+                if (!token) return;
+
+                const storedUser = await storage.getUser();
+                if (storedUser) {
+                    // Boot instantly from cache, then refresh from the server.
+                    setUser(storedUser);
                     setIsAuthenticated(true);
+                    refreshUserFromServer();
+                } else {
+                    // Token but no cached user → we must not render with user=null.
+                    // Fetch the profile; a 401 here means the session is dead.
+                    try {
+                        const { user: fresh } = await api.getProfile();
+                        await storage.setUser(fresh);
+                        setUser(fresh);
+                        setIsAuthenticated(true);
+                    } catch {
+                        await storage.clearTokens();
+                        await storage.clearUser();
+                        setUser(null);
+                        setIsAuthenticated(false);
+                    }
                 }
             } finally {
                 setIsLoading(false);
             }
         })();
-
-        setOnUnauthorized(() => {
-            logout();
-        });
-    }, [logout]);
+    }, [logout, refreshUserFromServer]);
 
     const applySession = async (session: { user: User; token: string; refreshToken: string }) => {
         await storage.setTokens(session.token, session.refreshToken);

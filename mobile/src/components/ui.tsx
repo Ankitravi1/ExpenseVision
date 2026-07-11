@@ -349,19 +349,47 @@ export const DateField: React.FC<{
                 <MaterialCommunityIcons name="calendar-outline" size={20} color={theme.colors.textTertiary} />
             </TouchableOpacity>
             {open ? (
-                <DateTimePicker
-                    value={parsed}
-                    mode="date"
-                    display="default"
-                    maximumDate={maximumDate}
-                    onChange={(event, date) => {
-                        setOpen(false);
-                        if (event.type === 'set' && date) {
-                            const iso = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-                            onChange(iso);
-                        }
-                    }}
-                />
+                Platform.OS === 'ios' ? (
+                    // iOS: an inline spinner that stays mounted while the wheel moves
+                    // (display="default" would unmount mid-scroll), committed via Done.
+                    <View style={[styles.iosPicker, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder }]}>
+                        <DateTimePicker
+                            value={parsed}
+                            mode="date"
+                            display="spinner"
+                            maximumDate={maximumDate}
+                            onChange={(_event, date) => {
+                                if (date) {
+                                    const iso = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+                                    onChange(iso);
+                                }
+                            }}
+                        />
+                        <TouchableOpacity
+                            onPress={() => {
+                                lightHaptic();
+                                setOpen(false);
+                            }}
+                            style={styles.iosPickerDone}
+                        >
+                            <Text style={{ color: theme.colors.primary, fontWeight: '600', fontSize: 16 }}>Done</Text>
+                        </TouchableOpacity>
+                    </View>
+                ) : (
+                    <DateTimePicker
+                        value={parsed}
+                        mode="date"
+                        display="default"
+                        maximumDate={maximumDate}
+                        onChange={(event, date) => {
+                            setOpen(false);
+                            if (event.type === 'set' && date) {
+                                const iso = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+                                onChange(iso);
+                            }
+                        }}
+                    />
+                )
             ) : null}
         </View>
     );
@@ -408,19 +436,47 @@ export const TimeField: React.FC<{
                 <MaterialCommunityIcons name="clock-outline" size={20} color={theme.colors.textTertiary} />
             </TouchableOpacity>
             {open ? (
-                <DateTimePicker
-                    value={parsed}
-                    mode="time"
-                    display="default"
-                    is24Hour={true}
-                    onChange={(event, date) => {
-                        setOpen(false);
-                        if (event.type === 'set' && date) {
-                            const timeStr = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
-                            onChange(timeStr);
-                        }
-                    }}
-                />
+                Platform.OS === 'ios' ? (
+                    // iOS: an inline spinner that stays mounted while the wheel moves
+                    // (display="default" would unmount mid-scroll), committed via Done.
+                    <View style={[styles.iosPicker, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder }]}>
+                        <DateTimePicker
+                            value={parsed}
+                            mode="time"
+                            display="spinner"
+                            is24Hour={true}
+                            onChange={(_event, date) => {
+                                if (date) {
+                                    const timeStr = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+                                    onChange(timeStr);
+                                }
+                            }}
+                        />
+                        <TouchableOpacity
+                            onPress={() => {
+                                lightHaptic();
+                                setOpen(false);
+                            }}
+                            style={styles.iosPickerDone}
+                        >
+                            <Text style={{ color: theme.colors.primary, fontWeight: '600', fontSize: 16 }}>Done</Text>
+                        </TouchableOpacity>
+                    </View>
+                ) : (
+                    <DateTimePicker
+                        value={parsed}
+                        mode="time"
+                        display="default"
+                        is24Hour={true}
+                        onChange={(event, date) => {
+                            setOpen(false);
+                            if (event.type === 'set' && date) {
+                                const timeStr = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+                                onChange(timeStr);
+                            }
+                        }}
+                    />
+                )
             ) : null}
         </View>
     );
@@ -506,5 +562,16 @@ const styles = StyleSheet.create({
         paddingVertical: 14,
         paddingHorizontal: spacing.sm,
         borderBottomWidth: StyleSheet.hairlineWidth,
+    },
+    iosPicker: {
+        marginTop: spacing.sm,
+        borderWidth: 1,
+        borderRadius: radius.md,
+        overflow: 'hidden',
+    },
+    iosPickerDone: {
+        alignItems: 'flex-end',
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
     },
 });

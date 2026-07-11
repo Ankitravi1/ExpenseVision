@@ -1,4 +1,4 @@
-import React, { useState, useContext, useMemo, useRef } from 'react';
+import React, { useState, useContext, useMemo, useRef, useEffect } from 'react';
 import {
     PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
     AreaChart, Area, XAxis, YAxis, CartesianGrid, BarChart, Bar, Legend,
@@ -6,7 +6,8 @@ import {
 import { Card } from '../components/Card';
 import { Icon } from '../components/Icon';
 import { AppContext } from '../App';
-import { formatCurrency } from '../utils/currency';
+import { formatCurrency, getCurrencySymbol } from '../utils/currency';
+import { useToast } from '../context/ToastContext';
 import { ImportTransactionsModal } from '../components/ImportTransactionsModal';
 import { formatTransactionDate } from '../utils/date';
 import { Account, Transaction } from '../types';
@@ -23,6 +24,14 @@ const getLocalDateString = (date: Date) => {
 
 const parseIsoDate = (iso: string) => {
     const [y, m, d] = iso.split('-').map(Number);
+    return new Date(y, m - 1, d);
+};
+
+// Parse a YYYY-MM-DD string as LOCAL midnight (not UTC), so period math is
+// timezone-safe. new Date("YYYY-MM-DD") would parse as UTC and shift the day
+// in negative-offset timezones.
+const parseLocalDate = (s: string) => {
+    const [y, m, d] = s.substring(0, 10).split('-').map(Number);
     return new Date(y, m - 1, d);
 };
 
@@ -44,23 +53,6 @@ const eachDayInRange = (start: string, end: string): string[] => {
         guard++;
     }
     return days;
-};
-
-const monthsInRange = (start: string, end: string): { year: number; month: number; key: string }[] => {
-    if (!start || !end) return [];
-    const result: { year: number; month: number; key: string }[] = [];
-    let y = Number(start.slice(0, 4));
-    let m = Number(start.slice(5, 7));
-    const endY = Number(end.slice(0, 4));
-    const endM = Number(end.slice(5, 7));
-    let guard = 0;
-    while ((y < endY || (y === endY && m <= endM)) && guard < 24) {
-        result.push({ year: y, month: m, key: `${y}-${String(m).padStart(2, '0')}` });
-        m += 1;
-        if (m > 12) { m = 1; y += 1; }
-        guard++;
-    }
-    return result;
 };
 
 type CategorySlice = { name: string; value: number; icon: string };
@@ -293,13 +285,14 @@ const MoneyCalendar: React.FC<{
     const monthLabel = activeDate.toLocaleString('default', { month: 'long', year: 'numeric' });
 
     // Format amounts compactly
+    const symbol = getCurrencySymbol(currency);
     const formatCompact = (val: number) => {
         if (val <= 0) return '';
         // E.g. format to rounded whole number or decimal k
         if (val >= 1000) {
-            return `₹${(val / 1000).toFixed(1).replace('.0', '')}k`;
+            return `${symbol}${(val / 1000).toFixed(1).replace('.0', '')}k`;
         }
-        return `₹${Math.round(val)}`;
+        return `${symbol}${Math.round(val)}`;
     };
 
     const max = Math.max(1, ...(Object.values(dayTotals) as number[]));
@@ -543,6 +536,7 @@ const AccountOverviewModal: React.FC<{
 export const Reports: React.FC = () => {
     const context = useContext(AppContext)!;
     const { transactions, categories, budgets, currency, accounts, theme } = context;
+    const { showToast } = useToast();
     const startDateRef = useRef<HTMLInputElement>(null);
     const endDateRef = useRef<HTMLInputElement>(null);
 
@@ -563,11 +557,16 @@ export const Reports: React.FC = () => {
     // Section collapse states
     const [isOverviewExpanded, setIsOverviewExpanded] = useState<boolean>(true);
     const [isFlowExpanded, setIsFlowExpanded] = useState<boolean>(true);
-    const [isCalendarExpanded, setIsCalendarExpanded] = useState<boolean>(true);
     const [isAccountsExpanded, setIsAccountsExpanded] = useState<boolean>(true);
 
     // Calendar navigation month offset
     const [calendarMonthOffset, setCalendarMonthOffset] = useState<number>(0);
+
+    // Reset the calendar's month offset whenever the report period changes, so
+    // the Activity Grid never points at a month outside the selected range.
+    useEffect(() => {
+        setCalendarMonthOffset(0);
+    }, [startDate, endDate]);
 
 
     const updateDatesForViewMode = (mode: string) => {
@@ -612,9 +611,9 @@ export const Reports: React.FC = () => {
     const handleShiftPeriod = (direction: -1 | 1) => {
         if (viewMode === 'Custom') return;
 
-        const currentStart = new Date(startDate);
-        let newStart = new Date(startDate);
-        let newEnd = new Date(endDate);
+        const currentStart = parseLocalDate(startDate);
+        let newStart = parseLocalDate(startDate);
+        let newEnd = parseLocalDate(endDate);
 
         switch (viewMode) {
             case 'Daily':
@@ -796,8 +795,8 @@ export const Reports: React.FC = () => {
     const selectedStats = accountStats.find(s => s.account.id === selectedAccountId) || null;
 
     const burnRateMetrics = useMemo(() => {
-        const startMs = new Date(startDate).getTime();
-        const endMs = new Date(endDate).getTime();
+        const startMs = parseLocalDate(startDate).getTime();
+        const endMs = parseLocalDate(endDate).getTime();
         const days = Math.max(1, Math.round((endMs - startMs) / (1000 * 60 * 60 * 24)) + 1);
         const dailyBurn = totalExpenses / days;
         const topCategoryName = expenseData[0]?.name || 'None';
@@ -814,10 +813,37 @@ export const Reports: React.FC = () => {
     }, [totalExpenses, totalIncome, expenseData, budgets, startDate, endDate, dateFilteredTransactions]);
 
     const insights = useMemo(() => {
-        const prevDate = new Date(new Date(startDate).getFullYear(), new Date(startDate).getMonth() - 1, 1);
-        const prevMonthStr = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
-        const prevMonthLabel = prevDate.toLocaleString('default', { month: 'long' });
-        const prevTransactions = transactions.filter(t => t.date.startsWith(prevMonthStr) && t.type === 'expense');
+        const start = parseLocalDate(startDate);
+        const end = parseLocalDate(endDate);
+
+        // Comparison baseline: the equivalent period immediately preceding the
+        // selected range. For Monthly we keep previous-calendar-month semantics;
+        // for every other view we compare against a range of the same length
+        // ending the day before startDate (timezone-safe, local dates).
+        let prevStart: string;
+        let prevEnd: string;
+        let comparisonLabel: string;
+        if (viewMode === 'Monthly') {
+            const prevDate = new Date(start.getFullYear(), start.getMonth() - 1, 1);
+            const prevMonthEnd = new Date(start.getFullYear(), start.getMonth(), 0);
+            prevStart = getLocalDateString(prevDate);
+            prevEnd = getLocalDateString(prevMonthEnd);
+            comparisonLabel = prevDate.toLocaleString('default', { month: 'long' });
+        } else {
+            const msPerDay = 1000 * 60 * 60 * 24;
+            const lengthDays = Math.max(1, Math.round((end.getTime() - start.getTime()) / msPerDay) + 1);
+            const prevEndDate = new Date(start.getFullYear(), start.getMonth(), start.getDate() - 1);
+            const prevStartDate = new Date(prevEndDate.getFullYear(), prevEndDate.getMonth(), prevEndDate.getDate() - (lengthDays - 1));
+            prevStart = getLocalDateString(prevStartDate);
+            prevEnd = getLocalDateString(prevEndDate);
+            comparisonLabel = `previous ${lengthDays} day${lengthDays === 1 ? '' : 's'}`;
+        }
+
+        const prevTransactions = transactions.filter(t => {
+            if (t.type !== 'expense') return false;
+            const d = t.date.split('T')[0];
+            return d >= prevStart && d <= prevEnd;
+        });
         const prevTotal = prevTransactions.reduce((sum, t) => sum + t.amount, 0);
 
         const totalDeltaPct = prevTotal > 0 ? ((totalExpenses - prevTotal) / prevTotal) * 100 : null;
@@ -839,24 +865,42 @@ export const Reports: React.FC = () => {
             }
         }
 
-        const isCurrentMonth = new Date(startDate).getMonth() === new Date().getMonth();
+        const now = new Date();
+        const isCurrentMonth = start.getMonth() === now.getMonth() && start.getFullYear() === now.getFullYear();
         let pace: { projected: number; totalBudget: number } | null = null;
         if (isCurrentMonth) {
-            const totalBudget = budgets
-                .filter(b => !b.month || b.month === startDate.substring(0, 7))
+            // Dedupe budgets so a monthly override replaces the recurring budget
+            // for the same category (mirrors Budgets.tsx), avoiding double-counting.
+            const monthStr = startDate.substring(0, 7);
+            const monthlyBudgets = budgets.filter(b => b.month === monthStr);
+            const repeatingBudgets = budgets.filter(b => !b.month && !monthlyBudgets.some(mb => mb.categoryId === b.categoryId));
+            const totalBudget = [...monthlyBudgets, ...repeatingBudgets]
                 .reduce((sum, b) => sum + (b.effectiveAmount ?? b.amount), 0);
-            if (totalBudget > 0 && new Date().getDate() > 0) {
-                const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
-                pace = { projected: (totalExpenses / new Date().getDate()) * daysInMonth, totalBudget };
+            if (totalBudget > 0 && now.getDate() > 0) {
+                const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+                pace = { projected: (totalExpenses / now.getDate()) * daysInMonth, totalBudget };
             }
         }
 
-        return { totalDeltaPct, prevTotal, prevMonthLabel, biggestChange, pace };
-    }, [startDate, totalExpenses, transactions, dateFilteredTransactions, categories, budgets]);
+        return { totalDeltaPct, prevTotal, comparisonLabel, biggestChange, pace };
+    }, [startDate, endDate, viewMode, totalExpenses, transactions, dateFilteredTransactions, categories, budgets]);
 
     const hasInsights = insights.totalDeltaPct !== null || (insights.biggestChange && insights.biggestChange.delta !== 0) || insights.pace;
 
+    // RFC 4180-style field escaping: double any embedded quote, and wrap the
+    // field in quotes when it contains a comma, quote, or newline.
+    const csvField = (value: unknown): string => {
+        const str = value == null ? '' : String(value);
+        const escaped = str.replace(/"/g, '""');
+        return /[",\n\r]/.test(str) ? `"${escaped}"` : escaped;
+    };
+
     const exportToCSV = () => {
+        if (dateFilteredTransactions.length === 0) {
+            showToast('No transactions in this period to export', 'info');
+            return;
+        }
+
         const headers = ['Date', 'Time', 'Note', 'Amount', 'Account', 'Type', 'Category', 'Transfer To'];
         const rows = dateFilteredTransactions.map(transaction => {
             const category = categories.find(c => c.id === transaction.categoryId);
@@ -869,16 +913,16 @@ export const Reports: React.FC = () => {
             return [
                 formatTransactionDate(transaction.date),
                 timePart || '',
-                `"${transaction.note.replace(/"/g, '""')}"`,
+                transaction.note,
                 transaction.amount.toFixed(2),
                 account?.name || '',
                 transaction.type,
                 category?.name || (transaction.type === 'transfer' ? 'Transfer' : ''),
                 transferAccount?.name || '',
-            ];
+            ].map(csvField);
         });
 
-        const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+        const csvContent = [headers.map(csvField).join(','), ...rows.map(row => row.join(','))].join('\n');
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
         const url = URL.createObjectURL(blob);
@@ -1024,7 +1068,7 @@ export const Reports: React.FC = () => {
 
             {/* Stats row */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <Card className="flex items-center p-6 bg-white dark:bg-gray-800 border border-gray-150 dark:border-gray-700/60 shadow-sm rounded-xl">
+                <Card className="flex items-center p-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700/60 shadow-sm rounded-xl">
                     <div className="w-12 h-12 rounded-xl bg-rose-50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/30 flex items-center justify-center mr-4">
                         <Icon name="TrendingDown" className="text-danger dark:text-rose-400" size={24} />
                     </div>
@@ -1036,7 +1080,7 @@ export const Reports: React.FC = () => {
                     </div>
                 </Card>
 
-                <Card className="flex items-center p-6 bg-white dark:bg-gray-800 border border-gray-150 dark:border-gray-700/60 shadow-sm rounded-xl">
+                <Card className="flex items-center p-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700/60 shadow-sm rounded-xl">
                     <div className="w-12 h-12 rounded-xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 flex items-center justify-center mr-4">
                         <Icon name="TrendingUp" className="text-success dark:text-emerald-400" size={24} />
                     </div>
@@ -1048,7 +1092,7 @@ export const Reports: React.FC = () => {
                     </div>
                 </Card>
 
-                <Card className="flex items-center p-6 bg-white dark:bg-gray-800 border border-gray-150 dark:border-gray-700/60 shadow-sm rounded-xl">
+                <Card className="flex items-center p-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700/60 shadow-sm rounded-xl">
                     <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-indigo-900/30 text-primary dark:text-indigo-300 flex items-center justify-center mr-4">
                         <Icon name="CircleDollarSign" size={24} />
                     </div>
@@ -1067,7 +1111,7 @@ export const Reports: React.FC = () => {
             <div className="space-y-6">
                 
                 {/* 1. Overview Section */}
-                <Card className="p-0 overflow-hidden border border-gray-150 dark:border-gray-800 shadow-sm">
+                <Card className="p-0 overflow-hidden border border-gray-200 dark:border-gray-800 shadow-sm">
                     <button
                         type="button"
                         onClick={() => setIsOverviewExpanded(!isOverviewExpanded)}
@@ -1110,14 +1154,14 @@ export const Reports: React.FC = () => {
                 </Card>
 
                 {/* 2. Flow & Activity Section */}
-                <Card className="p-0 overflow-hidden border border-gray-150 dark:border-gray-800 shadow-sm">
+                <Card className="p-0 overflow-hidden border border-gray-200 dark:border-gray-800 shadow-sm">
                     <button
                         type="button"
                         onClick={() => setIsFlowExpanded(!isFlowExpanded)}
                         className="w-full flex items-center justify-between p-5 text-left border-none focus:outline-none bg-transparent hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors"
                     >
                         <div>
-                            <h3 className="text-lg font-black text-gray-955 dark:text-white uppercase tracking-wider">Transaction Flow & Activity</h3>
+                            <h3 className="text-lg font-black text-gray-900 dark:text-white uppercase tracking-wider">Transaction Flow & Activity</h3>
                             <p className="text-xs text-gray-400 font-semibold mt-0.5">Combined view of transaction trends and calendar activity</p>
                         </div>
                         <Icon name={isFlowExpanded ? 'ChevronUp' : 'ChevronDown'} size={20} className="text-gray-400" />
@@ -1185,14 +1229,14 @@ export const Reports: React.FC = () => {
                 </Card>
 
                 {/* 3. Accounts Summary Section */}
-                <Card className="p-0 overflow-hidden border border-gray-150 dark:border-gray-800 shadow-sm">
+                <Card className="p-0 overflow-hidden border border-gray-200 dark:border-gray-800 shadow-sm">
                     <button
                         type="button"
                         onClick={() => setIsAccountsExpanded(!isAccountsExpanded)}
                         className="w-full flex items-center justify-between p-5 text-left border-none focus:outline-none bg-transparent hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors"
                     >
                         <div>
-                            <h3 className="text-lg font-black text-gray-955 dark:text-white uppercase tracking-wider">Accounts Summary</h3>
+                            <h3 className="text-lg font-black text-gray-900 dark:text-white uppercase tracking-wider">Accounts Summary</h3>
                             <p className="text-xs text-gray-400 font-semibold mt-0.5">Overview of initial/current balances, income, expenses & transfers</p>
                         </div>
                         <Icon name={isAccountsExpanded ? 'ChevronUp' : 'ChevronDown'} size={20} className="text-gray-400" />
@@ -1337,8 +1381,8 @@ export const Reports: React.FC = () => {
                     )}
                 </Card>
 
-                {/* 5. AI & Budget Insights Section (Collapsed by default, below Accounts) */}
-                <Card className="p-0 overflow-hidden border border-gray-150 dark:border-gray-800 shadow-sm">
+                {/* 4. AI & Budget Insights Section (Collapsed by default, below Accounts) */}
+                <Card className="p-0 overflow-hidden border border-gray-200 dark:border-gray-800 shadow-sm">
                     <button
                         type="button"
                         onClick={() => setShowInsights(!showInsights)}
@@ -1347,7 +1391,7 @@ export const Reports: React.FC = () => {
                         <div className="flex items-center gap-2">
                             <Icon name="Sparkles" size={18} className="text-amber-500 animate-pulse" />
                             <div>
-                                <h3 className="text-lg font-black text-gray-905 dark:text-white uppercase tracking-wider">AI & Budget Insights</h3>
+                                <h3 className="text-lg font-black text-gray-900 dark:text-white uppercase tracking-wider">AI & Budget Insights</h3>
                                 <p className="text-xs text-gray-400 font-semibold mt-0.5">Key budget metrics and automated financial insights</p>
                             </div>
                         </div>
@@ -1356,28 +1400,28 @@ export const Reports: React.FC = () => {
                     {showInsights && (
                         <div className="p-6 border-t border-gray-100 dark:border-gray-700/60 bg-white dark:bg-gray-800 space-y-6">
                             {/* The 4 clean borderless metrics */}
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 divide-y md:divide-y-0 md:divide-x divide-gray-150 dark:divide-gray-750">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 divide-y md:divide-y-0 md:divide-x divide-gray-200 dark:divide-gray-700">
                                 <div className="flex flex-col justify-between py-2">
-                                    <span className="text-[10px] font-bold text-gray-450 dark:text-gray-500 uppercase tracking-wider">Daily Burn Rate</span>
+                                    <span className="text-[10px] font-bold text-gray-500 dark:text-gray-500 uppercase tracking-wider">Daily Burn Rate</span>
                                     <p className="text-lg font-black text-gray-900 dark:text-white mt-1.5 tabular-nums">
                                         {formatCurrency(burnRateMetrics.dailyBurn, currency)}
                                         <span className="text-xs font-normal text-gray-400">/day</span>
                                     </p>
                                 </div>
                                 <div className="flex flex-col justify-between py-2 pt-4 md:pt-2 md:pl-6">
-                                    <span className="text-[10px] font-bold text-gray-450 dark:text-gray-500 uppercase tracking-wider">Top Category</span>
+                                    <span className="text-[10px] font-bold text-gray-500 dark:text-gray-500 uppercase tracking-wider">Top Category</span>
                                     <p className="text-lg font-black text-gray-900 dark:text-white mt-1.5 truncate" title={burnRateMetrics.topCategoryName}>
                                         {burnRateMetrics.topCategoryName}
                                     </p>
                                 </div>
                                 <div className="flex flex-col justify-between py-2 pt-4 md:pt-2 md:pl-6">
-                                    <span className="text-[10px] font-bold text-gray-450 dark:text-gray-500 uppercase tracking-wider">Savings Rate</span>
+                                    <span className="text-[10px] font-bold text-gray-500 dark:text-gray-500 uppercase tracking-wider">Savings Rate</span>
                                     <p className="text-lg font-black text-gray-900 dark:text-white mt-1.5">
                                         {burnRateMetrics.savingsRate.toFixed(1)}%
                                     </p>
                                 </div>
                                 <div className="flex flex-col justify-between py-2 pt-4 md:pt-2 md:pl-6">
-                                    <span className="text-[10px] font-bold text-gray-450 dark:text-gray-500 uppercase tracking-wider">Unbudgeted Spent</span>
+                                    <span className="text-[10px] font-bold text-gray-500 dark:text-gray-500 uppercase tracking-wider">Unbudgeted Spent</span>
                                     <p className="text-lg font-black text-gray-900 dark:text-white mt-1.5">
                                         {formatCurrency(burnRateMetrics.unbudgetedSpent, currency)}
                                     </p>
@@ -1395,7 +1439,7 @@ export const Reports: React.FC = () => {
                                                 className={insights.totalDeltaPct >= 0 ? 'text-danger mt-0.5' : 'text-success mt-0.5'}
                                             />
                                             <span>
-                                                Spending is <strong>{Math.abs(insights.totalDeltaPct).toFixed(0)}% {insights.totalDeltaPct >= 0 ? 'higher' : 'lower'}</strong> than {insights.prevMonthLabel} ({formatCurrency(insights.prevTotal, currency)})
+                                                Spending is <strong>{Math.abs(insights.totalDeltaPct).toFixed(0)}% {insights.totalDeltaPct >= 0 ? 'higher' : 'lower'}</strong> than {insights.comparisonLabel} ({formatCurrency(insights.prevTotal, currency)})
                                             </span>
                                         </div>
                                     )}
@@ -1403,7 +1447,7 @@ export const Reports: React.FC = () => {
                                         <div className="flex items-start gap-2.5">
                                             <Icon name="ArrowLeftRight" size={18} className="text-primary mt-0.5" />
                                             <span>
-                                                Biggest change: <strong>{insights.biggestChange.name}</strong> ({insights.biggestChange.delta > 0 ? '+' : '−'}{formatCurrency(Math.abs(insights.biggestChange.delta), currency)} vs last month)
+                                                Biggest change: <strong>{insights.biggestChange.name}</strong> ({insights.biggestChange.delta > 0 ? '+' : '−'}{formatCurrency(Math.abs(insights.biggestChange.delta), currency)} vs {insights.comparisonLabel})
                                             </span>
                                         </div>
                                     )}

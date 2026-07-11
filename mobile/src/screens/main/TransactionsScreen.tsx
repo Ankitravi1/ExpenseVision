@@ -7,10 +7,11 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { EmptyState, ChipSelector, Card, lightHaptic, warningHaptic } from '../../components/ui';
+import { EmptyState, ChipSelector, Card, DateField, lightHaptic, warningHaptic } from '../../components/ui';
 import { CategoryIcon } from '../../components/CategoryIcon';
 import { TransactionForm } from '../../components/TransactionForm';
 import { ScreenHeader } from '../../components/ScreenHeader';
+import { apiFetch } from '../../services/api';
 import { formatCurrency } from '../../utils/currency';
 import { isoDateToDisplay } from '../../utils/date';
 import { spacing, radius } from '../../theme';
@@ -20,13 +21,24 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
     UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
+type ViewMode = 'Daily' | 'Weekly' | 'Monthly' | '3 Month' | 'Yearly' | 'Custom';
+
 const VIEW_MODE_OPTIONS = [
     { value: 'Daily', label: 'Daily' },
     { value: 'Weekly', label: 'Weekly' },
     { value: 'Monthly', label: 'Monthly' },
     { value: '3 Month', label: '3 Months' },
     { value: 'Yearly', label: 'Yearly' },
+    { value: 'Custom', label: 'Custom' },
 ];
+
+// Format a Date as YYYY-MM-DD in local time (never use toISOString — that shifts by TZ).
+const formatIsoDate = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+};
 
 export default function TransactionsScreen() {
     const navigation = useNavigation();
@@ -37,12 +49,28 @@ export default function TransactionsScreen() {
     const [currentDate, setCurrentDate] = useState(new Date());
     const [search, setSearch] = useState('');
     const [typeFilter, setTypeFilter] = useState('all');
-    const [viewMode, setViewMode] = useState<'Daily' | 'Weekly' | 'Monthly' | '3 Month' | 'Yearly'>('Monthly');
+    const [viewMode, setViewMode] = useState<ViewMode>('Monthly');
     const [carryOver, setCarryOver] = useState(true);
+    const [applyFiltersToStats, setApplyFiltersToStats] = useState(false);
     const [isFilterCollapsed, setIsFilterCollapsed] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [editing, setEditing] = useState<Transaction | null>(null);
     const currency = user?.currency || 'INR';
+
+    // Custom range dates (YYYY-MM-DD). Mirror the derived range while not in Custom
+    // mode so the From/To fields always show meaningful values; editing either one
+    // switches the view to Custom.
+    const [customStart, setCustomStart] = useState(() => formatIsoDate(new Date(new Date().getFullYear(), new Date().getMonth(), 1)));
+    const [customEnd, setCustomEnd] = useState(() => formatIsoDate(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)));
+
+    // Amount range filter: limits rows of the selected type to <= limit; rows of
+    // other types stay visible. Applied instantly.
+    const [amountType, setAmountType] = useState<'expense' | 'income'>('expense');
+    const [amountLimit, setAmountLimit] = useState('');
+
+    // Bulk selection
+    const [selectionMode, setSelectionMode] = useState(false);
+    const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
     // Open form when navigated with openForm param (from FAB press)
     useEffect(() => {
@@ -54,6 +82,7 @@ export default function TransactionsScreen() {
     }, [route.params, navigation]);
 
     const shiftDate = (direction: -1 | 1) => {
+        if (viewMode === 'Custom') return;
         const next = new Date(currentDate);
         if (viewMode === 'Daily') {
             next.setDate(next.getDate() + direction);
@@ -61,14 +90,23 @@ export default function TransactionsScreen() {
             next.setDate(next.getDate() + direction * 7);
         } else if (viewMode === 'Yearly') {
             next.setFullYear(next.getFullYear() + direction);
+        } else if (viewMode === '3 Month') {
+            // Anchor to day 1 before month arithmetic so we never overflow into the
+            // wrong month, then jump 3 whole calendar months.
+            next.setDate(1);
+            next.setMonth(next.getMonth() + direction * 3);
         } else {
+            // Monthly
+            next.setDate(1);
             next.setMonth(next.getMonth() + direction);
         }
         setCurrentDate(next);
     };
 
     const getPeriodLabel = () => {
-        if (viewMode === 'Daily') {
+        if (viewMode === 'Custom') {
+            return `${isoDateToDisplay(range.start)} – ${isoDateToDisplay(range.end)}`;
+        } else if (viewMode === 'Daily') {
             return currentDate.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
         } else if (viewMode === 'Weekly') {
             const start = new Date(currentDate);
@@ -76,6 +114,15 @@ export default function TransactionsScreen() {
             const end = new Date(start);
             end.setDate(start.getDate() + 6);
             return `${start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} - ${end.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+        } else if (viewMode === '3 Month') {
+            const startM = new Date(currentDate.getFullYear(), currentDate.getMonth() - 2, 1);
+            const endM = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+            const startLabel = startM.toLocaleDateString(undefined, { month: 'short' });
+            const endLabel = endM.toLocaleDateString(undefined, { month: 'short' });
+            if (startM.getFullYear() === endM.getFullYear()) {
+                return `${startLabel} – ${endLabel} ${endM.getFullYear()}`;
+            }
+            return `${startLabel} ${startM.getFullYear()} – ${endLabel} ${endM.getFullYear()}`;
         } else if (viewMode === 'Yearly') {
             return String(currentDate.getFullYear());
         } else {
@@ -84,12 +131,9 @@ export default function TransactionsScreen() {
     };
 
     const range = useMemo(() => {
-        const formatDate = (d: Date) => {
-            const y = d.getFullYear();
-            const m = String(d.getMonth() + 1).padStart(2, '0');
-            const day = String(d.getDate()).padStart(2, '0');
-            return `${y}-${m}-${day}`;
-        };
+        if (viewMode === 'Custom') {
+            return { start: customStart, end: customEnd };
+        }
 
         let start: Date;
         let end: Date;
@@ -110,6 +154,7 @@ export default function TransactionsScreen() {
                 end = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
                 break;
             case '3 Month':
+                // Span exactly 3 calendar months: 1st of first month → last day of third.
                 start = new Date(currentDate.getFullYear(), currentDate.getMonth() - 2, 1);
                 end = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
                 break;
@@ -123,14 +168,23 @@ export default function TransactionsScreen() {
         }
 
         return {
-            start: formatDate(start),
-            end: formatDate(end),
+            start: formatIsoDate(start),
+            end: formatIsoDate(end),
         };
-    }, [viewMode, currentDate]);
+    }, [viewMode, currentDate, customStart, customEnd]);
+
+    // Keep the From/To fields mirrored to the derived range whenever we are NOT in
+    // Custom mode. (In Custom mode the fields are the source of truth for the range.)
+    useEffect(() => {
+        if (viewMode !== 'Custom') {
+            setCustomStart(range.start);
+            setCustomEnd(range.end);
+        }
+    }, [range.start, range.end, viewMode]);
 
     const preRangeBalance = useMemo(() => {
         const accountsInitialBalanceSum = accounts.reduce((sum, acc) => sum + (acc.initialBalance ?? acc.balance ?? 0), 0);
-        const preTxs = transactions.filter(t => t.date < range.start);
+        const preTxs = transactions.filter(t => t.date.substring(0, 10) < range.start);
         let incomeAndTransfersIn = 0;
         let expenseAndTransfersOut = 0;
         for (const t of preTxs) {
@@ -146,22 +200,15 @@ export default function TransactionsScreen() {
         return incomeAndTransfersIn - expenseAndTransfersOut + accountsInitialBalanceSum;
     }, [transactions, accounts, range.start]);
 
-    const rangeStats = useMemo(() => {
-        const rangeTxs = transactions.filter(t => t.date >= range.start && t.date <= range.end);
-        const income = rangeTxs.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
-        const expense = rangeTxs.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
-        return { income, expense };
-    }, [transactions, range]);
-
-    const displayBalance = carryOver
-        ? preRangeBalance + rangeStats.income - rangeStats.expense
-        : rangeStats.income - rangeStats.expense;
-
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
+        const limit = amountLimit ? parseFloat(amountLimit) : NaN;
         return transactions.filter(t => {
             if (typeFilter !== 'all' && t.type !== typeFilter) return false;
-            if (t.date < range.start || t.date > range.end) return false;
+            const d = t.date.substring(0, 10);
+            if (d < range.start || d > range.end) return false;
+            // Amount range filter: only constrain rows of the selected type.
+            if (!isNaN(limit) && t.type === amountType && t.amount > limit) return false;
             if (!q) return true;
             const cat = categories.find(c => c.id === t.categoryId);
             const acc = accounts.find(a => a.id === t.accountId);
@@ -171,7 +218,26 @@ export default function TransactionsScreen() {
                 (acc?.name.toLowerCase().includes(q) ?? false)
             );
         });
-    }, [transactions, categories, accounts, search, typeFilter, range]);
+    }, [transactions, categories, accounts, search, typeFilter, range, amountType, amountLimit]);
+
+    // Date-only list for the stats when "Apply filters to stats" is off.
+    const dateRangeTxs = useMemo(() => {
+        return transactions.filter(t => {
+            const d = t.date.substring(0, 10);
+            return d >= range.start && d <= range.end;
+        });
+    }, [transactions, range]);
+
+    const rangeStats = useMemo(() => {
+        const source = applyFiltersToStats ? filtered : dateRangeTxs;
+        const income = source.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+        const expense = source.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+        return { income, expense };
+    }, [applyFiltersToStats, filtered, dateRangeTxs]);
+
+    const displayBalance = carryOver
+        ? preRangeBalance + rangeStats.income - rangeStats.expense
+        : rangeStats.income - rangeStats.expense;
 
     const dataToRender = useMemo(() => {
         const sorted = [...filtered].sort((a, b) => b.date.localeCompare(a.date));
@@ -179,7 +245,7 @@ export default function TransactionsScreen() {
         let currentMonthLabel = '';
 
         for (const t of sorted) {
-            const dateParts = t.date.split('-');
+            const dateParts = t.date.substring(0, 10).split('-');
             if (dateParts.length === 3) {
                 const y = parseInt(dateParts[0], 10);
                 const m = parseInt(dateParts[1], 10);
@@ -199,6 +265,68 @@ export default function TransactionsScreen() {
         }
         return items;
     }, [filtered]);
+
+    // Selection helpers -----------------------------------------------------
+    const visibleIds = useMemo(() => filtered.map(t => t.id), [filtered]);
+    const allSelected = visibleIds.length > 0 && visibleIds.every(id => selectedIds.includes(id));
+
+    const applySelection = (ids: string[]) => {
+        setSelectedIds(ids);
+        if (ids.length === 0) setSelectionMode(false);
+    };
+
+    const toggleSelect = (id: string) => {
+        applySelection(
+            selectedIds.includes(id) ? selectedIds.filter(x => x !== id) : [...selectedIds, id]
+        );
+    };
+
+    const toggleSelectAll = () => {
+        if (allSelected) {
+            applySelection([]);
+        } else {
+            setSelectedIds(visibleIds);
+        }
+    };
+
+    // Clear any selection whenever the visible set can change (date range or
+    // filters). Prevents deleting rows the user can no longer see.
+    useEffect(() => {
+        setSelectedIds([]);
+        setSelectionMode(false);
+    }, [range.start, range.end, typeFilter, search, amountType, amountLimit]);
+
+    const doBulkDelete = () => {
+        if (selectedIds.length === 0) return;
+        const ids = [...selectedIds];
+        warningHaptic();
+        Alert.alert(
+            'Delete transactions',
+            `Delete ${ids.length} selected transaction${ids.length === 1 ? '' : 's'}? Account balances will be adjusted. This cannot be undone.`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            const res = await apiFetch('/transactions/bulk-delete', {
+                                method: 'POST',
+                                body: JSON.stringify({ ids }),
+                            });
+                            if (!res.ok) throw new Error('Failed to delete transactions');
+                            setSelectedIds([]);
+                            setSelectionMode(false);
+                            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                            await refresh();
+                        } catch (err: any) {
+                            Alert.alert('Error', err?.message || 'Failed to delete transactions');
+                        }
+                    },
+                },
+            ]
+        );
+    };
 
     const doDelete = (t: Transaction) => {
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -229,6 +357,65 @@ export default function TransactionsScreen() {
         const cat = categories.find(c => c.id === t.categoryId);
         const acc = accounts.find(a => a.id === t.accountId);
         const isIncome = t.type === 'income';
+        const isSelected = selectedIds.includes(t.id);
+
+        const rowInner = (
+            <TouchableOpacity
+                onPress={() => {
+                    if (selectionMode) {
+                        lightHaptic();
+                        toggleSelect(t.id);
+                    } else {
+                        setEditing(t);
+                        setShowForm(true);
+                    }
+                }}
+                onLongPress={() => {
+                    if (!selectionMode) {
+                        warningHaptic();
+                        setSelectionMode(true);
+                        setSelectedIds([t.id]);
+                    }
+                }}
+                activeOpacity={0.7}
+                style={[
+                    styles.txRow,
+                    {
+                        backgroundColor: isSelected ? theme.colors.primaryLight : theme.colors.card,
+                        borderColor: isSelected ? theme.colors.primary : theme.colors.cardBorder,
+                    },
+                ]}
+            >
+                {selectionMode && (
+                    <MaterialCommunityIcons
+                        name={isSelected ? 'checkbox-marked' : 'checkbox-blank-outline'}
+                        size={22}
+                        color={isSelected ? theme.colors.primary : theme.colors.textTertiary}
+                        style={{ marginRight: spacing.sm }}
+                    />
+                )}
+                <CategoryIcon name={t.type === 'transfer' ? 'CreditCard' : cat?.icon} size={16} />
+                <View style={{ flex: 1, marginLeft: spacing.sm }}>
+                    <Text style={{ color: theme.colors.text, fontWeight: '600' }} numberOfLines={1}>{t.note}</Text>
+                    <Text style={{ color: theme.colors.textTertiary, fontSize: 12 }}>
+                        {isoDateToDisplay(t.date)} · {acc?.name || '—'}{cat ? ` · ${cat.name}` : ''}
+                    </Text>
+                </View>
+                <Text
+                    style={{
+                        fontWeight: '700',
+                        color: isIncome ? theme.colors.success : t.type === 'expense' ? theme.colors.danger : theme.colors.textSecondary,
+                    }}
+                >
+                    {isIncome ? '+' : t.type === 'expense' ? '-' : ''}{formatCurrency(t.amount, currency)}
+                </Text>
+            </TouchableOpacity>
+        );
+
+        // In selection mode, drop the swipe-to-delete gesture so it can't fight the
+        // tap-to-select interaction.
+        if (selectionMode) return rowInner;
+
         return (
             <Swipeable
                 onSwipeableWillOpen={() => lightHaptic()}
@@ -243,50 +430,51 @@ export default function TransactionsScreen() {
                 )}
                 overshootRight={false}
             >
-                <TouchableOpacity
-                    onPress={() => {
-                        setEditing(t);
-                        setShowForm(true);
-                    }}
-                    onLongPress={() => confirmDelete(t)}
-                    activeOpacity={0.7}
-                    style={[styles.txRow, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder }]}
-                >
-                    <CategoryIcon name={t.type === 'transfer' ? 'CreditCard' : cat?.icon} size={16} />
-                    <View style={{ flex: 1, marginLeft: spacing.sm }}>
-                        <Text style={{ color: theme.colors.text, fontWeight: '600' }} numberOfLines={1}>{t.note}</Text>
-                        <Text style={{ color: theme.colors.textTertiary, fontSize: 12 }}>
-                            {isoDateToDisplay(t.date)} · {acc?.name || '—'}{cat ? ` · ${cat.name}` : ''}
-                        </Text>
-                    </View>
-                    <Text
-                        style={{
-                            fontWeight: '700',
-                            color: isIncome ? theme.colors.success : t.type === 'expense' ? theme.colors.danger : theme.colors.textSecondary,
-                        }}
-                    >
-                        {isIncome ? '+' : t.type === 'expense' ? '-' : ''}{formatCurrency(t.amount, currency)}
-                    </Text>
-                </TouchableOpacity>
+                {rowInner}
             </Swipeable>
         );
     };
+
+    const filtersActive = !!(search || typeFilter !== 'all' || amountLimit);
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top']}>
             <ScreenHeader title="Transactions" />
 
-            {/* Month Swiper Navigator */}
-            <View style={[styles.periodNavigator, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder }]}>
-                <TouchableOpacity onPress={() => shiftDate(-1)} style={styles.navButton}>
-                    <MaterialCommunityIcons name="chevron-left" size={24} color={theme.colors.text} />
+            {/* Import button row */}
+            <View style={styles.actionsRow}>
+                <TouchableOpacity
+                    onPress={() => {
+                        lightHaptic();
+                        navigation.navigate('ImportTransactions' as never);
+                    }}
+                    style={[styles.importButton, { backgroundColor: theme.colors.primary }]}
+                    activeOpacity={0.85}
+                >
+                    <MaterialCommunityIcons name="upload" size={16} color="#fff" />
+                    <Text style={styles.importButtonText}>Import</Text>
                 </TouchableOpacity>
-                <Text style={[styles.periodText, { color: theme.colors.text }]}>
+            </View>
+
+            {/* Period Swiper Navigator */}
+            <View style={[styles.periodNavigator, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder }]}>
+                {viewMode !== 'Custom' ? (
+                    <TouchableOpacity onPress={() => shiftDate(-1)} style={styles.navButton}>
+                        <MaterialCommunityIcons name="chevron-left" size={24} color={theme.colors.text} />
+                    </TouchableOpacity>
+                ) : (
+                    <View style={styles.navButton} />
+                )}
+                <Text style={[styles.periodText, { color: theme.colors.text }]} numberOfLines={1}>
                     {getPeriodLabel()}
                 </Text>
-                <TouchableOpacity onPress={() => shiftDate(1)} style={styles.navButton}>
-                    <MaterialCommunityIcons name="chevron-right" size={24} color={theme.colors.text} />
-                </TouchableOpacity>
+                {viewMode !== 'Custom' ? (
+                    <TouchableOpacity onPress={() => shiftDate(1)} style={styles.navButton}>
+                        <MaterialCommunityIcons name="chevron-right" size={24} color={theme.colors.text} />
+                    </TouchableOpacity>
+                ) : (
+                    <View style={styles.navButton} />
+                )}
             </View>
 
             {/* Summary Banner */}
@@ -366,7 +554,84 @@ export default function TransactionsScreen() {
                             <ChipSelector
                                 options={VIEW_MODE_OPTIONS}
                                 value={viewMode}
-                                onChange={(val) => setViewMode(val as any)}
+                                onChange={(val) => setViewMode(val as ViewMode)}
+                            />
+                        </View>
+
+                        {/* From / To date fields. Editing either switches to Custom mode. */}
+                        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                            <View style={{ flex: 1 }}>
+                                <DateField
+                                    label="From"
+                                    value={customStart}
+                                    onChange={(iso) => {
+                                        setViewMode('Custom');
+                                        setCustomStart(iso);
+                                    }}
+                                />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <DateField
+                                    label="To"
+                                    value={customEnd}
+                                    onChange={(iso) => {
+                                        setViewMode('Custom');
+                                        setCustomEnd(iso);
+                                    }}
+                                />
+                            </View>
+                        </View>
+
+                        {/* Amount range filter */}
+                        <Text style={{ color: theme.colors.textSecondary, fontSize: 12, fontWeight: '600', marginBottom: 4 }}>Amount Filter</Text>
+                        <View style={{ marginBottom: spacing.sm }}>
+                            <View style={[styles.segment, { borderColor: theme.colors.inputBorder, backgroundColor: theme.colors.inputBg }]}>
+                                {(['expense', 'income'] as const).map(opt => {
+                                    const active = amountType === opt;
+                                    return (
+                                        <TouchableOpacity
+                                            key={opt}
+                                            onPress={() => setAmountType(opt)}
+                                            style={[
+                                                styles.segmentItem,
+                                                active && { backgroundColor: opt === 'expense' ? theme.colors.danger : theme.colors.success },
+                                            ]}
+                                        >
+                                            <Text style={{ color: active ? '#fff' : theme.colors.textSecondary, fontWeight: '600', fontSize: 13 }}>
+                                                {opt === 'expense' ? 'Expense' : 'Income'}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </View>
+                            <View style={[styles.searchBox, { backgroundColor: theme.colors.inputBg, borderColor: theme.colors.inputBorder, marginBottom: 0, marginTop: spacing.sm }]}>
+                                <MaterialCommunityIcons name="arrow-collapse-down" size={18} color={theme.colors.textTertiary} />
+                                <TextInput
+                                    value={amountLimit}
+                                    onChangeText={(txt) => setAmountLimit(txt.replace(/[^0-9.]/g, ''))}
+                                    placeholder={`Show ${amountType} up to limit...`}
+                                    placeholderTextColor={theme.colors.textTertiary}
+                                    keyboardType="numeric"
+                                    style={[styles.searchInput, { color: theme.colors.text }]}
+                                />
+                                {amountLimit ? (
+                                    <TouchableOpacity onPress={() => setAmountLimit('')}>
+                                        <MaterialCommunityIcons name="close-circle" size={18} color={theme.colors.textTertiary} />
+                                    </TouchableOpacity>
+                                ) : null}
+                            </View>
+                        </View>
+
+                        {/* Apply filters to stats */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 }}>
+                            <View style={{ flex: 1, marginRight: spacing.sm }}>
+                                <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 13 }}>Apply filters to stats</Text>
+                                <Text style={{ color: theme.colors.textTertiary, fontSize: 10 }}>Reflect the active filters in the summary cards</Text>
+                            </View>
+                            <Switch
+                                value={applyFiltersToStats}
+                                onValueChange={setApplyFiltersToStats}
+                                trackColor={{ true: theme.colors.primary }}
                             />
                         </View>
 
@@ -390,16 +655,52 @@ export default function TransactionsScreen() {
                 data={dataToRender}
                 keyExtractor={item => item.id}
                 renderItem={renderItem}
-                contentContainerStyle={{ padding: spacing.md, paddingTop: 0, gap: spacing.sm }}
+                extraData={{ selectionMode, selectedIds }}
+                contentContainerStyle={{ padding: spacing.md, paddingTop: 0, paddingBottom: selectionMode ? 96 : spacing.md, gap: spacing.sm }}
                 refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refresh} tintColor={theme.colors.primary} />}
                 ListEmptyComponent={
                     <EmptyState
                         icon="swap-horizontal"
-                        title={search || typeFilter !== 'all' ? 'No matching transactions' : 'No transactions yet'}
-                        subtitle={search || typeFilter !== 'all' ? 'Try changing the search or filters' : 'Tap the + button at the bottom to add your first transaction. Tap to edit, swipe left to delete.'}
+                        title={filtersActive ? 'No matching transactions' : 'No transactions yet'}
+                        subtitle={filtersActive ? 'Try changing the search or filters' : 'Tap the + button at the bottom to add your first transaction. Tap to edit, swipe left to delete, long-press to select.'}
                     />
                 }
             />
+
+            {/* Bulk selection action bar */}
+            {selectionMode && (
+                <View style={[styles.selectionBar, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder }]}>
+                    <TouchableOpacity onPress={toggleSelectAll} style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }} activeOpacity={0.7}>
+                        <MaterialCommunityIcons
+                            name={allSelected ? 'checkbox-marked' : 'checkbox-blank-outline'}
+                            size={22}
+                            color={allSelected ? theme.colors.primary : theme.colors.textTertiary}
+                        />
+                        <Text style={{ color: theme.colors.text, fontWeight: '700', marginLeft: spacing.sm }}>
+                            {selectedIds.length} selected
+                        </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        onPress={() => {
+                            setSelectionMode(false);
+                            setSelectedIds([]);
+                        }}
+                        style={[styles.selectionActionBtn, { borderColor: theme.colors.cardBorder, borderWidth: 1 }]}
+                        activeOpacity={0.7}
+                    >
+                        <Text style={{ color: theme.colors.textSecondary, fontWeight: '600' }}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        onPress={doBulkDelete}
+                        disabled={selectedIds.length === 0}
+                        style={[styles.selectionActionBtn, { backgroundColor: theme.colors.danger, opacity: selectedIds.length === 0 ? 0.5 : 1 }]}
+                        activeOpacity={0.7}
+                    >
+                        <MaterialCommunityIcons name="trash-can-outline" size={16} color="#fff" />
+                        <Text style={{ color: '#fff', fontWeight: '700', marginLeft: 4 }}>Delete</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
 
             <TransactionForm
                 visible={showForm}
@@ -414,6 +715,27 @@ export default function TransactionsScreen() {
 }
 
 const styles = StyleSheet.create({
+    actionsRow: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        alignItems: 'center',
+        paddingHorizontal: spacing.md,
+        paddingTop: spacing.sm,
+        marginBottom: spacing.sm,
+    },
+    importButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: spacing.md,
+        paddingVertical: 8,
+        borderRadius: radius.md,
+    },
+    importButtonText: {
+        color: '#fff',
+        fontWeight: '700',
+        fontSize: 13,
+    },
     periodNavigator: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -427,11 +749,13 @@ const styles = StyleSheet.create({
     periodText: {
         fontSize: 15,
         fontWeight: 'bold',
-        width: 160,
+        flex: 1,
         textAlign: 'center',
     },
     navButton: {
         padding: 4,
+        width: 32,
+        alignItems: 'center',
     },
     collapseHeader: {
         flexDirection: 'row',
@@ -491,6 +815,20 @@ const styles = StyleSheet.create({
         paddingHorizontal: 8,
         fontSize: 15,
     },
+    segment: {
+        flexDirection: 'row',
+        borderWidth: 1,
+        borderRadius: radius.md,
+        padding: 3,
+        gap: 3,
+    },
+    segmentItem: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 8,
+        borderRadius: radius.sm,
+    },
     monthRow: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -512,5 +850,31 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         marginLeft: spacing.sm,
         gap: 2,
+    },
+    selectionBar: {
+        position: 'absolute',
+        left: spacing.md,
+        right: spacing.md,
+        bottom: spacing.md,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.sm,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+        borderRadius: radius.lg,
+        borderWidth: 1,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+        elevation: 6,
+    },
+    selectionActionBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: spacing.md,
+        paddingVertical: 8,
+        borderRadius: radius.md,
     },
 });

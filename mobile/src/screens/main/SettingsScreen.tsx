@@ -17,13 +17,11 @@ import { spacing } from '../../theme';
 import { Category, RecurringRule } from '../../types';
 import { apiFetch } from '../../services/api';
 
-import * as DocumentPicker from 'expo-document-picker';
 import * as LegacyFS from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AiProvider, AiSettings, defaultAiSettings, getAiSettings, saveAiSettings } from '../../services/aiSettings';
 
 export default function SettingsScreen() {
@@ -32,7 +30,6 @@ export default function SettingsScreen() {
     const { categories, recurring, deleteCategory, deleteRecurring, transactions, refresh } = useData();
     const { theme } = useTheme();
     const [exporting, setExporting] = useState(false);
-    const [importing, setImporting] = useState(false);
     const [showAiSettings, setShowAiSettings] = useState(false);
     const [aiSettings, setAiSettings] = useState<AiSettings>(defaultAiSettings);
     const [savingAiSettings, setSavingAiSettings] = useState(false);
@@ -43,8 +40,6 @@ export default function SettingsScreen() {
     const [clearBudgets, setClearBudgets] = useState(false);
     const [clearAccounts, setClearAccounts] = useState(false);
     const [notificationsEnabled, setNotificationsEnabled] = useState(!!user?.expoPushToken);
-    const [budgetAlertsEnabled, setBudgetAlertsEnabled] = useState(true);
-    const [emailReportsEnabled, setEmailReportsEnabled] = useState(false);
     const [dirty, setDirty] = useState(false);
     const [testingConnection, setTestingConnection] = useState(false);
 
@@ -56,22 +51,6 @@ export default function SettingsScreen() {
     useEffect(() => {
         getAiSettings().then(setAiSettings).catch(() => setAiSettings(defaultAiSettings));
         setNotificationsEnabled(!!user?.expoPushToken);
-
-        AsyncStorage.getItem('budget_alerts_enabled').then(val => {
-            if (val !== null) {
-                setBudgetAlertsEnabled(val === 'true');
-            } else {
-                setBudgetAlertsEnabled(true);
-            }
-        });
-
-        AsyncStorage.getItem('email_reports_enabled').then(val => {
-            if (val !== null) {
-                setEmailReportsEnabled(val === 'true');
-            } else {
-                setEmailReportsEnabled(false);
-            }
-        });
     }, [user]);
 
     const handleToggleNotifications = async (enabled: boolean) => {
@@ -100,7 +79,9 @@ export default function SettingsScreen() {
                     Alert.alert('Success', 'Push notifications enabled!');
                 } else {
                     Alert.alert('Expo Go/Simulator Limitation', 'System push notifications only work on real devices with standalone development builds. In-app notifications will still function.');
-                    // Still set to true locally for simulation
+                    // No push token can be registered here, so keep the toggle honest (off).
+                    setNotificationsEnabled(false);
+                    return;
                 }
             } else {
                 await apiFetch('/profile/expo-token', {
@@ -114,24 +95,6 @@ export default function SettingsScreen() {
             console.error('Failed to toggle notifications:', error);
             setNotificationsEnabled(!enabled);
             Alert.alert('Error', 'Failed to update notification settings.');
-        }
-    };
-
-    const handleToggleBudgetAlerts = async (enabled: boolean) => {
-        setBudgetAlertsEnabled(enabled);
-        try {
-            await AsyncStorage.setItem('budget_alerts_enabled', String(enabled));
-        } catch (error) {
-            console.error('Failed to save budget alerts setting:', error);
-        }
-    };
-
-    const handleToggleEmailReports = async (enabled: boolean) => {
-        setEmailReportsEnabled(enabled);
-        try {
-            await AsyncStorage.setItem('email_reports_enabled', String(enabled));
-        } catch (error) {
-            console.error('Failed to save email reports setting:', error);
         }
     };
 
@@ -296,46 +259,6 @@ export default function SettingsScreen() {
         }
     };
 
-    const handleImport = async () => {
-        try {
-            const res = await DocumentPicker.getDocumentAsync({
-                type: ['text/csv', 'application/csv', 'text/comma-separated-values'],
-                copyToCacheDirectory: true,
-            });
-            
-            if (res.canceled || !res.assets || res.assets.length === 0) return;
-            
-            setImporting(true);
-            const fileUri = res.assets[0].uri;
-            
-            const formData = new FormData();
-            formData.append('file', {
-                uri: fileUri,
-                name: res.assets[0].name || 'import.csv',
-                type: res.assets[0].mimeType || 'text/csv'
-            } as any);
-
-            const token = await require('../../services/storage').getToken();
-            const response = await fetch(`${require('../../config').API_URL}/api/transactions/import`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                },
-                body: formData
-            });
-
-            const result = await response.json();
-            if (!response.ok) throw new Error(result.error || 'Import failed');
-
-            Alert.alert('Success', `Imported ${result.count} transactions successfully.`);
-            refresh();
-        } catch (err: any) {
-            Alert.alert('Import failed', err.message || 'Could not import transactions');
-        } finally {
-            setImporting(false);
-        }
-    };
-
     const handleDownloadTemplate = async () => {
         try {
             const csvContent = 'Date,Note,Amount,Type,Category,Account,Transfer to Account\n' +
@@ -486,12 +409,12 @@ export default function SettingsScreen() {
                             <MaterialCommunityIcons name="alert-circle-outline" size={22} color={theme.colors.textSecondary} style={{ marginRight: 12 }} />
                             <View>
                                 <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 15 }}>Budget Alerts</Text>
-                                <Text style={{ color: theme.colors.textTertiary, fontSize: 11, marginTop: 2 }}>Get notified when approaching budgets</Text>
+                                <Text style={{ color: theme.colors.textTertiary, fontSize: 11, marginTop: 2 }}>Coming soon</Text>
                             </View>
                         </View>
                         <Switch
-                            value={budgetAlertsEnabled}
-                            onValueChange={handleToggleBudgetAlerts}
+                            value={false}
+                            disabled
                             trackColor={{ true: theme.colors.primary }}
                         />
                     </View>
@@ -501,12 +424,12 @@ export default function SettingsScreen() {
                             <MaterialCommunityIcons name="email-outline" size={22} color={theme.colors.textSecondary} style={{ marginRight: 12 }} />
                             <View>
                                 <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 15 }}>Email Reports</Text>
-                                <Text style={{ color: theme.colors.textTertiary, fontSize: 11, marginTop: 2 }}>Receive weekly and monthly summary reports</Text>
+                                <Text style={{ color: theme.colors.textTertiary, fontSize: 11, marginTop: 2 }}>Coming soon</Text>
                             </View>
                         </View>
                         <Switch
-                            value={emailReportsEnabled}
-                            onValueChange={handleToggleEmailReports}
+                            value={false}
+                            disabled
                             trackColor={{ true: theme.colors.primary }}
                         />
                     </View>
@@ -543,7 +466,6 @@ export default function SettingsScreen() {
 
                 <Card style={{ marginBottom: spacing.md, paddingVertical: 0 }}>
                     <Row icon="file-download-outline" label="Download CSV template" onPress={handleDownloadTemplate} />
-                    <Row icon="file-import-outline" label={importing ? 'Importing…' : 'Import transactions (CSV)'} onPress={importing ? undefined : handleImport} />
                     <Row icon="export-variant" label={exporting ? 'Exporting…' : 'Export transactions (CSV)'} onPress={exporting ? undefined : handleExport} />
                     <Row icon="delete-sweep" label="Clear / Reset Data" onPress={confirmClearData} danger />
                 </Card>

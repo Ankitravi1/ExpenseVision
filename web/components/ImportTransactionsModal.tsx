@@ -12,6 +12,38 @@ interface ImportTransactionsModalProps {
     onImportSuccess?: (minDate: string, maxDate: string) => void;
 }
 
+// Proper CSV line parser: handles quoted fields, doubled "" escapes,
+// commas inside quotes, and strips wrapping quotes.
+const parseCsvLine = (line: string): string[] => {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (inQuotes) {
+            if (char === '"') {
+                if (line[i + 1] === '"') {
+                    current += '"';
+                    i++;
+                } else {
+                    inQuotes = false;
+                }
+            } else {
+                current += char;
+            }
+        } else if (char === '"') {
+            inQuotes = true;
+        } else if (char === ',') {
+            result.push(current);
+            current = '';
+        } else {
+            current += char;
+        }
+    }
+    result.push(current);
+    return result.map(c => c.trim());
+};
+
 export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = ({ isOpen, onClose, onImportSuccess }) => {
     const context = useContext(AppContext);
     const { showToast } = useToast();
@@ -32,6 +64,11 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
     const [aiSettings, setAiSettings] = useState<any>(null);
     const [isSettingsLoading, setIsSettingsLoading] = useState(true);
 
+    // Inline password prompt state for password-protected PDFs
+    const [pdfPasswordPrompt, setPdfPasswordPrompt] = useState<{ attempt: number } | null>(null);
+    const [pdfPasswordInput, setPdfPasswordInput] = useState('');
+    const passwordResolverRef = useRef<((value: string | null) => void) | null>(null);
+
     useEffect(() => {
         api.fetch('/ai-settings')
             .then(r => r.ok ? r.json() : null)
@@ -45,6 +82,51 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
     if (!isOpen || !context) return null;
 
     const { accounts, categories, refreshData, transactions, currency } = context;
+
+    // Reset all parse/preview state (after a successful import, or on close).
+    const resetImportState = () => {
+        setMode('none');
+        setPreviewData([]);
+        setAiDrafts([]);
+        setSelectedAiDraftIndexes([]);
+        setFile(null);
+        setValidationErrors([]);
+        setAiText('');
+        setProcessStatus('');
+        setIsProcessing(false);
+        setPdfPasswordPrompt(null);
+        if (passwordResolverRef.current) {
+            passwordResolverRef.current(null);
+            passwordResolverRef.current = null;
+        }
+    };
+
+    const handleClose = () => {
+        resetImportState();
+        onClose();
+    };
+
+    const requestPdfPassword = (attempt: number): Promise<string | null> => {
+        return new Promise(resolve => {
+            passwordResolverRef.current = resolve;
+            setPdfPasswordInput('');
+            setPdfPasswordPrompt({ attempt });
+        });
+    };
+
+    const submitPdfPassword = () => {
+        const resolver = passwordResolverRef.current;
+        passwordResolverRef.current = null;
+        setPdfPasswordPrompt(null);
+        if (resolver) resolver(pdfPasswordInput);
+    };
+
+    const cancelPdfPassword = () => {
+        const resolver = passwordResolverRef.current;
+        passwordResolverRef.current = null;
+        setPdfPasswordPrompt(null);
+        if (resolver) resolver(null);
+    };
 
     // Load PDF.js dynamically from CDN for client-side text extraction
     const loadPdfJs = () => {
@@ -81,10 +163,7 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
                 break;
             } catch (err: any) {
                 if (err.name === 'PasswordException' || err.message.toLowerCase().includes('password')) {
-                    const promptMsg = attempts === 0 
-                        ? 'This PDF is password-protected. Please enter the password:'
-                        : 'Incorrect password. Please enter the password again:';
-                    const userPassword = prompt(promptMsg);
+                    const userPassword = await requestPdfPassword(attempts);
                     if (userPassword === null) {
                         throw new Error('Password extraction cancelled by user.');
                     }
@@ -144,8 +223,8 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
 
     const checkIsDuplicate = (row: any) => {
         const rowDate = row.date.substring(0, 10);
-        return transactions.some(t => 
-            t.date === rowDate &&
+        return transactions.some(t =>
+            t.date.substring(0, 10) === rowDate &&
             Math.abs(t.amount - row.amount) < 0.01 &&
             t.type === row.type &&
             t.note.toLowerCase().includes(row.note.toLowerCase())
@@ -185,7 +264,7 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
                 // Let's inspect headers to see if it matches standard template
                 const lines = csvText.split('\n').map(l => l.trim()).filter(Boolean);
                 if (lines.length > 0) {
-                    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+                    const headers = parseCsvLine(lines[0]).map(h => h.toLowerCase());
                     const getIndex = (name: string) => headers.findIndex(h => h.includes(name));
                     
                     const typeIdx = getIndex('type');
@@ -361,7 +440,7 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
         if (!text) return;
 
         const lines = text.split('\n');
-        const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+        const headers = parseCsvLine(lines[0]).map(h => h.toLowerCase());
 
         const parsed: any[] = [];
         const errors: string[] = [];
@@ -405,7 +484,7 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
             const line = lines[i].trim();
             if (!line) continue;
 
-            const cols = line.split(',').map(c => c.trim());
+            const cols = parseCsvLine(line);
 
             if (cols.length < headers.length) continue;
 
@@ -492,8 +571,10 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
                 onImportSuccess(minDate, maxDate);
             }
 
+            const count = previewData.length;
+            resetImportState();
             onClose();
-            alert(`Successfully imported ${previewData.length} transactions.`);
+            showToast(`Successfully imported ${count} transactions.`, 'success');
         } catch (error) {
             console.error('Import failed:', error);
             showToast('Failed to import transactions.', 'error');
@@ -532,8 +613,10 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
                 onImportSuccess(minDate, maxDate);
             }
 
+            const count = payload.length;
+            resetImportState();
             onClose();
-            alert(`Successfully imported ${payload.length} transactions using AI.`);
+            showToast(`Successfully imported ${count} transactions using AI.`, 'success');
         } catch (error) {
             console.error('AI Import failed:', error);
             showToast('Failed to import transactions.', 'error');
@@ -550,7 +633,7 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
 
     return (
         <>
-            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40" onClick={onClose} />
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40" onClick={handleClose} />
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
                 <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col pointer-events-auto transform transition-all border border-gray-200 dark:border-gray-700">
                     
@@ -560,7 +643,7 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
                             <Icon name="Upload" className="text-primary dark:text-indigo-400" />
                             <span>Import Transactions</span>
                         </h3>
-                        <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 transition-colors">
+                        <button onClick={handleClose} className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 transition-colors">
                             <Icon name="X" size={20} />
                         </button>
                     </div>
@@ -633,10 +716,56 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
                         )}
 
                         {/* File Processing Spinner */}
-                        {isProcessing && (
+                        {isProcessing && !pdfPasswordPrompt && (
                             <div className="py-16 flex flex-col items-center justify-center gap-4 text-center">
                                 <div className="w-10 h-10 border-4 border-primary/20 border-t-primary dark:border-indigo-400/20 dark:border-t-indigo-400 rounded-full animate-spin" />
                                 <p className="text-sm font-bold text-gray-700 dark:text-gray-300">{processStatus}</p>
+                            </div>
+                        )}
+
+                        {/* Inline password prompt for password-protected PDFs */}
+                        {pdfPasswordPrompt && (
+                            <div className="py-10 flex flex-col items-center justify-center gap-4 text-center">
+                                <div className="w-12 h-12 bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 rounded-full flex items-center justify-center">
+                                    <Icon name="Lock" size={24} />
+                                </div>
+                                <div>
+                                    <p className="text-sm font-bold text-gray-900 dark:text-white">
+                                        {pdfPasswordPrompt.attempt === 0
+                                            ? 'This PDF is password-protected'
+                                            : 'Incorrect password, please try again'}
+                                    </p>
+                                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                                        Attempt {pdfPasswordPrompt.attempt + 1} of 3
+                                    </p>
+                                </div>
+                                <div className="w-full max-w-xs flex flex-col gap-3">
+                                    <input
+                                        type="password"
+                                        autoFocus
+                                        value={pdfPasswordInput}
+                                        onChange={e => setPdfPasswordInput(e.target.value)}
+                                        onKeyDown={e => { if (e.key === 'Enter') submitPdfPassword(); }}
+                                        placeholder="Enter PDF password"
+                                        className="input text-sm w-full rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-3 outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500"
+                                    />
+                                    <div className="flex justify-center gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={cancelPdfPassword}
+                                            className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 font-bold hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-200 dark:border-gray-700"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={submitPdfPassword}
+                                            className="px-5 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold transition-all"
+                                        >
+                                            Unlock
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         )}
 
@@ -781,7 +910,7 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
                                                 const isSelected = selectedAiDraftIndexes.includes(i);
                                                 const isDup = checkIsDuplicate(row);
                                                 return (
-                                                    <tr key={i} className={`text-gray-700 dark:text-gray-350 hover:bg-gray-50/50 dark:hover:bg-gray-800/20 ${isDup ? 'opacity-65 bg-amber-50/10' : ''}`}>
+                                                    <tr key={i} className={`text-gray-700 dark:text-gray-400 hover:bg-gray-50/50 dark:hover:bg-gray-800/20 ${isDup ? 'opacity-65 bg-amber-50/10' : ''}`}>
                                                         <td className="px-4 py-2 text-center">
                                                             <input
                                                                 type="checkbox"
@@ -822,7 +951,7 @@ export const ImportTransactionsModal: React.FC<ImportTransactionsModalProps> = (
 
                     {/* Footer buttons */}
                     <div className="p-6 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3 bg-gray-50/30 dark:bg-gray-800/20 shrink-0">
-                        <button onClick={onClose} className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 font-bold hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-200 dark:border-gray-700">
+                        <button onClick={handleClose} className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 font-bold hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-200 dark:border-gray-700">
                             Cancel
                         </button>
                         

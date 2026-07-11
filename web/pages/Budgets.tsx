@@ -9,8 +9,8 @@ import { formatCurrency } from '../utils/currency';
 
 const PeriodNavigator: React.FC<{ date: Date; setDate: (date: Date) => void }> = ({ date, setDate }) => {
     const changeMonth = (offset: number) => {
-        const newDate = new Date(date);
-        newDate.setMonth(newDate.getMonth() + offset);
+        // Anchor to the 1st so month arithmetic never overflows (e.g. May 31 -> Jul 1).
+        const newDate = new Date(date.getFullYear(), date.getMonth() + offset, 1);
         setDate(newDate);
     };
 
@@ -267,7 +267,7 @@ export const Budgets: React.FC = () => {
                                     : 'bg-white hover:bg-amber-50/50 text-amber-600 dark:bg-gray-800 dark:text-amber-400 dark:hover:bg-amber-950/20 border border-gray-200 dark:border-gray-700'
                             }`}
                         >
-                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 dark:bg-amber-455"></span>
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 dark:bg-amber-400"></span>
                             Near Limit ({groupedBudgets.warning.length})
                         </button>
                         <button
@@ -275,10 +275,10 @@ export const Budgets: React.FC = () => {
                             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
                                 activeTab === 'Healthy'
                                     ? 'bg-emerald-500 text-white shadow-md'
-                                    : 'bg-white hover:bg-emerald-50/50 text-emerald-650 dark:bg-gray-800 dark:text-emerald-400 dark:hover:bg-emerald-950/20 border border-gray-200 dark:border-gray-700'
+                                    : 'bg-white hover:bg-emerald-50/50 text-emerald-600 dark:bg-gray-800 dark:text-emerald-400 dark:hover:bg-emerald-950/20 border border-gray-200 dark:border-gray-700'
                             }`}
                         >
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-455"></span>
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-500"></span>
                             On Track ({groupedBudgets.healthy.length})
                         </button>
                     </div>

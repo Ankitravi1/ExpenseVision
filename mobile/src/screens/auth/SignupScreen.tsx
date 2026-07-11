@@ -22,8 +22,8 @@ export default function SignupScreen({ navigation }: any) {
             setError('Fill in all fields.');
             return;
         }
-        if (password.length < 6) {
-            setError('Password must be at least 6 characters.');
+        if (password.length < 8) {
+            setError('Password must be at least 8 characters.');
             return;
         }
         if (password !== confirmPassword) {
@@ -62,7 +62,7 @@ export default function SignupScreen({ navigation }: any) {
 
             <Input label="Name" value={name} onChangeText={setName} placeholder="Your name" />
             <Input label="Email" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" placeholder="you@example.com" />
-            <Input label="Password" value={password} onChangeText={setPassword} secureTextEntry placeholder="Min 6 characters" />
+            <Input label="Password" value={password} onChangeText={setPassword} secureTextEntry placeholder="Min 8 characters" />
             <Input label="Confirm password" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry placeholder="Repeat password" />
 
             <Button title="Sign Up" onPress={handleSignup} loading={loading} />

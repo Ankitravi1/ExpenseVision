@@ -15,8 +15,10 @@ interface AppNotification {
 export const NotificationCenter: React.FC = () => {
     const [isOpen, setIsOpen] = useState(false);
     const [notifications, setNotifications] = useState<AppNotification[]>([]);
-    const [unreadCount, setUnreadCount] = useState(0);
     const dropdownRef = useRef<HTMLDivElement>(null);
+
+    // Derive unread count from notifications so it can't drift or double-decrement.
+    const unreadCount = notifications.filter(n => !n.read).length;
 
     const context = useContext(AppContext);
     const setActivePage = context?.setActivePage;
@@ -28,7 +30,6 @@ export const NotificationCenter: React.FC = () => {
             if (res.ok) {
                 const data = await res.json();
                 setNotifications(data);
-                setUnreadCount(data.filter((n: AppNotification) => !n.read).length);
             }
         } catch (error) {
             console.error('Failed to fetch notifications', error);
@@ -60,7 +61,6 @@ export const NotificationCenter: React.FC = () => {
         try {
             await api.fetch(`/notifications/${id}/read`, { method: 'PUT' });
             setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
-            setUnreadCount(prev => Math.max(0, prev - 1));
         } catch (error) {
             console.error('Failed to mark notification as read', error);
         }
@@ -69,13 +69,7 @@ export const NotificationCenter: React.FC = () => {
     const deleteNotification = async (id: string) => {
         try {
             await api.fetch(`/notifications/${id}`, { method: 'DELETE' });
-            setNotifications(prev => {
-                const notif = prev.find(n => n.id === id);
-                if (notif && !notif.read) {
-                    setUnreadCount(count => Math.max(0, count - 1));
-                }
-                return prev.filter(n => n.id !== id);
-            });
+            setNotifications(prev => prev.filter(n => n.id !== id));
         } catch (error) {
             console.error('Failed to delete notification', error);
         }
@@ -85,7 +79,6 @@ export const NotificationCenter: React.FC = () => {
         try {
             await api.fetch('/notifications', { method: 'DELETE' });
             setNotifications([]);
-            setUnreadCount(0);
             setIsOpen(false);
         } catch (error) {
             console.error('Failed to clear notifications', error);
@@ -187,7 +180,7 @@ export const NotificationCenter: React.FC = () => {
                                                         e.stopPropagation(); 
                                                         deleteNotification(notification.id); 
                                                     }} 
-                                                    className="p-1.5 text-gray-455 hover:text-danger rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors" 
+                                                    className="p-1.5 text-gray-500 hover:text-danger rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                                                     title="Clear"
                                                 >
                                                     <Icon name="Trash2" size={16} />

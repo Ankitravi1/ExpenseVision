@@ -48,8 +48,8 @@ const RecurringRuleCard: React.FC<{
   currency: string;
   accountName: (id: string) => string;
   categoryName: (id: string) => string;
-  updateRecurring: (id: string, rule: Partial<RecurringRule>) => Promise<void>;
-  runRecurring: (id: string) => Promise<void>;
+  updateRecurring: (id: string, rule: Partial<RecurringRule>) => Promise<boolean>;
+  runRecurring: (id: string) => Promise<boolean>;
   editRule: (rule: RecurringRule) => void;
   onDelete: (rule: RecurringRule) => void;
 }> = ({ rule, transactions, currency, accountName, categoryName, updateRecurring, runRecurring, editRule, onDelete }) => {
@@ -73,7 +73,7 @@ const RecurringRuleCard: React.FC<{
             rule.type === 'income'
               ? 'bg-green-200 text-green-800 dark:bg-green-950/40 dark:text-green-300'
               : rule.type === 'transfer'
-                ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-350'
+                ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-400'
                 : 'bg-red-200 text-red-800 dark:bg-red-950/40 dark:text-red-300'
           }`}>
             {rule.type}
@@ -82,7 +82,7 @@ const RecurringRuleCard: React.FC<{
             {rule.active ? 'Active' : 'Paused'}
           </span>
         </div>
-        <h3 className="text-base font-bold text-gray-900 dark:text-gray-500 truncate" title={rule.note}>
+        <h3 className="text-base font-bold text-gray-900 dark:text-gray-100 truncate" title={rule.note}>
           {rule.note}
         </h3>
         <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1 uppercase tracking-wider font-bold">
@@ -118,7 +118,7 @@ const RecurringRuleCard: React.FC<{
         {showHistory && ruleTransactions.length > 0 && (
           <div className="mt-2 bg-gray-50 dark:bg-gray-900/30 p-2.5 rounded-lg border border-gray-100 dark:border-gray-700 max-h-[120px] overflow-y-auto space-y-1.5 scrollbar-thin">
             {ruleTransactions.map(t => (
-              <div key={t.id} className="flex justify-between items-center text-[10px] text-gray-600 dark:text-gray-400 border-b border-gray-100 dark:border-gray-808 pb-1 last:border-b-0 last:pb-0">
+              <div key={t.id} className="flex justify-between items-center text-[10px] text-gray-600 dark:text-gray-400 border-b border-gray-100 dark:border-gray-800 pb-1 last:border-b-0 last:pb-0">
                 <span className="font-semibold">{formatTransactionDate(t.date, true)}</span>
                 <span className="font-medium text-gray-500 dark:text-gray-400 truncate max-w-[130px]">{t.note}</span>
               </div>
@@ -141,7 +141,7 @@ const RecurringRuleCard: React.FC<{
           <div className="flex items-center gap-1.5">
             {confirmRun ? (
               <div className="flex items-center gap-1 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/40 px-2 py-0.5 rounded-lg">
-                <span className="text-[9px] font-extrabold text-amber-600 dark:text-amber-450 mr-1 animate-pulse">RUN NOW?</span>
+                <span className="text-[9px] font-extrabold text-amber-600 dark:text-amber-400 mr-1 animate-pulse">RUN NOW?</span>
                 <button
                   onClick={async () => {
                     await runRecurring(rule.id);
@@ -161,7 +161,7 @@ const RecurringRuleCard: React.FC<{
             ) : (
               <button
                 onClick={() => setConfirmRun(true)}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/60 text-amber-600 dark:text-amber-450 hover:bg-amber-100 transition-colors"
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/60 text-amber-600 dark:text-amber-400 hover:bg-amber-100 transition-colors"
                 title="Run manual execution now"
               >
                 <Icon name="Play" size={12} />
@@ -199,6 +199,7 @@ export const Recurring: React.FC = () => {
     recurring,
     transactions,
     currency,
+    theme,
     addRecurring,
     updateRecurring,
     deleteRecurring,
@@ -279,12 +280,12 @@ export const Recurring: React.FC = () => {
       active: form.active,
     };
 
-    if (form.id) {
-      await updateRecurring(form.id, payload);
-    } else {
-      await addRecurring(payload);
-    }
-    resetForm();
+    // Only reset the form when the save actually succeeds, so a failed save keeps
+    // the user's input instead of wiping it.
+    const ok = form.id
+      ? await updateRecurring(form.id, payload)
+      : await addRecurring(payload);
+    if (ok) resetForm();
   };
 
   return (
@@ -439,7 +440,7 @@ export const Recurring: React.FC = () => {
                    value={form.startDate}
                    onChange={event => setForm(prev => ({ ...prev, startDate: event.target.value }))}
                    className="input dark:[color-scheme:dark]"
-                   style={{ colorScheme: 'dark' }}
+                   style={{ colorScheme: theme }}
                  />
               </label>
             </div>
@@ -470,7 +471,7 @@ export const Recurring: React.FC = () => {
                   value={form.endDate}
                   onChange={event => setForm(prev => ({ ...prev, endDate: event.target.value }))}
                   className="input dark:[color-scheme:dark]"
-                  style={{ colorScheme: 'dark' }}
+                  style={{ colorScheme: theme }}
                 />
               </label>
             )}

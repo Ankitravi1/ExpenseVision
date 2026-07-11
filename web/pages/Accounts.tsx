@@ -6,6 +6,7 @@ import { Account, Category, Transaction } from '../types';
 import { AddAccountModal } from '../components/AddAccountModal';
 import { NewTransactionModal } from '../components/NewTransactionModal';
 import { formatCurrency } from '../utils/currency';
+import { formatTransactionDate } from '../utils/date';
 
 interface AccountDetailsModalProps {
     isOpen: boolean;
@@ -156,7 +157,7 @@ const AccountDetailsModal: React.FC<AccountDetailsModalProps> = ({
                                                                     {t.note || (t.type === 'transfer' ? 'Transfer' : category?.name || 'Uncategorized')}
                                                                 </p>
                                                                 <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">
-                                                                    {t.date}
+                                                                    {formatTransactionDate(t.date, true)}
                                                                 </p>
                                                             </div>
                                                         </div>
@@ -335,7 +336,7 @@ export const Accounts: React.FC = () => {
                     </Card>
 
                     <Card className="flex items-center p-6 bg-gradient-to-br from-green-50/30 to-emerald-50/10 dark:from-emerald-950/20 dark:to-gray-800/40">
-                        <div className="w-12 h-12 rounded-xl bg-green-100 dark:bg-emerald-955/40 flex items-center justify-center mr-4">
+                        <div className="w-12 h-12 rounded-xl bg-green-100 dark:bg-emerald-950/40 flex items-center justify-center mr-4">
                             <Icon name="TrendingUp" className="text-success dark:text-emerald-400" size={24} />
                         </div>
                         <div>
@@ -371,16 +372,28 @@ export const Accounts: React.FC = () => {
                         </button>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {accounts.map(account => (
-                            <AccountCard
-                                key={account.id}
-                                account={account}
-                                onEdit={() => handleEdit(account)}
-                                onClick={() => setSelectedDetailAccount(account)}
-                            />
-                        ))}
-                    </div>
+                    {accounts.length === 0 ? (
+                        <Card className="flex flex-col items-center justify-center text-center py-16">
+                            <div className="w-16 h-16 rounded-2xl bg-primary-light dark:bg-primary/20 flex items-center justify-center mb-4">
+                                <Icon name="Landmark" className="text-primary dark:text-indigo-400" size={32} />
+                            </div>
+                            <h4 className="text-lg font-bold text-gray-darkest dark:text-gray-100">No accounts yet</h4>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 max-w-xs">
+                                Add your first account using the <span className="font-semibold">Add Account</span> button above to start tracking balances.
+                            </p>
+                        </Card>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {accounts.map(account => (
+                                <AccountCard
+                                    key={account.id}
+                                    account={account}
+                                    onEdit={() => handleEdit(account)}
+                                    onClick={() => setSelectedDetailAccount(account)}
+                                />
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
 

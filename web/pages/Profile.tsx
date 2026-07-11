@@ -29,9 +29,6 @@ export const Profile: React.FC = () => {
         }
     }, []);
 
-    if (!context) return null;
-    const { transactions, setCurrency: setGlobalCurrency } = context;
-
     const handleSaveProfile = async () => {
         setIsSaving(true);
         try {
@@ -41,7 +38,10 @@ export const Profile: React.FC = () => {
                 currency
             });
             setUser(updatedUser.user);
-            setGlobalCurrency(currency);
+            // Refresh App-level user state (name/timezone) and global currency so
+            // changes reflect immediately without a page reload.
+            context?.updateUser(updatedUser.user);
+            context?.setCurrency(currency);
             showToast('Profile updated successfully!', 'success');
         } catch (error) {
             console.error('Failed to update profile:', error);
@@ -79,6 +79,10 @@ export const Profile: React.FC = () => {
             .map(tz => getTimezoneOption(tz))
             .sort((a, b) => a.offset - b.offset);
     }, []);
+
+    // All hooks are declared above; safe to bail out now.
+    if (!context) return null;
+    const { transactions } = context;
 
     return (
         <div className="space-y-6 max-w-4xl">

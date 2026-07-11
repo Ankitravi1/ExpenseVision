@@ -18,7 +18,11 @@ const getDevHost = (): string => {
     return Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
 };
 
-export const API_URL = `http://${getDevHost()}:5000/api`;
+// Production/release builds cannot reach a Metro dev host, so they MUST set
+// EXPO_PUBLIC_API_URL (e.g. https://api.expensevision.app/api) — used verbatim
+// when present. Otherwise fall back to the dev host detection above.
+const envApiUrl = process.env.EXPO_PUBLIC_API_URL;
+export const API_URL = envApiUrl && envApiUrl.length > 0 ? envApiUrl : `http://${getDevHost()}:5000/api`;
 
 // Same OAuth client ID as backend GOOGLE_CLIENT_ID / web VITE_GOOGLE_CLIENT_ID
 export const GOOGLE_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ?? '';

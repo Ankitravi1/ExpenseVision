@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
 import { Page } from '../types';
 import { Icon, IconName } from './Icon';
-import { authService, User } from '../services/auth';
+import { AppContext } from '../App';
 
 interface SidebarProps {
   activePage: Page;
@@ -11,6 +11,9 @@ interface SidebarProps {
   theme: 'light' | 'dark';
   setTheme: (theme: 'light' | 'dark') => void;
   onLogout?: () => void;
+  /** Mobile drawer open state (below the `lg` breakpoint). */
+  isMobileOpen: boolean;
+  setMobileOpen: (open: boolean) => void;
 }
 
 interface NavItemProps {
@@ -41,15 +44,13 @@ const NavItem: React.FC<NavItemProps> = ({ icon, label, isActive, onClick, isCol
   </li>
 );
 
-export const Sidebar: React.FC<SidebarProps> = ({ activePage, setActivePage, isCollapsed, setCollapsed, theme, setTheme, onLogout }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ activePage, setActivePage, isCollapsed, setCollapsed, theme, setTheme, onLogout, isMobileOpen, setMobileOpen }) => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
+  const context = useContext(AppContext);
+  // Read the user from context so name/avatar/timezone changes made on the
+  // Profile page reflect live instead of only after a full reload.
+  const user = context?.user ?? null;
   const userMenuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const currentUser = authService.getUser();
-    setUser(currentUser);
-  }, []);
 
   const navItems = React.useMemo((): { icon: IconName; label: Page }[] => {
     const items: { icon: IconName; label: Page }[] = [
@@ -85,12 +86,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ activePage, setActivePage, isC
 
   return (
     <aside
-      className="flex flex-col fixed left-0 top-0 transition-all duration-300 z-50"
+      className={`flex flex-col fixed left-0 top-0 h-screen z-50 transition-transform duration-300 lg:translate-x-0 ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'} ${isCollapsed ? 'w-20' : 'w-64'}`}
       style={{
         background: 'var(--gradient-sidebar)',
         boxShadow: 'var(--shadow-sidebar)',
-        height: '100vh',
-        width: isCollapsed ? 64 : 208,
       }}
     >
         <div className="px-6 py-6 flex items-center justify-between">

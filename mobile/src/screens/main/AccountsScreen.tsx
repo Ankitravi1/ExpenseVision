@@ -2,35 +2,28 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { useNavigation } from '@react-navigation/native';
 import { EmptyState, Card, SheetModal } from '../../components/ui';
-import { AccountForm } from '../../components/AccountForm';
+import { CategoryIcon } from '../../components/CategoryIcon';
+import { AccountForm, getAccountVisual } from '../../components/AccountForm';
+import { TransactionForm } from '../../components/TransactionForm';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { formatCurrency } from '../../utils/currency';
 import { spacing, radius } from '../../theme';
-import { Account } from '../../types';
-
-const TYPE_ICONS: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> = {
-    Checking: 'bank',
-    Savings: 'piggy-bank',
-    savings: 'piggy-bank',
-    Cash: 'cash',
-    'Credit Card': 'credit-card',
-    Asset: 'chart-line',
-    Liability: 'scale-balance',
-};
+import { Account, Transaction } from '../../types';
 
 export default function AccountsScreen() {
-    const navigation = useNavigation();
     const { accounts, deleteAccount, isLoading, refresh, transactions } = useData();
     const { user } = useAuth();
     const { theme } = useTheme();
     const [showForm, setShowForm] = useState(false);
     const [editing, setEditing] = useState<Account | null>(null);
     const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+    const [editTx, setEditTx] = useState<Transaction | null>(null);
+    const [showTxForm, setShowTxForm] = useState(false);
     const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
     const currency = user?.currency || 'INR';
 
@@ -58,7 +51,13 @@ export default function AccountsScreen() {
         return transactions.filter(t => t.accountId === accountId || t.transferToAccountId === accountId);
     };
 
-    const getTxAmountAndColor = (t: any, accountId: string) => {
+    const openTxEdit = (t: Transaction) => {
+        setSelectedAccount(null);
+        setEditTx(t);
+        setShowTxForm(true);
+    };
+
+    const getTxAmountAndColor = (t: Transaction, accountId: string) => {
         let isDebit = false;
         let prefix = '';
         if (t.type === 'expense') {
@@ -81,6 +80,52 @@ export default function AccountsScreen() {
             color: isDebit ? theme.colors.danger : theme.colors.success,
         };
     };
+
+    // Theme-aware subtle gradient tints for the summary stat cards (web parity).
+    const statGradients: Record<'expense' | 'income' | 'balance', [string, string]> = theme.dark
+        ? {
+              expense: ['#2a1418', theme.colors.card],
+              income: ['#0d2019', theme.colors.card],
+              balance: ['#161c33', theme.colors.card],
+          }
+        : {
+              expense: ['#fff1f2', '#ffffff'],
+              income: ['#ecfdf5', '#ffffff'],
+              balance: ['#eef2ff', '#ffffff'],
+          };
+
+    const StatCard = ({
+        gradient,
+        icon,
+        label,
+        value,
+        color,
+        tintBg,
+    }: {
+        gradient: [string, string];
+        icon: keyof typeof MaterialCommunityIcons.glyphMap;
+        label: string;
+        value: string;
+        color: string;
+        tintBg: string;
+    }) => (
+        <LinearGradient
+            colors={gradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.statCard, { borderColor: theme.colors.cardBorder }]}
+        >
+            <View style={[styles.statIcon, { backgroundColor: tintBg }]}>
+                <MaterialCommunityIcons name={icon} size={18} color={color} />
+            </View>
+            <Text style={{ color: theme.colors.textSecondary, fontSize: 11, fontWeight: '600' }} numberOfLines={1}>
+                {label}
+            </Text>
+            <Text style={{ color, fontSize: 16, fontWeight: '800', marginTop: 2 }} numberOfLines={1} adjustsFontSizeToFit>
+                {value}
+            </Text>
+        </LinearGradient>
+    );
 
     const renderAccountDetails = () => {
         if (!selectedAccount) return null;
@@ -188,9 +233,16 @@ export default function AccountsScreen() {
                                 <View style={{ gap: 6 }}>
                                     {group.transactions.map(t => {
                                         const { text, color } = getTxAmountAndColor(t, selectedAccount.id);
-                                        const dayStr = t.date.split('-')[2];
+                                        // Derive the day from the ISO date portion so timed
+                                        // transactions ("2026-07-10T14:30") don't render "10T14:30".
+                                        const dayStr = t.date.substring(0, 10).split('-')[2];
                                         return (
-                                            <View key={t.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 }}>
+                                            <TouchableOpacity
+                                                key={t.id}
+                                                onPress={() => openTxEdit(t)}
+                                                activeOpacity={0.6}
+                                                style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6 }}
+                                            >
                                                 <View style={{ flex: 1, marginRight: spacing.md }}>
                                                     <Text style={{ color: theme.colors.text, fontSize: 13 }} numberOfLines={1}>
                                                         {t.note || 'Unspecified'}
@@ -199,10 +251,11 @@ export default function AccountsScreen() {
                                                         Day {dayStr} • {t.type}
                                                     </Text>
                                                 </View>
-                                                <Text style={{ color, fontWeight: '600', fontSize: 13 }}>
+                                                <Text style={{ color, fontWeight: '600', fontSize: 13, marginRight: 6 }}>
                                                     {text}
                                                 </Text>
-                                            </View>
+                                                <MaterialCommunityIcons name="pencil-outline" size={13} color={theme.colors.textTertiary} />
+                                            </TouchableOpacity>
                                         );
                                     })}
                                 </View>
@@ -218,34 +271,32 @@ export default function AccountsScreen() {
         <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top']}>
             <ScreenHeader title="Accounts" />
 
-            {/* Combined Stats Card */}
-            <View style={{ paddingHorizontal: spacing.md, marginBottom: spacing.md }}>
-                <Card style={{ padding: spacing.md }}>
-                    <Text style={{ color: theme.colors.textSecondary, fontSize: 12, textTransform: 'uppercase', fontWeight: '700', letterSpacing: 0.5 }}>Combined Balance</Text>
-                    <Text style={{ color: theme.colors.text, fontSize: 26, fontWeight: '800', marginVertical: 4 }}>
-                        {formatCurrency(total, currency)}
-                    </Text>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.colors.separator, paddingTop: spacing.md, marginTop: spacing.xs }}>
-                        <View style={{ flex: 1 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                <MaterialCommunityIcons name="arrow-down-bold-circle-outline" size={16} color={theme.colors.success} />
-                                <Text style={{ color: theme.colors.textSecondary, fontSize: 11, fontWeight: '600' }}>Income so far</Text>
-                            </View>
-                            <Text style={{ color: theme.colors.success, fontSize: 16, fontWeight: '700', marginTop: 2 }}>
-                                {formatCurrency(totalIncomeAllTime, currency)}
-                            </Text>
-                        </View>
-                        <View style={{ flex: 1, borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: theme.colors.separator, paddingLeft: spacing.md }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                <MaterialCommunityIcons name="arrow-up-bold-circle-outline" size={16} color={theme.colors.danger} />
-                                <Text style={{ color: theme.colors.textSecondary, fontSize: 11, fontWeight: '600' }}>Expense so far</Text>
-                            </View>
-                            <Text style={{ color: theme.colors.danger, fontSize: 16, fontWeight: '700', marginTop: 2 }}>
-                                {formatCurrency(totalExpensesAllTime, currency)}
-                            </Text>
-                        </View>
-                    </View>
-                </Card>
+            {/* Summary stat cards (web parity): Expense / Income / Combined Balance */}
+            <View style={{ flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.md, marginBottom: spacing.md }}>
+                <StatCard
+                    gradient={statGradients.expense}
+                    icon="trending-down"
+                    label="Expense so far"
+                    value={formatCurrency(totalExpensesAllTime, currency)}
+                    color={theme.colors.danger}
+                    tintBg={theme.colors.dangerBg}
+                />
+                <StatCard
+                    gradient={statGradients.income}
+                    icon="trending-up"
+                    label="Income so far"
+                    value={formatCurrency(totalIncomeAllTime, currency)}
+                    color={theme.colors.success}
+                    tintBg={theme.colors.successBg}
+                />
+                <StatCard
+                    gradient={statGradients.balance}
+                    icon="bank-outline"
+                    label="Combined"
+                    value={formatCurrency(total, currency)}
+                    color={theme.colors.primary}
+                    tintBg={theme.colors.primaryLight}
+                />
             </View>
 
             <FlatList
@@ -253,30 +304,53 @@ export default function AccountsScreen() {
                 keyExtractor={a => a.id}
                 contentContainerStyle={{ padding: spacing.md, paddingTop: 0, gap: spacing.sm }}
                 refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refresh} tintColor={theme.colors.primary} />}
-                renderItem={({ item: a }) => (
-                    <TouchableOpacity
-                        onPress={() => {
-                            setSelectedAccount(a);
-                        }}
-                        onLongPress={() => confirmDelete(a)}
-                        style={[styles.accountRow, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder }]}
-                    >
-                        <View style={[styles.iconBox, { backgroundColor: theme.colors.primaryLight }]}>
-                            <MaterialCommunityIcons
-                                name={TYPE_ICONS[a.type] || 'wallet'}
-                                size={22}
-                                color={theme.colors.primary}
-                            />
-                        </View>
-                        <View style={{ flex: 1, marginLeft: spacing.md }}>
-                            <Text style={{ color: theme.colors.text, fontWeight: '700', fontSize: 15 }}>{a.name}</Text>
-                            <Text style={{ color: theme.colors.textTertiary, fontSize: 12 }}>{a.type}</Text>
-                        </View>
-                        <Text style={{ color: a.balance < 0 ? theme.colors.danger : theme.colors.text, fontWeight: '700', fontSize: 15 }}>
-                            {formatCurrency(a.balance, currency)}
-                        </Text>
-                    </TouchableOpacity>
-                )}
+                renderItem={({ item: a }) => {
+                    const { gradient, icon } = getAccountVisual(a.type, a.icon);
+                    return (
+                        <TouchableOpacity
+                            activeOpacity={0.85}
+                            onPress={() => setSelectedAccount(a)}
+                            onLongPress={() => confirmDelete(a)}
+                        >
+                            <LinearGradient
+                                colors={gradient}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                style={styles.accountCard}
+                            >
+                                <View style={styles.accountCardTop}>
+                                    <View style={{ flex: 1, marginRight: spacing.sm }}>
+                                        <Text style={styles.accountName} numberOfLines={1}>{a.name}</Text>
+                                        <Text style={styles.accountType} numberOfLines={1}>{a.type}</Text>
+                                    </View>
+                                    <CategoryIcon
+                                        name={icon}
+                                        size={20}
+                                        color="#ffffff"
+                                        backgroundColor="rgba(255,255,255,0.18)"
+                                    />
+                                </View>
+                                <View style={styles.accountCardDivider} />
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                                    <View>
+                                        <Text style={styles.accountBalanceLabel}>Current Balance</Text>
+                                        <Text style={styles.accountBalance}>{formatCurrency(a.balance, currency)}</Text>
+                                    </View>
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            setEditing(a);
+                                            setShowForm(true);
+                                        }}
+                                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                        style={styles.accountEditBtn}
+                                    >
+                                        <MaterialCommunityIcons name="cog-outline" size={18} color="rgba(255,255,255,0.9)" />
+                                    </TouchableOpacity>
+                                </View>
+                            </LinearGradient>
+                        </TouchableOpacity>
+                    );
+                }}
                 ListEmptyComponent={
                     <EmptyState icon="wallet-outline" title="No accounts yet" subtitle="Tap + to add your first account. Tap an account to view details, long-press to delete." />
                 }
@@ -298,6 +372,15 @@ export default function AccountsScreen() {
             >
                 {renderAccountDetails()}
             </SheetModal>
+
+            <TransactionForm
+                visible={showTxForm}
+                editing={editTx}
+                onClose={() => {
+                    setShowTxForm(false);
+                    setEditTx(null);
+                }}
+            />
 
             <TouchableOpacity
                 onPress={() => {
@@ -328,36 +411,59 @@ export default function AccountsScreen() {
 }
 
 const styles = StyleSheet.create({
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: spacing.md,
-    },
-    title: {
-        fontSize: 26,
-        fontWeight: '800',
-    },
-    addButton: {
-        width: 44,
-        height: 44,
-        borderRadius: radius.md,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    accountRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: spacing.md,
+    statCard: {
+        flex: 1,
         borderRadius: radius.md,
         borderWidth: 1,
+        padding: spacing.sm,
     },
-    iconBox: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
+    statIcon: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
         alignItems: 'center',
         justifyContent: 'center',
+        marginBottom: 6,
+    },
+    accountCard: {
+        borderRadius: radius.lg,
+        padding: spacing.md,
+    },
+    accountCardTop: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        justifyContent: 'space-between',
+    },
+    accountName: {
+        color: '#ffffff',
+        fontWeight: '800',
+        fontSize: 17,
+    },
+    accountType: {
+        color: 'rgba(255,255,255,0.8)',
+        fontWeight: '600',
+        fontSize: 12,
+        marginTop: 2,
+    },
+    accountCardDivider: {
+        height: StyleSheet.hairlineWidth,
+        backgroundColor: 'rgba(255,255,255,0.25)',
+        marginVertical: spacing.md,
+    },
+    accountBalanceLabel: {
+        color: 'rgba(255,255,255,0.8)',
+        fontSize: 11,
+    },
+    accountBalance: {
+        color: '#ffffff',
+        fontSize: 24,
+        fontWeight: '800',
+        marginTop: 2,
+    },
+    accountEditBtn: {
+        padding: 6,
+        borderRadius: 999,
+        backgroundColor: 'rgba(255,255,255,0.12)',
     },
     sortButton: {
         paddingHorizontal: spacing.sm,

@@ -9,6 +9,32 @@ export const setOnUnauthorized = (handler: () => void) => {
     onUnauthorized = handler;
 };
 
+// Single-flight token refresh. The backend rotates and revokes refresh tokens on
+// use (each refresh token is single-use), so concurrent 401s (initial-data +
+// notifications + ai-settings on app open) must NOT each POST /auth/refresh-token
+// with the same token — the first would succeed and the rest 401, forcing a random
+// logout. Instead every caller awaits the same in-flight refresh. Resolves to the
+// new access token, or null when the shared refresh itself failed.
+let refreshPromise: Promise<string | null> | null = null;
+
+const performRefresh = async (): Promise<string | null> => {
+    const refreshToken = await storage.getRefreshToken();
+    if (!refreshToken) return null;
+    try {
+        const refreshResponse = await fetch(`${API_URL}/auth/refresh-token`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refreshToken }),
+        });
+        if (!refreshResponse.ok) return null;
+        const data = await refreshResponse.json();
+        await storage.setTokens(data.token, data.refreshToken);
+        return data.token as string;
+    } catch {
+        return null;
+    }
+};
+
 export const apiFetch = async (endpoint: string, options: RequestInit = {}): Promise<Response> => {
     const token = await storage.getToken();
 
@@ -20,30 +46,21 @@ export const apiFetch = async (endpoint: string, options: RequestInit = {}): Pro
 
     let response = await fetch(`${API_URL}${endpoint}`, { ...options, headers });
 
-    // Access token expired → try refresh once, then retry the apiFetch
+    // Access token expired → refresh once (shared across concurrent callers), then
+    // retry the original request with the new access token.
     if (response.status === 401) {
-        const refreshToken = await storage.getRefreshToken();
-        if (refreshToken) {
-            try {
-                const refreshResponse = await fetch(`${API_URL}/auth/refresh-token`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ refreshToken }),
-                });
-                if (refreshResponse.ok) {
-                    const data = await refreshResponse.json();
-                    await storage.setTokens(data.token, data.refreshToken);
-                    headers['Authorization'] = `Bearer ${data.token}`;
-                    response = await fetch(`${API_URL}${endpoint}`, { ...options, headers });
-                } else {
-                    await storage.clearTokens();
-                    onUnauthorized?.();
-                }
-            } catch {
-                await storage.clearTokens();
-                onUnauthorized?.();
-            }
+        if (!refreshPromise) {
+            refreshPromise = performRefresh().finally(() => {
+                refreshPromise = null;
+            });
+        }
+        const newToken = await refreshPromise;
+        if (newToken) {
+            headers['Authorization'] = `Bearer ${newToken}`;
+            response = await fetch(`${API_URL}${endpoint}`, { ...options, headers });
         } else {
+            // The shared refresh failed → the session is truly dead.
+            await storage.clearTokens();
             onUnauthorized?.();
         }
     }
@@ -181,6 +198,11 @@ export const api = {
         });
         return json(res, 'Failed to send reset email');
     },
+    // No dedicated GET endpoint exists; PUT /auth/update-profile with an empty body
+    // returns the current user unchanged (and 401s on an invalid/expired session),
+    // so it doubles as "fetch me".
+    getProfile: async (): Promise<{ user: User }> =>
+        json(await apiFetch('/auth/update-profile', { method: 'PUT', body: JSON.stringify({}) }), 'Failed to load profile'),
     completeProfile: async (data: { currency: string; timezone?: string; country?: string }): Promise<{ user: User }> =>
         json(await apiFetch('/auth/complete-profile', { method: 'PUT', body: JSON.stringify(data) }), 'Failed to complete profile'),
     updateProfile: async (data: { name?: string; currency?: string; timezone?: string; theme?: string }): Promise<{ user: User }> =>

@@ -1,63 +1,142 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { PieChart } from 'react-native-chart-kit';
 import { useNavigation } from '@react-navigation/native';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { Card, EmptyState } from '../../components/ui';
 import { CategoryIcon } from '../../components/CategoryIcon';
-import { TransactionForm } from '../../components/TransactionForm';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { formatCurrency } from '../../utils/currency';
 import { isoDateToDisplay } from '../../utils/date';
 import { spacing, radius } from '../../theme';
 
-const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+// Fixed palette for the expense donut / category list (mirrors ReportsScreen).
+const CATEGORY_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#f43f5e', '#3b82f6', '#8b5cf6', '#ec4899', '#64748b', '#14b8a6', '#94a3b8'];
+
+// Trend semantics differ by card type: a rising expense is unfavorable (red),
+// whereas rising income / net flow is favorable (green).
+const StatCard: React.FC<{
+    title: string;
+    amount: number;
+    change: number;
+    type: 'income' | 'expense' | 'net';
+    currency: string;
+}> = ({ title, amount, change, type, currency }) => {
+    const { theme } = useTheme();
+    const isPositiveChange = change >= 0;
+    const isFavorable = type === 'expense' ? change <= 0 : change >= 0;
+    const trendColor = isFavorable ? theme.colors.success : theme.colors.danger;
+    const valueColor =
+        type === 'income' ? theme.colors.success :
+        type === 'expense' ? theme.colors.danger :
+        theme.colors.primary;
+    const icon = type === 'income' ? 'trending-up' : type === 'expense' ? 'trending-down' : 'wallet-outline';
+
+    return (
+        <Card style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <Text style={[styles.cardLabel, { color: theme.colors.textSecondary }]}>{title}</Text>
+                <MaterialCommunityIcons name={icon as any} size={18} color={valueColor} />
+            </View>
+            <Text style={[styles.statValue, { color: valueColor }]} numberOfLines={1} adjustsFontSizeToFit>
+                {formatCurrency(amount, currency)}
+            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                <MaterialCommunityIcons
+                    name={isPositiveChange ? 'arrow-up' : 'arrow-down'}
+                    size={12}
+                    color={trendColor}
+                />
+                <Text style={{ color: trendColor, fontSize: 11, fontWeight: '700' }}>{Math.abs(change)}%</Text>
+                <Text style={{ color: theme.colors.textTertiary, fontSize: 11, marginLeft: 4 }}>vs last month</Text>
+            </View>
+        </Card>
+    );
+};
 
 export default function DashboardScreen() {
     const { accounts, transactions, categories, isLoading, refresh } = useData();
     const { user } = useAuth();
     const { theme } = useTheme();
     const navigation = useNavigation();
-    const [showForm, setShowForm] = useState(false);
     const currency = user?.currency || 'INR';
 
-    const { netWorth, monthIncome, monthExpense, recent, sixMonths } = useMemo(() => {
-        const netWorth = accounts.reduce((sum, a) => sum + a.balance, 0);
-        const nowKey = monthKey(new Date());
+    const now = new Date();
+    const [currentDate, setCurrentDate] = useState(new Date(now.getFullYear(), now.getMonth(), 1));
 
-        let monthIncome = 0;
-        let monthExpense = 0;
+    const isAtCurrentMonth =
+        currentDate.getFullYear() === now.getFullYear() && currentDate.getMonth() === now.getMonth();
+
+    const changeMonth = (offset: number) => {
+        setCurrentDate(prev => {
+            // Anchor to the 1st so month arithmetic never overflows month-end.
+            const next = new Date(prev.getFullYear(), prev.getMonth() + offset, 1);
+            const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+            return next > currentMonthStart ? currentMonthStart : next;
+        });
+    };
+
+    const netWorth = useMemo(() => accounts.reduce((sum, a) => sum + a.balance, 0), [accounts]);
+
+    const { totalIncome, totalExpenses, netFlow, incomeChange, expenseChange, netFlowChange, recent, expenseByCategory } = useMemo(() => {
+        const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        const currentMonthKey = monthKey(currentDate);
+        const lastMonthKey = monthKey(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+
+        // Compare by the YYYY-MM prefix of the date-only portion (never new Date()).
+        const inMonth = (t: (typeof transactions)[number], key: string) => t.date.substring(0, 10).slice(0, 7) === key;
+        const sumType = (key: string, type: 'income' | 'expense') =>
+            transactions.filter(t => t.type === type && inMonth(t, key)).reduce((s, t) => s + t.amount, 0);
+
+        const totalIncome = sumType(currentMonthKey, 'income');
+        const totalExpenses = sumType(currentMonthKey, 'expense');
+        const netFlow = totalIncome - totalExpenses;
+
+        const lastIncome = sumType(lastMonthKey, 'income');
+        const lastExpenses = sumType(lastMonthKey, 'expense');
+        const lastNet = lastIncome - lastExpenses;
+
+        const calcChange = (cur: number, prev: number) => {
+            if (prev === 0) return cur > 0 ? 100 : 0;
+            return Math.round(((cur - prev) / prev) * 100);
+        };
+
+        const recent = [...transactions]
+            .sort((a, b) => b.date.substring(0, 10).localeCompare(a.date.substring(0, 10)))
+            .slice(0, 6);
+
+        const byCat: Record<string, number> = {};
         for (const t of transactions) {
-            if (t.date.startsWith(nowKey)) {
-                if (t.type === 'income') monthIncome += t.amount;
-                if (t.type === 'expense') monthExpense += t.amount;
-            }
+            if (t.type !== 'expense' || !inMonth(t, currentMonthKey)) continue;
+            const name = categories.find(c => c.id === t.categoryId)?.name || 'Uncategorized';
+            byCat[name] = (byCat[name] || 0) + t.amount;
         }
+        const expenseByCategory = (Object.entries(byCat) as [string, number][])
+            .sort(([, a], [, b]) => b - a)
+            .map(([name, value]) => ({ name, value }));
 
-        // Last 6 months income/expense for the mini bar chart
-        const sixMonths: { label: string; income: number; expense: number }[] = [];
-        for (let i = 5; i >= 0; i--) {
-            const d = new Date();
-            d.setMonth(d.getMonth() - i);
-            const key = monthKey(d);
-            let income = 0;
-            let expense = 0;
-            for (const t of transactions) {
-                if (t.date.startsWith(key)) {
-                    if (t.type === 'income') income += t.amount;
-                    if (t.type === 'expense') expense += t.amount;
-                }
-            }
-            sixMonths.push({ label: d.toLocaleString('default', { month: 'short' }), income, expense });
-        }
+        return {
+            totalIncome, totalExpenses, netFlow,
+            incomeChange: calcChange(totalIncome, lastIncome),
+            expenseChange: calcChange(totalExpenses, lastExpenses),
+            netFlowChange: calcChange(netFlow, lastNet),
+            recent, expenseByCategory,
+        };
+    }, [transactions, categories, currentDate]);
 
-        return { netWorth, monthIncome, monthExpense, recent: transactions.slice(0, 6), sixMonths };
-    }, [accounts, transactions]);
-
-    const maxBar = Math.max(1, ...sixMonths.flatMap(m => [m.income, m.expense]));
+    const chartWidth = Dimensions.get('window').width - spacing.md * 4;
+    const donutSize = 130;
+    const pieData = expenseByCategory.map((c, i) => ({
+        name: c.name,
+        amount: c.value,
+        color: CATEGORY_COLORS[i % CATEGORY_COLORS.length],
+        legendFontColor: theme.colors.textSecondary,
+        legendFontSize: 12,
+    }));
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top']}>
@@ -66,6 +145,23 @@ export default function DashboardScreen() {
                 contentContainerStyle={styles.container}
                 refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refresh} tintColor={theme.colors.primary} />}
             >
+                {/* Month navigator */}
+                <View style={[styles.monthNav, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder }]}>
+                    <TouchableOpacity onPress={() => changeMonth(-1)} style={styles.monthNavBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                        <MaterialCommunityIcons name="chevron-left" size={24} color={theme.colors.textSecondary} />
+                    </TouchableOpacity>
+                    <Text style={[styles.monthLabel, { color: theme.colors.text }]}>
+                        {currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
+                    </Text>
+                    <TouchableOpacity
+                        onPress={() => changeMonth(1)}
+                        disabled={isAtCurrentMonth}
+                        style={[styles.monthNavBtn, { opacity: isAtCurrentMonth ? 0.3 : 1 }]}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                        <MaterialCommunityIcons name="chevron-right" size={24} color={theme.colors.textSecondary} />
+                    </TouchableOpacity>
+                </View>
 
                 {/* Net worth */}
                 <Card style={{ marginBottom: spacing.md }}>
@@ -76,58 +172,80 @@ export default function DashboardScreen() {
                     </Text>
                 </Card>
 
-                {/* This month income / expense */}
+                {/* Stat cards with % change vs previous month */}
                 <View style={styles.row}>
-                    <Card style={{ flex: 1 }}>
-                        <Text style={[styles.cardLabel, { color: theme.colors.textSecondary }]}>Income</Text>
-                        <Text style={[styles.statValue, { color: theme.colors.success }]}>
-                            +{formatCurrency(monthIncome, currency)}
-                        </Text>
-                        <Text style={{ color: theme.colors.textTertiary, fontSize: 11 }}>this month</Text>
-                    </Card>
-                    <Card style={{ flex: 1 }}>
-                        <Text style={[styles.cardLabel, { color: theme.colors.textSecondary }]}>Expenses</Text>
-                        <Text style={[styles.statValue, { color: theme.colors.danger }]}>
-                            -{formatCurrency(monthExpense, currency)}
-                        </Text>
-                        <Text style={{ color: theme.colors.textTertiary, fontSize: 11 }}>this month</Text>
-                    </Card>
+                    <StatCard title="Expenses" amount={totalExpenses} change={expenseChange} type="expense" currency={currency} />
+                    <StatCard title="Income" amount={totalIncome} change={incomeChange} type="income" currency={currency} />
+                </View>
+                <View style={{ marginTop: spacing.md }}>
+                    <StatCard title="Balance (net flow)" amount={netFlow} change={netFlowChange} type="net" currency={currency} />
                 </View>
 
-                {/* 6-month trend */}
+                {/* Expense distribution donut */}
                 <Card style={{ marginTop: spacing.md }}>
-                    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Last 6 months</Text>
-                    <View style={styles.chart}>
-                        {sixMonths.map(m => (
-                            <View key={m.label} style={styles.chartGroup}>
-                                <View style={styles.chartBars}>
-                                    <View
-                                        style={{
-                                            width: 10,
-                                            borderRadius: 3,
-                                            height: Math.max(3, (m.income / maxBar) * 90),
-                                            backgroundColor: theme.colors.success,
-                                        }}
-                                    />
-                                    <View
-                                        style={{
-                                            width: 10,
-                                            borderRadius: 3,
-                                            height: Math.max(3, (m.expense / maxBar) * 90),
-                                            backgroundColor: theme.colors.danger,
-                                        }}
-                                    />
+                    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Expense Distribution</Text>
+                    {expenseByCategory.length === 0 ? (
+                        <EmptyState icon="chart-pie" title="No expenses this month" />
+                    ) : (
+                        <>
+                            <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+                                <PieChart
+                                    data={pieData}
+                                    width={chartWidth}
+                                    height={200}
+                                    chartConfig={{ color: () => theme.colors.text }}
+                                    accessor="amount"
+                                    backgroundColor="transparent"
+                                    paddingLeft={String(chartWidth / 4)}
+                                    hasLegend={false}
+                                    absolute
+                                />
+                                {/* Center overlay converts the pie into a donut */}
+                                <View
+                                    pointerEvents="none"
+                                    style={[
+                                        styles.donutCenter,
+                                        {
+                                            width: donutSize,
+                                            height: donutSize,
+                                            borderRadius: donutSize / 2,
+                                            backgroundColor: theme.colors.card,
+                                        },
+                                    ]}
+                                >
+                                    <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '800' }} numberOfLines={1} adjustsFontSizeToFit>
+                                        {formatCurrency(totalExpenses, currency)}
+                                    </Text>
+                                    <Text style={{ color: theme.colors.textTertiary, fontSize: 10, fontWeight: '700', letterSpacing: 0.5, marginTop: 2 }}>
+                                        TOTAL SPENT
+                                    </Text>
                                 </View>
-                                <Text style={{ color: theme.colors.textTertiary, fontSize: 11 }}>{m.label}</Text>
                             </View>
-                        ))}
-                    </View>
-                    <View style={styles.legend}>
-                        <View style={[styles.legendDot, { backgroundColor: theme.colors.success }]} />
-                        <Text style={{ color: theme.colors.textSecondary, fontSize: 12, marginRight: spacing.md }}>Income</Text>
-                        <View style={[styles.legendDot, { backgroundColor: theme.colors.danger }]} />
-                        <Text style={{ color: theme.colors.textSecondary, fontSize: 12 }}>Expenses</Text>
-                    </View>
+
+                            {/* Category breakdown list */}
+                            <View style={{ marginTop: spacing.md }}>
+                                {expenseByCategory.map((cat, i) => {
+                                    const color = CATEGORY_COLORS[i % CATEGORY_COLORS.length];
+                                    const category = categories.find(c => c.name === cat.name);
+                                    const pct = totalExpenses > 0 ? ((cat.value / totalExpenses) * 100).toFixed(1) : '0';
+                                    return (
+                                        <View key={cat.name} style={styles.catRow}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                                                <View style={[styles.catDot, { backgroundColor: color }]} />
+                                                <CategoryIcon name={category?.icon} size={14} />
+                                                <Text style={{ color: theme.colors.text, fontWeight: '600', marginLeft: spacing.sm }} numberOfLines={1}>
+                                                    {cat.name}
+                                                </Text>
+                                            </View>
+                                            <Text style={{ color: theme.colors.textSecondary, fontSize: 13 }}>
+                                                {formatCurrency(cat.value, currency)} · {pct}%
+                                            </Text>
+                                        </View>
+                                    );
+                                })}
+                            </View>
+                        </>
+                    )}
                 </Card>
 
                 {/* Recent transactions */}
@@ -164,10 +282,43 @@ export default function DashboardScreen() {
                     )}
                 </Card>
 
+                {/* Accounts summary */}
+                <Card style={{ marginTop: spacing.md }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
+                        <Text style={[styles.sectionTitle, { color: theme.colors.text, marginBottom: 0 }]}>Accounts Summary</Text>
+                        <TouchableOpacity onPress={() => (navigation as any).navigate('Accounts')}>
+                            <Text style={{ color: theme.colors.primary, fontWeight: '600', fontSize: 13 }}>Manage</Text>
+                        </TouchableOpacity>
+                    </View>
+                    {accounts.length === 0 ? (
+                        <EmptyState icon="wallet-outline" title="No accounts yet" />
+                    ) : (
+                        accounts.map(acc => {
+                            let accIcon: keyof typeof MaterialCommunityIcons.glyphMap = 'wallet-outline';
+                            const type = acc.type.toLowerCase();
+                            if (type.includes('savings') || type.includes('piggy')) accIcon = 'piggy-bank-outline';
+                            else if (type.includes('credit')) accIcon = 'credit-card-outline';
+                            else if (type.includes('bank') || type.includes('checking')) accIcon = 'bank-outline';
+                            return (
+                                <View key={acc.id} style={[styles.accRow, { backgroundColor: theme.colors.background, borderColor: theme.colors.cardBorder }]}>
+                                    <View style={[styles.accIcon, { backgroundColor: theme.colors.primaryLight }]}>
+                                        <MaterialCommunityIcons name={accIcon} size={16} color={theme.colors.primary} />
+                                    </View>
+                                    <View style={{ flex: 1, marginLeft: spacing.sm }}>
+                                        <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 13 }} numberOfLines={1}>{acc.name}</Text>
+                                        <Text style={{ color: theme.colors.textTertiary, fontSize: 11 }} numberOfLines={1}>{acc.type}</Text>
+                                    </View>
+                                    <Text style={{ fontWeight: '700', fontSize: 13, color: acc.balance < 0 ? theme.colors.danger : theme.colors.text }}>
+                                        {formatCurrency(acc.balance, currency)}
+                                    </Text>
+                                </View>
+                            );
+                        })
+                    )}
+                </Card>
+
                 <View style={{ height: spacing.xl }} />
             </ScrollView>
-
-            <TransactionForm visible={showForm} onClose={() => setShowForm(false)} />
         </SafeAreaView>
     );
 }
@@ -176,36 +327,22 @@ const styles = StyleSheet.create({
     container: {
         padding: spacing.md,
     },
-    headerRow: {
+    monthNav: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
+        justifyContent: 'space-between',
+        borderWidth: 1,
+        borderRadius: radius.md,
+        paddingHorizontal: spacing.sm,
+        paddingVertical: 4,
         marginBottom: spacing.md,
     },
-    headerCenter: {
-        flex: 1,
-        paddingHorizontal: spacing.md,
-    },
-    headerRight: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    drawerToggle: {
+    monthNavBtn: {
         padding: spacing.xs,
     },
-    greeting: {
-        fontSize: 14,
-    },
-    title: {
-        fontSize: 26,
-        fontWeight: '800',
-    },
-    iconButton: {
-        width: 44,
-        height: 44,
-        borderRadius: radius.md,
-        alignItems: 'center',
-        justifyContent: 'center',
+    monthLabel: {
+        fontSize: 15,
+        fontWeight: '700',
     },
     cardLabel: {
         fontSize: 13,
@@ -222,40 +359,31 @@ const styles = StyleSheet.create({
         gap: spacing.md,
     },
     statValue: {
-        fontSize: 17,
-        fontWeight: '700',
+        fontSize: 20,
+        fontWeight: '800',
+        marginTop: 2,
     },
     sectionTitle: {
         fontSize: 16,
         fontWeight: '700',
         marginBottom: spacing.md,
     },
-    chart: {
+    donutCenter: {
+        position: 'absolute',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    catRow: {
         flexDirection: 'row',
+        alignItems: 'center',
         justifyContent: 'space-between',
-        alignItems: 'flex-end',
-        height: 110,
-        paddingHorizontal: spacing.xs,
+        paddingVertical: 8,
     },
-    chartGroup: {
-        alignItems: 'center',
-        gap: 6,
-    },
-    chartBars: {
-        flexDirection: 'row',
-        alignItems: 'flex-end',
-        gap: 3,
-    },
-    legend: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginTop: spacing.md,
-    },
-    legendDot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        marginRight: 4,
+    catDot: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        marginRight: spacing.sm,
     },
     txRow: {
         flexDirection: 'row',
@@ -263,21 +391,19 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         borderBottomWidth: StyleSheet.hairlineWidth,
     },
-    badge: {
-        position: 'absolute',
-        top: -4,
-        right: -4,
-        backgroundColor: 'red',
-        borderRadius: 8,
-        minWidth: 16,
-        height: 16,
+    accRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: spacing.sm,
+        borderRadius: radius.md,
+        borderWidth: 1,
+        marginBottom: spacing.sm,
+    },
+    accIcon: {
+        width: 32,
+        height: 32,
+        borderRadius: radius.sm,
         alignItems: 'center',
         justifyContent: 'center',
-        paddingHorizontal: 3,
-    },
-    badgeText: {
-        color: '#fff',
-        fontSize: 10,
-        fontWeight: '700',
     },
 });

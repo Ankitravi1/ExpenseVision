@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Alert, StyleSheet, Text, View, DeviceEventEmitter } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { SheetModal, Input, Button, ChipSelector, FieldLabel, OptionSheet, DateField, TimeField, successHaptic } from './ui';
 import { useData } from '../context/DataContext';
 import { useTheme } from '../context/ThemeContext';
@@ -33,9 +34,18 @@ export const TransactionForm: React.FC<Props> = ({ visible, onClose, editing }) 
     const [parseMessage, setParseMessage] = useState('');
     const [aiSettings, setAiSettings] = useState<any>(null);
 
-    useEffect(() => {
+    // Refetch AI settings whenever the hosting screen regains focus (so enabling AI
+    // in Settings reveals Quick Entry without an app reload) and each time the form
+    // opens.
+    const loadAiSettings = React.useCallback(() => {
         getAiSettings().then(setAiSettings).catch(console.error);
     }, []);
+
+    useFocusEffect(loadAiSettings);
+
+    useEffect(() => {
+        if (visible) loadAiSettings();
+    }, [visible, loadAiSettings]);
 
     useEffect(() => {
         if (visible) {
@@ -80,7 +90,7 @@ export const TransactionForm: React.FC<Props> = ({ visible, onClose, editing }) 
 
     const handleParseQuickEntry = async () => {
         const aiSettings = await getAiSettings();
-        if (!aiSettings.enabled) return Alert.alert('AI disabled', 'Enable AI transaction parsing in Settings first.');
+        if (!aiSettings.enabled || aiSettings.autoParseEnabled === false) return Alert.alert('AI disabled', 'Enable AI transaction auto-parsing in Settings first.');
         if (!aiSettings.keys || !aiSettings.keys[aiSettings.provider]?.length) return Alert.alert('Missing API key', `Add your AI API key for ${aiSettings.provider} in Settings first.`);
         if (!quickEntry.trim()) return Alert.alert('Missing note', 'Type or dictate a transaction note first.');
 
@@ -167,7 +177,7 @@ export const TransactionForm: React.FC<Props> = ({ visible, onClose, editing }) 
                 }}
             />
 
-            {!editing && aiSettings?.enabled ? (
+            {!editing && aiSettings?.enabled && aiSettings?.autoParseEnabled !== false ? (
                 <View style={[styles.quickEntry, { backgroundColor: theme.colors.primaryLight, borderColor: theme.colors.cardBorder }]}>
                     <View style={styles.quickEntryHeader}>
                         <MaterialCommunityIcons name="microphone-outline" size={18} color={theme.colors.primary} />

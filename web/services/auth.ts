@@ -171,6 +171,10 @@ export const authService = {
         return user ? JSON.parse(user) : null;
     },
 
+    setUser: (user: User) => {
+        localStorage.setItem('user', JSON.stringify(user));
+    },
+
     async setup2FA() {
         const token = authService.getToken();
         const res = await fetch(`${API_URL}/auth/2fa/setup`, {

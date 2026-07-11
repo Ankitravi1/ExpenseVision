@@ -58,6 +58,7 @@ const App: React.FC = () => {
   const [needsProfileCompletion, setNeedsProfileCompletion] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [currency, setCurrencyState] = useState('INR');
   const [user, setUser] = useState<User | null>(null);
   const [theme, setThemeState] = useState<'light' | 'dark'>(() => {
@@ -110,6 +111,11 @@ const App: React.FC = () => {
     }
   }, [theme]);
 
+  // Close the mobile navigation drawer whenever the route changes.
+  useEffect(() => {
+    setIsMobileNavOpen(false);
+  }, [location.pathname]);
+
   // Load user preferences from stored session
   const applyStoredUser = useCallback(() => {
     const storedUser = authService.getUser();
@@ -119,6 +125,13 @@ const App: React.FC = () => {
       if (storedUser.currency) setCurrencyState(storedUser.currency);
       if (storedUser.theme) setThemeState(storedUser.theme as 'light' | 'dark');
     }
+  }, []);
+
+  // Update the app-level user (name/timezone/etc.) and persist it, so changes
+  // made on the Profile page reflect everywhere (Sidebar, Header) without a reload.
+  const updateUser = useCallback((updated: User) => {
+    setUser(updated);
+    authService.setUser(updated);
   }, []);
 
   // Fetch Initial Data
@@ -182,140 +195,162 @@ const App: React.FC = () => {
     }
   }, []);
 
-  const addTransaction = useCallback(async (transaction: Omit<Transaction, 'id'>) => {
+  const addTransaction = useCallback(async (transaction: Omit<Transaction, 'id'>): Promise<boolean> => {
     try {
       const newTransaction = await api.createTransaction(transaction);
       setTransactions(prev => [newTransaction, ...prev].sort((a, b) => transactionDateToIso(b.date).localeCompare(transactionDateToIso(a.date))));
       await refreshFinancials();
       showToast('Transaction added', 'success');
+      return true;
     } catch (err: any) {
       console.error('Failed to add transaction:', err);
       showToast(err.message || 'Failed to add transaction', 'error');
+      return false;
     }
   }, [refreshFinancials, showToast]);
 
-  const updateTransaction = useCallback(async (id: string, updatedData: Partial<Transaction>) => {
+  const updateTransaction = useCallback(async (id: string, updatedData: Partial<Transaction>): Promise<boolean> => {
     try {
       const updated = await api.updateTransaction(id, updatedData);
       setTransactions(prev => prev.map(t => t.id === id ? updated : t)
         .sort((a, b) => transactionDateToIso(b.date).localeCompare(transactionDateToIso(a.date))));
       await refreshFinancials();
       showToast('Transaction updated', 'success');
+      return true;
     } catch (err: any) {
       console.error('Failed to update transaction:', err);
       showToast(err.message || 'Failed to update transaction', 'error');
+      return false;
     }
   }, [refreshFinancials, showToast]);
 
-  const deleteTransaction = useCallback(async (id: string) => {
+  const deleteTransaction = useCallback(async (id: string): Promise<boolean> => {
     try {
       await api.deleteTransaction(id);
       setTransactions(prev => prev.filter(t => t.id !== id));
       await refreshFinancials();
       showToast('Transaction deleted', 'success');
+      return true;
     } catch (err: any) {
       console.error('Failed to delete transaction:', err);
       showToast(err.message || 'Failed to delete transaction', 'error');
+      return false;
     }
   }, [refreshFinancials, showToast]);
 
-  const bulkDeleteTransactions = useCallback(async (ids: string[]) => {
+  const bulkDeleteTransactions = useCallback(async (ids: string[]): Promise<boolean> => {
     try {
       await api.bulkDeleteTransactions(ids);
       setTransactions(prev => prev.filter(t => !ids.includes(t.id)));
       await refreshFinancials();
       showToast(`${ids.length} transactions deleted`, 'success');
+      return true;
     } catch (err: any) {
       console.error('Failed to bulk delete transactions:', err);
       showToast(err.message || 'Failed to bulk delete transactions', 'error');
+      return false;
     }
   }, [refreshFinancials, showToast]);
 
-  const clearAllTransactions = useCallback(async (confirmationPhrase: string) => {
+  const clearAllTransactions = useCallback(async (confirmationPhrase: string): Promise<boolean> => {
     try {
       await api.clearAllTransactions(confirmationPhrase);
       setTransactions([]);
       await refreshFinancials();
       showToast('All transactions cleared successfully', 'success');
+      return true;
     } catch (err: any) {
       console.error('Failed to clear transactions:', err);
       showToast(err.message || 'Failed to clear transactions', 'error');
+      return false;
     }
   }, [refreshFinancials, showToast]);
 
-  const addAccount = useCallback(async (account: Omit<Account, 'id'>) => {
+  const addAccount = useCallback(async (account: Omit<Account, 'id'>): Promise<boolean> => {
     try {
       const newAccount = await api.createAccount(account);
       setAccounts(prev => [...prev, newAccount]);
       showToast('Account added', 'success');
+      return true;
     } catch (err: any) {
       console.error('Failed to add account:', err);
       showToast(err.message || 'Failed to add account', 'error');
+      return false;
     }
   }, [showToast]);
 
-  const updateAccount = useCallback(async (id: string, updatedData: Partial<Account>) => {
+  const updateAccount = useCallback(async (id: string, updatedData: Partial<Account>): Promise<boolean> => {
     try {
       const updatedAccount = await api.updateAccount(id, updatedData);
       setAccounts(prev => prev.map(acc => acc.id === id ? updatedAccount : acc));
       showToast('Account updated', 'success');
+      return true;
     } catch (err: any) {
       console.error('Failed to update account:', err);
       showToast(err.message || 'Failed to update account', 'error');
+      return false;
     }
   }, [showToast]);
 
-  const deleteAccount = useCallback(async (id: string) => {
+  const deleteAccount = useCallback(async (id: string): Promise<boolean> => {
     try {
       await api.deleteAccount(id);
       setAccounts(prev => prev.filter(acc => acc.id !== id));
       showToast('Account deleted', 'success');
+      return true;
     } catch (err: any) {
       console.error('Failed to delete account:', err);
       const message = err.message?.includes('Foreign key constraint')
         ? 'This account is in use and cannot be deleted.'
         : (err.message || 'Failed to delete account');
       showToast(message, 'error');
+      return false;
     }
   }, [showToast]);
 
-  const addCategory = useCallback(async (category: Omit<Category, 'id'>) => {
+  const addCategory = useCallback(async (category: Omit<Category, 'id'>): Promise<boolean> => {
     try {
       const newCategory = await api.createCategory(category);
       setCategories(prev => [...prev, newCategory]);
       showToast('Category added', 'success');
+      return true;
     } catch (err: any) {
       console.error('Failed to add category:', err);
       showToast(err.message || 'Failed to add category', 'error');
+      return false;
     }
   }, [showToast]);
 
-  const updateCategory = useCallback(async (id: string, updatedData: Partial<Category>) => {
+  const updateCategory = useCallback(async (id: string, updatedData: Partial<Category>): Promise<boolean> => {
     try {
       const updatedCategory = await api.updateCategory(id, updatedData);
       setCategories(prev => prev.map(cat => cat.id === id ? updatedCategory : cat));
       showToast('Category updated', 'success');
+      return true;
     } catch (err: any) {
       console.error('Failed to update category:', err);
       showToast(err.message || 'Failed to update category', 'error');
+      return false;
     }
   }, [showToast]);
 
-  const deleteCategory = useCallback(async (id: string) => {
+  const deleteCategory = useCallback(async (id: string): Promise<boolean> => {
     try {
       await api.deleteCategory(id);
       setCategories(prev => prev.filter(cat => cat.id !== id));
       showToast('Category deleted', 'success');
+      return true;
     } catch (err: any) {
       console.error('Failed to delete category:', err);
       const message = err.message?.includes('Foreign key constraint')
         ? 'This category is in use and cannot be deleted.'
         : (err.message || 'Failed to delete category');
       showToast(message, 'error');
+      return false;
     }
   }, [showToast]);
 
-  const setBudget = useCallback(async (budget: Budget) => {
+  const setBudget = useCallback(async (budget: Budget): Promise<boolean> => {
     try {
       const newBudget = await api.createBudget(budget);
       setBudgets(prev => {
@@ -326,66 +361,78 @@ const App: React.FC = () => {
         return [...prev, newBudget];
       });
       showToast('Budget saved', 'success');
+      return true;
     } catch (err: any) {
       console.error('Failed to set budget:', err);
       showToast(err.message || 'Failed to set budget', 'error');
+      return false;
     }
   }, [showToast]);
 
-  const deleteBudget = useCallback(async (id: string) => {
+  const deleteBudget = useCallback(async (id: string): Promise<boolean> => {
     try {
       await api.deleteBudget(id);
       setBudgets(prev => prev.filter(b => b.id !== id));
       showToast('Budget deleted', 'success');
+      return true;
     } catch (err: any) {
       console.error('Failed to delete budget:', err);
       showToast(err.message || 'Failed to delete budget', 'error');
+      return false;
     }
   }, [showToast]);
 
-  const addRecurring = useCallback(async (rule: Partial<RecurringRule>) => {
+  const addRecurring = useCallback(async (rule: Partial<RecurringRule>): Promise<boolean> => {
     try {
       await api.createRecurring(rule);
       // Due occurrences are materialized server-side on the next initial-data
       // fetch, so refresh everything to pick up any generated transactions.
       await fetchData();
       showToast('Recurring rule added', 'success');
+      return true;
     } catch (err: any) {
       console.error('Failed to add recurring rule:', err);
       showToast(err.message || 'Failed to add recurring rule', 'error');
+      return false;
     }
   }, [fetchData, showToast]);
 
-  const updateRecurring = useCallback(async (id: string, updatedData: Partial<RecurringRule>) => {
+  const updateRecurring = useCallback(async (id: string, updatedData: Partial<RecurringRule>): Promise<boolean> => {
     try {
       await api.updateRecurring(id, updatedData);
       await fetchData();
       showToast('Recurring rule updated', 'success');
+      return true;
     } catch (err: any) {
       console.error('Failed to update recurring rule:', err);
       showToast(err.message || 'Failed to update recurring rule', 'error');
+      return false;
     }
   }, [fetchData, showToast]);
 
-  const deleteRecurring = useCallback(async (id: string) => {
+  const deleteRecurring = useCallback(async (id: string): Promise<boolean> => {
     try {
       await api.deleteRecurring(id);
       setRecurring(prev => prev.filter(r => r.id !== id));
       showToast('Recurring rule deleted', 'success');
+      return true;
     } catch (err: any) {
       console.error('Failed to delete recurring rule:', err);
       showToast(err.message || 'Failed to delete recurring rule', 'error');
+      return false;
     }
   }, [showToast]);
 
-  const runRecurring = useCallback(async (id: string) => {
+  const runRecurring = useCallback(async (id: string): Promise<boolean> => {
     try {
       await api.runRecurring(id);
       await fetchData();
       showToast('Recurring rule executed manually', 'success');
+      return true;
     } catch (err: any) {
       console.error('Failed to manually execute recurring rule:', err);
       showToast(err.message || 'Failed to execute recurring rule', 'error');
+      return false;
     }
   }, [fetchData, showToast]);
 
@@ -419,7 +466,8 @@ const App: React.FC = () => {
     setActivePage,
     refreshData: fetchData,
     user,
-  }), [accounts, categories, transactions, budgets, recurring, currency, setCurrency, theme, setTheme, addTransaction, updateTransaction, deleteTransaction, bulkDeleteTransactions, clearAllTransactions, addAccount, updateAccount, deleteAccount, addCategory, updateCategory, deleteCategory, setBudget, deleteBudget, addRecurring, updateRecurring, deleteRecurring, runRecurring, setActivePage, fetchData, user]);
+    updateUser,
+  }), [accounts, categories, transactions, budgets, recurring, currency, setCurrency, theme, setTheme, addTransaction, updateTransaction, deleteTransaction, bulkDeleteTransactions, clearAllTransactions, addAccount, updateAccount, deleteAccount, addCategory, updateCategory, deleteCategory, setBudget, deleteBudget, addRecurring, updateRecurring, deleteRecurring, runRecurring, setActivePage, fetchData, user, updateUser]);
 
   // Auth handlers
   const handleAuthSuccess = () => {
@@ -556,6 +604,9 @@ const App: React.FC = () => {
       <Route path="/profile" element={<Profile />} />
       <Route path="/settings" element={<Settings />} />
       <Route path="/admin" element={<Admin />} />
+      {/* Email-link routes must also resolve for logged-in users clicking links */}
+      <Route path="/verify-email" element={<VerifyEmail />} />
+      <Route path="/reset-password" element={<ResetPassword onSuccess={handleLogout} />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
@@ -564,6 +615,14 @@ const App: React.FC = () => {
     <AppContext.Provider value={appContextValue}>
       <div className="bg-gray-light font-sans text-gray-darkest min-h-screen dark:bg-gray-900 dark:text-gray-100">
         <div className="flex">
+          {/* Backdrop for the mobile drawer; hidden on desktop */}
+          {isMobileNavOpen && (
+            <div
+              className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+              onClick={() => setIsMobileNavOpen(false)}
+              aria-hidden="true"
+            />
+          )}
           <Sidebar
             activePage={activePage}
             setActivePage={setActivePage}
@@ -572,10 +631,12 @@ const App: React.FC = () => {
             theme={theme}
             setTheme={setTheme}
             onLogout={handleLogout}
+            isMobileOpen={isMobileNavOpen}
+            setMobileOpen={setIsMobileNavOpen}
           />
-          <main className={`flex-1 min-w-0 relative z-0 transition-all duration-300 ${isSidebarCollapsed ? 'ml-20' : 'ml-64'}`}>
+          <main className={`flex-1 min-w-0 relative z-0 transition-all duration-300 ${isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'}`}>
             <div className="min-h-screen flex flex-col">
-              <Header pageTitle={activePage} onNewTransaction={() => setIsModalOpen(true)} />
+              <Header pageTitle={activePage} onNewTransaction={() => setIsModalOpen(true)} onMenuClick={() => setIsMobileNavOpen(true)} />
               <div key={activePage} className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 page-enter">
                 {pageContent}
               </div>

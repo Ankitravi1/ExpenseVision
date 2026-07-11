@@ -2,6 +2,7 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { AppContext } from '../App';
 import { Icon, iconList } from './Icon';
+import { ConfirmDialog } from './ConfirmDialog';
 import { Account, AccountType } from '../types';
 import { getCurrencySymbol } from '../utils/currency';
 
@@ -29,6 +30,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ isOpen, onClos
     const [customTypeName, setCustomTypeName] = useState('');
     const [selectedIcon, setSelectedIcon] = useState('Wallet');
     const [showIconPicker, setShowIconPicker] = useState(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
     useEffect(() => {
         if (isOpen) { // Only reset/fill when modal opens
@@ -219,12 +221,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ isOpen, onClos
                             {account && onDelete && (
                                 <button
                                     type="button"
-                                    onClick={() => {
-                                        if (window.confirm('Are you sure you want to delete this account?')) {
-                                            onDelete(account.id);
-                                            onClose();
-                                        }
-                                    }}
+                                    onClick={() => setShowDeleteConfirm(true)}
                                     className="mt-3 w-full bg-red-50 text-red-600 font-semibold px-4 py-3 rounded-lg shadow-sm hover:bg-red-100 transition-colors dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30"
                                 >
                                     Delete Account
@@ -234,6 +231,23 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ isOpen, onClos
                     </form>
                 </div>
             </div>
+
+            {account && onDelete && (
+                <ConfirmDialog
+                    isOpen={showDeleteConfirm}
+                    onClose={() => setShowDeleteConfirm(false)}
+                    onConfirm={() => {
+                        onDelete(account.id);
+                        setShowDeleteConfirm(false);
+                        onClose();
+                    }}
+                    title="Delete Account"
+                    message="Are you sure you want to delete this account? This action cannot be undone."
+                    confirmText="Delete"
+                    cancelText="Cancel"
+                    variant="danger"
+                />
+            )}
         </>
     );
 };

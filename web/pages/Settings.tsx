@@ -77,7 +77,7 @@ const ClearDataModal: React.FC<ClearDataModalProps> = ({ isOpen, onClose, onConf
                                     className="w-4 h-4 rounded text-primary focus:ring-primary border-gray-300 dark:border-gray-600 dark:bg-gray-700"
                                 />
                                 <div>
-                                    <p className="text-sm font-semibold text-gray-755 dark:text-gray-200">Transactions</p>
+                                    <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">Transactions</p>
                                     <p className="text-xs text-gray-500 dark:text-gray-400">Permanently clears all transactions.</p>
                                 </div>
                             </label>
@@ -90,7 +90,7 @@ const ClearDataModal: React.FC<ClearDataModalProps> = ({ isOpen, onClose, onConf
                                     className="w-4 h-4 rounded text-primary focus:ring-primary border-gray-300 dark:border-gray-600 dark:bg-gray-700"
                                 />
                                 <div>
-                                    <p className="text-sm font-semibold text-gray-755 dark:text-gray-200">Budgets</p>
+                                    <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">Budgets</p>
                                     <p className="text-xs text-gray-500 dark:text-gray-400">Permanently clears all budgets.</p>
                                 </div>
                             </label>
@@ -103,7 +103,7 @@ const ClearDataModal: React.FC<ClearDataModalProps> = ({ isOpen, onClose, onConf
                                     className="w-4 h-4 rounded text-primary focus:ring-primary border-gray-300 dark:border-gray-600 dark:bg-gray-700"
                                 />
                                 <div>
-                                    <p className="text-sm font-semibold text-gray-755 dark:text-gray-200">Accounts</p>
+                                    <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">Accounts</p>
                                     <p className="text-xs text-gray-500 dark:text-gray-400">Permanently clears all accounts (and dependent transactions).</p>
                                 </div>
                             </label>
@@ -152,12 +152,9 @@ const ClearDataModal: React.FC<ClearDataModalProps> = ({ isOpen, onClose, onConf
 export const Settings: React.FC = () => {
     const context = useContext(AppContext);
     const { showToast } = useToast();
-    if (!context) return null;
-    const { theme, setTheme, transactions, refreshData } = context;
 
     const [notifications, setNotifications] = useState(false); // Default to false until checked
     const [budgetAlerts, setBudgetAlerts] = useState(false);
-    const [emailReports, setEmailReports] = useState(false);
     const [isClearDataOpen, setIsClearDataOpen] = useState(false);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [aiSettings, setAiSettings] = useState<AiSettings>(defaultAiSettings);
@@ -195,6 +192,9 @@ export const Settings: React.FC = () => {
             .catch(() => setVapidConfigured(false));
     }, []);
 
+    if (!context) return null;
+    const { theme, setTheme, refreshData } = context;
+
     const handleThemeChange = (newTheme: 'light' | 'dark') => {
         setTheme(newTheme);
     };
@@ -227,7 +227,7 @@ export const Settings: React.FC = () => {
                 message = 'Push notification configuration is missing on the backend.';
             }
 
-            showToast(message, 'success');
+            showToast(message, 'error');
         }
     };
 
@@ -246,13 +246,10 @@ export const Settings: React.FC = () => {
     };
 
     const handleClearData = async (options: { transactions: boolean; budgets: boolean; accounts: boolean }) => {
-        try {
-            await api.clearData(options);
-            await refreshData();
-        } catch (error: any) {
-            console.error('Clear data failed:', error);
-            showToast(error.message || 'Failed to clear data', 'error');
-        }
+        // Let errors propagate so ClearDataModal keeps itself open and shows the failure.
+        await api.clearData(options);
+        await refreshData();
+        showToast('Selected data cleared successfully.', 'success');
     };
 
     const handleExportData = async () => {
@@ -421,12 +418,12 @@ export const Settings: React.FC = () => {
             });
             const data = await res.json().catch(() => ({}));
             if (res.ok && data.success) {
-                alert(`Connection successful! Model replied: ${data.message || ''}`);
+                showToast(`Connection successful! Model replied: ${data.message || ''}`, 'success');
             } else {
-                alert(`Connection failed: ${data.error || 'Unknown error'}`);
+                showToast(`Connection failed: ${data.error || 'Unknown error'}`, 'error');
             }
         } catch (error: any) {
-            alert(`Connection failed: ${error.message || 'Network error'}`);
+            showToast(`Connection failed: ${error.message || 'Network error'}`, 'error');
         } finally {
             setIsTestingConnection(false);
         }
@@ -495,21 +492,23 @@ export const Settings: React.FC = () => {
                         </label>
                     </div>
 
-                    <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                    <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg opacity-60">
                         <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1">
                                 <Icon name="Mail" size={18} className="text-gray-600 dark:text-gray-400" />
                                 <h4 className="font-medium text-gray-darkest dark:text-gray-50">Email Reports</h4>
+                                <span className="px-1.5 py-0.5 text-[10px] font-bold rounded uppercase tracking-wider bg-gray-200 text-gray-600 dark:bg-gray-600 dark:text-gray-300">Coming soon</span>
                             </div>
                             <p className="text-sm text-gray-600 dark:text-gray-400">
                                 Receive monthly financial summary reports via email
                             </p>
                         </div>
-                        <label className="relative inline-flex items-center cursor-pointer ml-4">
+                        <label className="relative inline-flex items-center cursor-not-allowed ml-4">
                             <input
                                 type="checkbox"
-                                checked={emailReports}
-                                onChange={(e) => setEmailReports(e.target.checked)}
+                                checked={false}
+                                disabled
+                                readOnly
                                 className="sr-only peer"
                             />
                             <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 dark:peer-focus:ring-primary/40 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>

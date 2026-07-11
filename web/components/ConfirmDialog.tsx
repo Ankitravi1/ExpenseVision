@@ -31,6 +31,25 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
     }
   }, [isOpen]);
 
+  React.useEffect(() => {
+    if (!isOpen) {
+      document.body.style.overflow = 'unset';
+      return;
+    }
+
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = 'unset';
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const handleConfirm = () => {
@@ -43,7 +62,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
       case 'danger':
         return 'btn-danger';
       case 'warning':
-        return 'btn bg-warning-500 text-white hover:bg-warning-600';
+        return 'btn bg-amber-500 text-white hover:bg-amber-600';
       case 'primary':
         return 'btn-primary';
       default:

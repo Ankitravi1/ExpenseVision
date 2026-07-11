@@ -7,6 +7,7 @@ import { formatCurrency } from '../utils/currency';
 interface HeaderProps {
   pageTitle: string;
   onNewTransaction: () => void;
+  onMenuClick: () => void;
 }
 
 const getPageSubtitle = (title: string) => {
@@ -30,7 +31,7 @@ const getPageSubtitle = (title: string) => {
   }
 };
 
-export const Header: React.FC<HeaderProps> = ({ pageTitle, onNewTransaction }) => {
+export const Header: React.FC<HeaderProps> = ({ pageTitle, onNewTransaction, onMenuClick }) => {
   const context = useContext(AppContext);
   const accounts = context?.accounts || [];
   const currency = context?.currency || 'INR';
@@ -47,11 +48,20 @@ export const Header: React.FC<HeaderProps> = ({ pageTitle, onNewTransaction }) =
 
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-gray-300 p-4 sm:px-6 lg:px-8 flex items-center justify-between dark:bg-gray-800 dark:border-gray-700 backdrop-blur-sm bg-opacity-95 dark:bg-opacity-95 shadow-sm">
-      <div className="flex flex-col">
+      <div className="flex items-center gap-3">
+        <button
+          onClick={onMenuClick}
+          className="lg:hidden text-gray-darkest dark:text-gray-100 p-1 -ml-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          aria-label="Open navigation menu"
+        >
+          <Icon name="Menu" size={24} />
+        </button>
+        <div className="flex flex-col">
         <h2 className="text-xl sm:text-2xl font-black text-gray-darkest dark:text-gray-50 leading-tight">{displayTitle}</h2>
         <span className="text-xs text-gray-medium dark:text-gray-400 font-medium hidden sm:inline">{getPageSubtitle(pageTitle)}</span>
+        </div>
       </div>
-      
+
       <div className="flex items-center gap-3 sm:gap-4">
         <div className="flex flex-col items-end border-r border-gray-200 dark:border-gray-700 pr-3 sm:pr-4">
           <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Net Worth</span>

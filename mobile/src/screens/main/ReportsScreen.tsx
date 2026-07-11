@@ -1,108 +1,340 @@
-import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
-import { PieChart } from 'react-native-chart-kit';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { Card, EmptyState, lightHaptic } from '../../components/ui';
-import { CategoryIcon } from '../../components/CategoryIcon';
+import { Card, ChipSelector, DateField, lightHaptic } from '../../components/ui';
 import { formatCurrency } from '../../utils/currency';
 import { spacing, radius } from '../../theme';
+import { Transaction } from '../../types';
+import { shareReportCsv } from '../../utils/exportCsv';
+import { CategoryDonut, DonutSlice } from '../../components/reports/CategoryDonut';
+import { MoneyCalendar } from '../../components/reports/MoneyCalendar';
+import { FlowChart } from '../../components/reports/FlowChart';
+import { AccountsSummary, AccountStats } from '../../components/reports/AccountsSummary';
+import {
+    ViewMode,
+    getLocalDateString,
+    parseLocalDate,
+    dayPart,
+    rangeForViewMode,
+    shiftRange,
+    periodLabel,
+    csvField,
+} from '../../components/reports/helpers';
 
-const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+const VIEW_MODES: ViewMode[] = ['Daily', 'Weekly', 'Monthly', '3 Month', 'Yearly', 'Custom'];
 
-const monthLabel = (key: string) => {
-    const [y, m] = key.split('-').map(Number);
-    return new Date(y, m - 1, 1).toLocaleString('default', { month: 'long', year: 'numeric' });
+// A collapsible titled section wrapper.
+const Section: React.FC<{ title: string; subtitle?: string; children: React.ReactNode; defaultOpen?: boolean }> = ({
+    title,
+    subtitle,
+    children,
+    defaultOpen = true,
+}) => {
+    const { theme } = useTheme();
+    const [open, setOpen] = useState(defaultOpen);
+    return (
+        <Card style={{ marginBottom: spacing.md, padding: 0, overflow: 'hidden' }}>
+            <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => {
+                    lightHaptic();
+                    setOpen(o => !o);
+                }}
+                style={styles.sectionHeader}
+            >
+                <View style={{ flex: 1 }}>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>{title}</Text>
+                    {subtitle ? <Text style={{ color: theme.colors.textTertiary, fontSize: 11, marginTop: 2 }}>{subtitle}</Text> : null}
+                </View>
+                <MaterialCommunityIcons name={open ? 'chevron-up' : 'chevron-down'} size={22} color={theme.colors.textTertiary} />
+            </TouchableOpacity>
+            {open ? <View style={{ padding: spacing.md, paddingTop: 0 }}>{children}</View> : null}
+        </Card>
+    );
 };
 
-const shiftMonth = (key: string, delta: number) => {
-    const [y, m] = key.split('-').map(Number);
-    return monthKey(new Date(y, m - 1 + delta, 1));
+const StatCard: React.FC<{
+    label: string;
+    value: string;
+    icon: keyof typeof MaterialCommunityIcons.glyphMap;
+    rgb: string;
+    color: string;
+}> = ({ label, value, icon, rgb, color }) => {
+    const { theme } = useTheme();
+    return (
+        <View style={[styles.statCard, { borderColor: theme.colors.cardBorder }]}>
+            <LinearGradient
+                colors={[`rgba(${rgb},${theme.dark ? 0.22 : 0.12})`, `rgba(${rgb},0.02)`]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFill}
+            />
+            <View style={[styles.statIcon, { backgroundColor: `rgba(${rgb},0.18)` }]}>
+                <MaterialCommunityIcons name={icon} size={18} color={color} />
+            </View>
+            <Text style={{ color: theme.colors.textTertiary, fontSize: 10, fontWeight: '700', letterSpacing: 0.4, marginTop: spacing.sm }} numberOfLines={1}>
+                {label.toUpperCase()}
+            </Text>
+            <Text style={{ color, fontSize: 16, fontWeight: '900', marginTop: 2 }} numberOfLines={1}>
+                {value}
+            </Text>
+        </View>
+    );
 };
 
 export default function ReportsScreen() {
     const navigation = useNavigation();
-    const { transactions, categories, budgets } = useData();
+    const { transactions, categories, budgets, accounts, isLoading, refresh } = useData();
     const { user } = useAuth();
     const { theme } = useTheme();
     const currency = user?.currency || 'INR';
-    const currentMonth = monthKey(new Date());
-    const [month, setMonth] = useState(currentMonth);
-    const prevMonth = shiftMonth(month, -1);
 
-    const report = useMemo(() => {
-        const spentByCategory = (m: string) => {
-            const map = new Map<string, number>();
-            let total = 0;
-            let income = 0;
-            for (const t of transactions) {
-                if (!t.date.startsWith(m)) continue;
-                if (t.type === 'income') income += t.amount;
-                if (t.type !== 'expense') continue;
-                total += t.amount;
+    const initial = useMemo(() => rangeForViewMode('Monthly'), []);
+    const [viewMode, setViewMode] = useState<ViewMode>('Monthly');
+    const [startDate, setStartDate] = useState(initial.start);
+    const [endDate, setEndDate] = useState(initial.end);
+    const [carryOver, setCarryOver] = useState(true);
+    const [calendarMonthOffset, setCalendarMonthOffset] = useState(0);
+
+    // Reset the calendar's month offset whenever the report period changes, so
+    // the heatmap never points at a month outside the selected range.
+    useEffect(() => {
+        setCalendarMonthOffset(0);
+    }, [startDate, endDate]);
+
+    const changeViewMode = (mode: ViewMode) => {
+        setViewMode(mode);
+        if (mode !== 'Custom') {
+            const r = rangeForViewMode(mode);
+            setStartDate(r.start);
+            setEndDate(r.end);
+        }
+    };
+
+    const shift = (direction: -1 | 1) => {
+        if (viewMode === 'Custom') return;
+        lightHaptic();
+        const r = shiftRange(viewMode, startDate, endDate, direction);
+        setStartDate(r.start);
+        setEndDate(r.end);
+    };
+
+    const inRange = useCallback((t: Transaction) => {
+        const d = dayPart(t.date);
+        return d >= startDate && d <= endDate;
+    }, [startDate, endDate]);
+
+    const filtered = useMemo(() => transactions.filter(inRange), [transactions, inRange]);
+
+    const totalIncome = useMemo(
+        () => filtered.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0),
+        [filtered],
+    );
+    const totalExpenses = useMemo(
+        () => filtered.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0),
+        [filtered],
+    );
+
+    const preRangeBalance = useMemo(() => {
+        let inflow = 0;
+        let outflow = 0;
+        for (const t of transactions) {
+            if (dayPart(t.date) >= startDate) continue;
+            if (t.type === 'income') inflow += t.amount;
+            else if (t.type === 'expense') outflow += t.amount;
+            else if (t.type === 'transfer') {
+                inflow += t.amount;
+                outflow += t.amount;
+            }
+        }
+        const initialSum = accounts.reduce((s, a) => s + (a.initialBalance ?? 0), 0);
+        return inflow - outflow + initialSum;
+    }, [transactions, accounts, startDate]);
+
+    const displayBalance = carryOver ? preRangeBalance + totalIncome - totalExpenses : totalIncome - totalExpenses;
+
+    const buildSlices = useCallback((type: 'expense' | 'income'): DonutSlice[] => {
+        const byCat: Record<string, number> = {};
+        for (const t of filtered) {
+            if (t.type !== type) continue;
+            const name = categories.find(c => c.id === t.categoryId)?.name || 'Uncategorized';
+            byCat[name] = (byCat[name] || 0) + t.amount;
+        }
+        return Object.entries(byCat)
+            .map(([name, value]) => ({ name, value, icon: categories.find(c => c.name === name)?.icon }))
+            .sort((a, b) => b.value - a.value);
+    }, [filtered, categories]);
+
+    const expenseSlices = useMemo(() => buildSlices('expense'), [buildSlices]);
+    const incomeSlices = useMemo(() => buildSlices('income'), [buildSlices]);
+
+    const daySeries = useMemo(() => {
+        const expenseByDay: Record<string, number> = {};
+        const incomeByDay: Record<string, number> = {};
+        for (const t of filtered) {
+            const d = dayPart(t.date);
+            if (t.type === 'expense') expenseByDay[d] = (expenseByDay[d] || 0) + t.amount;
+            else if (t.type === 'income') incomeByDay[d] = (incomeByDay[d] || 0) + t.amount;
+        }
+        return { expenseByDay, incomeByDay };
+    }, [filtered]);
+
+    const accountStats = useMemo((): AccountStats[] => {
+        return accounts
+            .map(account => {
+                let income = 0;
+                let expense = 0;
+                let transferIn = 0;
+                let transferOut = 0;
+                const txs: Transaction[] = [];
+                for (const t of filtered) {
+                    const touches = t.accountId === account.id || t.transferToAccountId === account.id;
+                    if (!touches) continue;
+                    txs.push(t);
+                    if (t.type === 'income' && t.accountId === account.id) income += t.amount;
+                    if (t.type === 'expense' && t.accountId === account.id) expense += t.amount;
+                    if (t.type === 'transfer') {
+                        if (t.accountId === account.id) transferOut += t.amount;
+                        if (t.transferToAccountId === account.id) transferIn += t.amount;
+                    }
+                }
+                // copy already local (txs built fresh); sort newest-first
+                txs.sort((a, b) => dayPart(b.date).localeCompare(dayPart(a.date)));
+                return {
+                    account,
+                    income,
+                    expense,
+                    transferIn,
+                    transferOut,
+                    periodNet: income - expense - transferOut + transferIn,
+                    incomePct: totalIncome > 0 ? (income / totalIncome) * 100 : 0,
+                    expensePct: totalExpenses > 0 ? (expense / totalExpenses) * 100 : 0,
+                    txs,
+                };
+            })
+            .sort((a, b) => b.income + b.expense - (a.income + a.expense));
+    }, [accounts, filtered, totalIncome, totalExpenses]);
+
+    const metrics = useMemo(() => {
+        const startMs = parseLocalDate(startDate).getTime();
+        const endMs = parseLocalDate(endDate).getTime();
+        const days = Math.max(1, Math.round((endMs - startMs) / 86400000) + 1);
+        const dailyBurn = totalExpenses / days;
+        const topCategory = expenseSlices[0]?.name || 'None';
+        const savingsRate = totalIncome > 0 ? Math.max(0, ((totalIncome - totalExpenses) / totalIncome) * 100) : 0;
+
+        const activeBudgetCatIds = budgets
+            .filter(b => !b.month || b.month === startDate.substring(0, 7))
+            .map(b => b.categoryId);
+        const unbudgetedSpent = filtered
+            .filter(t => t.type === 'expense' && !activeBudgetCatIds.includes(t.categoryId || ''))
+            .reduce((s, t) => s + t.amount, 0);
+
+        return { dailyBurn, topCategory, savingsRate, unbudgetedSpent };
+    }, [startDate, endDate, totalExpenses, totalIncome, expenseSlices, budgets, filtered]);
+
+    // Text insights (comparison vs previous equivalent period) — mirrors web.
+    const insights = useMemo(() => {
+        const start = parseLocalDate(startDate);
+        const end = parseLocalDate(endDate);
+        let prevStart: string;
+        let prevEnd: string;
+        let comparisonLabel: string;
+        if (viewMode === 'Monthly') {
+            const prevDate = new Date(start.getFullYear(), start.getMonth() - 1, 1);
+            const prevMonthEnd = new Date(start.getFullYear(), start.getMonth(), 0);
+            prevStart = getLocalDateString(prevDate);
+            prevEnd = getLocalDateString(prevMonthEnd);
+            comparisonLabel = prevDate.toLocaleString('default', { month: 'long' });
+        } else {
+            const lengthDays = Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000) + 1);
+            const prevEndDate = new Date(start.getFullYear(), start.getMonth(), start.getDate() - 1);
+            const prevStartDate = new Date(prevEndDate.getFullYear(), prevEndDate.getMonth(), prevEndDate.getDate() - (lengthDays - 1));
+            prevStart = getLocalDateString(prevStartDate);
+            prevEnd = getLocalDateString(prevEndDate);
+            comparisonLabel = `previous ${lengthDays} day${lengthDays === 1 ? '' : 's'}`;
+        }
+
+        const prevExpenses = transactions.filter(t => {
+            if (t.type !== 'expense') return false;
+            const d = dayPart(t.date);
+            return d >= prevStart && d <= prevEnd;
+        });
+        const prevTotal = prevExpenses.reduce((s, t) => s + t.amount, 0);
+        const totalDeltaPct = prevTotal > 0 ? ((totalExpenses - prevTotal) / prevTotal) * 100 : null;
+
+        const byCat = (list: Transaction[]) =>
+            list.reduce((acc: Record<string, number>, t) => {
                 const key = t.categoryId || 'uncategorized';
-                map.set(key, (map.get(key) || 0) + t.amount);
-            }
-            return { map, total, income };
-        };
-
-        const cur = spentByCategory(month);
-        const prev = spentByCategory(prevMonth);
-
-        // Category rows sorted by spend
-        const rows = [...cur.map.entries()]
-            .map(([categoryId, amount]) => ({
-                categoryId,
-                category: categories.find(c => c.id === categoryId),
-                amount,
-                share: cur.total > 0 ? amount / cur.total : 0,
-            }))
-            .sort((a, b) => b.amount - a.amount);
-
-        // Insight 1: biggest category change vs previous month
-        let biggestChange: { name: string; icon?: string; delta: number } | null = null;
-        const allCatIds = new Set([...cur.map.keys(), ...prev.map.keys()]);
-        for (const id of allCatIds) {
-            const delta = (cur.map.get(id) || 0) - (prev.map.get(id) || 0);
+                acc[key] = (acc[key] || 0) + t.amount;
+                return acc;
+            }, {});
+        const curByCat = byCat(filtered.filter(t => t.type === 'expense'));
+        const prevByCat = byCat(prevExpenses);
+        let biggestChange: { name: string; delta: number } | null = null;
+        for (const id of new Set([...Object.keys(curByCat), ...Object.keys(prevByCat)])) {
+            const delta = (curByCat[id] || 0) - (prevByCat[id] || 0);
             if (!biggestChange || Math.abs(delta) > Math.abs(biggestChange.delta)) {
-                const c = categories.find(x => x.id === id);
-                biggestChange = { name: c?.name || 'Uncategorized', icon: c?.icon, delta };
+                biggestChange = { name: categories.find(c => c.id === id)?.name || 'Uncategorized', delta };
             }
         }
 
-        // Insight 2: spending pace vs total budget (only for the current month)
+        const now = new Date();
+        const isCurrentMonth = start.getMonth() === now.getMonth() && start.getFullYear() === now.getFullYear();
         let pace: { projected: number; totalBudget: number } | null = null;
-        if (month === currentMonth) {
-            const totalBudget = budgets.reduce((sum, b) => sum + (b.effectiveAmount ?? b.amount), 0);
-            if (totalBudget > 0) {
-                const now = new Date();
-                const daysElapsed = now.getDate();
+        if (isCurrentMonth) {
+            const monthStr = startDate.substring(0, 7);
+            const monthlyBudgets = budgets.filter(b => b.month === monthStr);
+            const repeatingBudgets = budgets.filter(b => !b.month && !monthlyBudgets.some(mb => mb.categoryId === b.categoryId));
+            const totalBudget = [...monthlyBudgets, ...repeatingBudgets].reduce((s, b) => s + (b.effectiveAmount ?? b.amount), 0);
+            if (totalBudget > 0 && now.getDate() > 0) {
                 const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-                pace = { projected: (cur.total / daysElapsed) * daysInMonth, totalBudget };
+                pace = { projected: (totalExpenses / now.getDate()) * daysInMonth, totalBudget };
             }
         }
 
-        // Insight 3: total vs previous month
-        const totalDeltaPct = prev.total > 0 ? ((cur.total - prev.total) / prev.total) * 100 : null;
+        return { totalDeltaPct, prevTotal, comparisonLabel, biggestChange, pace };
+    }, [startDate, endDate, viewMode, totalExpenses, transactions, filtered, categories, budgets]);
 
-        return { rows, total: cur.total, income: cur.income, prevTotal: prev.total, biggestChange, pace, totalDeltaPct };
-    }, [transactions, categories, budgets, month, prevMonth, currentMonth]);
+    const hasTextInsights =
+        insights.totalDeltaPct !== null ||
+        (insights.biggestChange && insights.biggestChange.delta !== 0) ||
+        !!insights.pace;
 
-    const barColors = [theme.colors.primary, theme.colors.success, theme.colors.warning, theme.colors.danger, '#8b5cf6', '#ec4899', '#14b8a6'];
+    const exportCsv = async () => {
+        if (filtered.length === 0) return;
+        const headers = ['Date', 'Time', 'Note', 'Amount', 'Account', 'Type', 'Category', 'Transfer To'];
+        const rows = filtered.map(t => {
+            const cat = categories.find(c => c.id === t.categoryId);
+            const acc = accounts.find(a => a.id === t.accountId);
+            const dest = t.transferToAccountId ? accounts.find(a => a.id === t.transferToAccountId) : null;
+            const time = t.date.includes('T') ? t.date.split('T')[1]?.slice(0, 5) : '';
+            return [
+                dayPart(t.date),
+                time || '',
+                t.note,
+                t.amount.toFixed(2),
+                acc?.name || '',
+                t.type,
+                cat?.name || (t.type === 'transfer' ? 'Transfer' : ''),
+                dest?.name || '',
+            ].map(csvField);
+        });
+        const csv = [headers.map(csvField).join(','), ...rows.map(r => r.join(','))].join('\n');
+        try {
+            await shareReportCsv(csv, `expensevision_${startDate}_to_${endDate}.csv`);
+        } catch {
+            /* sharing unavailable / cancelled — silent */
+        }
+    };
 
-    const pieChartData = useMemo(() => {
-        return report.rows.map((row, i) => ({
-            name: row.category?.name || 'Uncategorized',
-            amount: row.amount,
-            color: barColors[i % barColors.length],
-            legendFontColor: theme.colors.textSecondary,
-            legendFontSize: 12
-        }));
-    }, [report.rows, theme, barColors]);
+    const isEmptyPeriod = filtered.length === 0;
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top']}>
@@ -110,158 +342,225 @@ export default function ReportsScreen() {
                 <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                     <MaterialCommunityIcons name="arrow-left" size={24} color={theme.colors.text} />
                 </TouchableOpacity>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <TouchableOpacity
-                        onPress={() => (navigation as any).openDrawer?.()}
-                        style={{ marginRight: 12, padding: 4 }}
-                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                    >
-                        <MaterialCommunityIcons name="menu" size={26} color={theme.colors.text} />
-                    </TouchableOpacity>
-                    <Text style={[styles.title, { color: theme.colors.text }]}>Reports</Text>
-                </View>
-                <View style={{ width: 24 }} />
-            </View>
-
-            {/* Month navigator */}
-            <View style={styles.monthRow}>
+                <Text style={[styles.title, { color: theme.colors.text }]}>Reports</Text>
                 <TouchableOpacity
                     onPress={() => {
                         lightHaptic();
-                        setMonth(shiftMonth(month, -1));
+                        exportCsv();
                     }}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    disabled={isEmptyPeriod}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                    style={{ opacity: isEmptyPeriod ? 0.35 : 1 }}
                 >
-                    <MaterialCommunityIcons name="chevron-left" size={26} color={theme.colors.textSecondary} />
-                </TouchableOpacity>
-                <Text style={{ color: theme.colors.text, fontWeight: '700', fontSize: 15 }}>{monthLabel(month)}</Text>
-                <TouchableOpacity
-                    onPress={() => {
-                        if (month >= currentMonth) return;
-                        lightHaptic();
-                        setMonth(shiftMonth(month, 1));
-                    }}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    style={{ opacity: month < currentMonth ? 1 : 0.3 }}
-                >
-                    <MaterialCommunityIcons name="chevron-right" size={26} color={theme.colors.textSecondary} />
+                    <MaterialCommunityIcons name="tray-arrow-down" size={22} color={theme.colors.primary} />
                 </TouchableOpacity>
             </View>
 
-            <ScrollView contentContainerStyle={{ padding: spacing.md, paddingTop: 0 }}>
-                {/* Totals */}
-                <View style={{ flexDirection: 'row', gap: spacing.md, marginBottom: spacing.md }}>
-                    <Card style={{ flex: 1 }}>
-                        <Text style={[styles.cardLabel, { color: theme.colors.textSecondary }]}>Spent</Text>
-                        <Text style={{ color: theme.colors.danger, fontWeight: '800', fontSize: 18 }}>
-                            {formatCurrency(report.total, currency)}
+            <ScrollView
+                contentContainerStyle={{ padding: spacing.md }}
+                refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refresh} tintColor={theme.colors.primary} />}
+            >
+                {/* View mode + period nav */}
+                <ChipSelector
+                    options={VIEW_MODES.map(m => ({ value: m, label: m }))}
+                    value={viewMode}
+                    onChange={v => changeViewMode(v as ViewMode)}
+                />
+
+                {viewMode === 'Custom' ? (
+                    <View style={{ flexDirection: 'row', gap: spacing.md }}>
+                        <View style={{ flex: 1 }}>
+                            <DateField
+                                label="From"
+                                value={startDate}
+                                onChange={iso => {
+                                    setStartDate(iso);
+                                    setViewMode('Custom');
+                                }}
+                            />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <DateField
+                                label="To"
+                                value={endDate}
+                                onChange={iso => {
+                                    setEndDate(iso);
+                                    setViewMode('Custom');
+                                }}
+                            />
+                        </View>
+                    </View>
+                ) : (
+                    <View style={[styles.periodNav, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder }]}>
+                        <TouchableOpacity onPress={() => shift(-1)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                            <MaterialCommunityIcons name="chevron-left" size={26} color={theme.colors.textSecondary} />
+                        </TouchableOpacity>
+                        <Text style={{ color: theme.colors.text, fontWeight: '800', fontSize: 15 }}>
+                            {periodLabel(viewMode, startDate, endDate)}
                         </Text>
-                    </Card>
-                    <Card style={{ flex: 1 }}>
-                        <Text style={[styles.cardLabel, { color: theme.colors.textSecondary }]}>Income</Text>
-                        <Text style={{ color: theme.colors.success, fontWeight: '800', fontSize: 18 }}>
-                            {formatCurrency(report.income, currency)}
+                        <TouchableOpacity onPress={() => shift(1)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                            <MaterialCommunityIcons name="chevron-right" size={26} color={theme.colors.textSecondary} />
+                        </TouchableOpacity>
+                    </View>
+                )}
+
+                {/* Carry-over toggle */}
+                <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={() => {
+                        lightHaptic();
+                        setCarryOver(c => !c);
+                    }}
+                    style={[styles.carryRow, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder }]}
+                >
+                    <MaterialCommunityIcons
+                        name={carryOver ? 'checkbox-marked' : 'checkbox-blank-outline'}
+                        size={20}
+                        color={carryOver ? theme.colors.primary : theme.colors.textTertiary}
+                    />
+                    <View style={{ marginLeft: spacing.sm, flex: 1 }}>
+                        <Text style={{ color: theme.colors.text, fontSize: 13, fontWeight: '700' }}>Carry over balance</Text>
+                        <Text style={{ color: theme.colors.textTertiary, fontSize: 11 }}>
+                            Include savings from before this period in the balance
                         </Text>
-                    </Card>
+                    </View>
+                </TouchableOpacity>
+
+                {/* Stat cards */}
+                <View style={styles.statRow}>
+                    <StatCard label="Expense" value={`−${formatCurrency(totalExpenses, currency)}`} icon="trending-down" rgb="244,63,94" color={theme.colors.danger} />
+                    <StatCard label="Income" value={`+${formatCurrency(totalIncome, currency)}`} icon="trending-up" rgb="16,185,129" color={theme.colors.success} />
+                    <StatCard
+                        label={carryOver ? 'Balance' : 'Net'}
+                        value={formatCurrency(displayBalance, currency)}
+                        icon="wallet-outline"
+                        rgb="59,130,246"
+                        color="#3b82f6"
+                    />
                 </View>
+
+                {isEmptyPeriod ? (
+                    <Card style={{ marginBottom: spacing.md, alignItems: 'center', paddingVertical: spacing.lg }}>
+                        <MaterialCommunityIcons name="calendar-blank-outline" size={40} color={theme.colors.textTertiary} />
+                        <Text style={{ color: theme.colors.textSecondary, fontWeight: '700', marginTop: spacing.sm }}>
+                            No transactions in this period
+                        </Text>
+                        <Text style={{ color: theme.colors.textTertiary, fontSize: 12, marginTop: 4, textAlign: 'center' }}>
+                            Try a different range or add some transactions.
+                        </Text>
+                    </Card>
+                ) : null}
+
+                {/* Overview donuts */}
+                <Section title="Overview" subtitle="Category breakdown">
+                    <CategoryDonut
+                        expense={expenseSlices}
+                        income={incomeSlices}
+                        expenseTotal={totalExpenses}
+                        incomeTotal={totalIncome}
+                        currency={currency}
+                    />
+                </Section>
+
+                {/* Calendar heatmap */}
+                <Section title="Money Calendar" subtitle="Daily activity intensity">
+                    <MoneyCalendar
+                        monthOffset={calendarMonthOffset}
+                        onMonthOffsetChange={setCalendarMonthOffset}
+                        baseStartDate={startDate}
+                        dayTotals={daySeries.expenseByDay}
+                        currency={currency}
+                        rangeStart={startDate}
+                        rangeEnd={endDate}
+                        key={`${startDate}-${endDate}`}
+                    />
+                </Section>
+
+                {/* Flow chart */}
+                <Section title="Transaction Flow" subtitle="Income vs expense over time">
+                    <FlowChart start={startDate} end={endDate} series={daySeries} currency={currency} />
+                </Section>
+
+                {/* Accounts */}
+                <Section title="Accounts Summary" subtitle="Per-account activity this period">
+                    <AccountsSummary stats={accountStats} accounts={accounts} categories={categories} currency={currency} />
+                </Section>
 
                 {/* Insights */}
-                <Card style={{ marginBottom: spacing.md }}>
-                    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Insights</Text>
+                <Section title="Insights" subtitle="Key metrics & trends">
+                    <View style={styles.tileGrid}>
+                        <InsightTile label="Daily Burn Rate" value={`${formatCurrency(metrics.dailyBurn, currency)}/day`} rgb="245,158,11" />
+                        <InsightTile label="Top Category" value={metrics.topCategory} rgb="99,102,241" />
+                        <InsightTile label="Savings Rate" value={`${metrics.savingsRate.toFixed(1)}%`} rgb="16,185,129" />
+                        <InsightTile label="Unbudgeted Spent" value={formatCurrency(metrics.unbudgetedSpent, currency)} rgb="244,63,94" />
+                    </View>
 
-                    {report.totalDeltaPct !== null ? (
-                        <View style={styles.insightRow}>
-                            <MaterialCommunityIcons
-                                name={report.totalDeltaPct >= 0 ? 'trending-up' : 'trending-down'}
-                                size={20}
-                                color={report.totalDeltaPct >= 0 ? theme.colors.danger : theme.colors.success}
-                            />
-                            <Text style={[styles.insightText, { color: theme.colors.textSecondary }]}>
-                                Spending is {Math.abs(report.totalDeltaPct).toFixed(0)}% {report.totalDeltaPct >= 0 ? 'higher' : 'lower'} than {monthLabel(prevMonth)} ({formatCurrency(report.prevTotal, currency)})
-                            </Text>
+                    {hasTextInsights ? (
+                        <View style={{ marginTop: spacing.md, gap: spacing.sm }}>
+                            {insights.totalDeltaPct !== null ? (
+                                <InsightLine
+                                    icon={insights.totalDeltaPct >= 0 ? 'trending-up' : 'trending-down'}
+                                    color={insights.totalDeltaPct >= 0 ? theme.colors.danger : theme.colors.success}
+                                    text={`Spending is ${Math.abs(insights.totalDeltaPct).toFixed(0)}% ${insights.totalDeltaPct >= 0 ? 'higher' : 'lower'} than ${insights.comparisonLabel} (${formatCurrency(insights.prevTotal, currency)})`}
+                                />
+                            ) : null}
+                            {insights.biggestChange && insights.biggestChange.delta !== 0 ? (
+                                <InsightLine
+                                    icon="swap-horizontal"
+                                    color={theme.colors.primary}
+                                    text={`Biggest change: ${insights.biggestChange.name} (${insights.biggestChange.delta > 0 ? '+' : '−'}${formatCurrency(Math.abs(insights.biggestChange.delta), currency)} vs ${insights.comparisonLabel})`}
+                                />
+                            ) : null}
+                            {insights.pace ? (
+                                <InsightLine
+                                    icon="speedometer"
+                                    color={insights.pace.projected > insights.pace.totalBudget ? theme.colors.danger : theme.colors.success}
+                                    text={`At this pace you'll spend ~${formatCurrency(insights.pace.projected, currency)} this month (${insights.pace.projected > insights.pace.totalBudget ? 'over' : 'within'} your ${formatCurrency(insights.pace.totalBudget, currency)} budget)`}
+                                />
+                            ) : null}
                         </View>
-                    ) : null}
-
-                    {report.biggestChange && report.biggestChange.delta !== 0 ? (
-                        <View style={styles.insightRow}>
-                            <CategoryIcon name={report.biggestChange.icon} size={14} />
-                            <Text style={[styles.insightText, { color: theme.colors.textSecondary }]}>
-                                Biggest change: {report.biggestChange.name} ({report.biggestChange.delta > 0 ? '+' : '−'}{formatCurrency(Math.abs(report.biggestChange.delta), currency)} vs last month)
-                            </Text>
-                        </View>
-                    ) : null}
-
-                    {report.pace ? (
-                        <View style={styles.insightRow}>
-                            <MaterialCommunityIcons
-                                name="speedometer"
-                                size={20}
-                                color={report.pace.projected > report.pace.totalBudget ? theme.colors.danger : theme.colors.success}
-                            />
-                            <Text style={[styles.insightText, { color: theme.colors.textSecondary }]}>
-                                At this pace you'll spend ~{formatCurrency(report.pace.projected, currency)} this month ({report.pace.projected > report.pace.totalBudget ? 'over' : 'within'} your {formatCurrency(report.pace.totalBudget, currency)} total budget)
-                            </Text>
-                        </View>
-                    ) : null}
-
-                    {report.totalDeltaPct === null && (!report.biggestChange || report.biggestChange.delta === 0) && !report.pace ? (
-                        <Text style={{ color: theme.colors.textTertiary, fontSize: 13 }}>
-                            Not enough data yet — insights appear once you have transactions in two months.
-                        </Text>
-                    ) : null}
-                </Card>
-
-                {/* Category breakdown */}
-                <Card>
-                    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Spending by category</Text>
-                    {report.rows.length === 0 ? (
-                        <EmptyState icon="chart-pie" title="No expenses this month" />
                     ) : (
-                        <>
-                            <PieChart
-                                data={pieChartData}
-                                width={Dimensions.get('window').width - spacing.md * 4}
-                                height={220}
-                                chartConfig={{
-                                    color: (opacity = 1) => theme.colors.text,
-                                }}
-                                accessor={"amount"}
-                                backgroundColor={"transparent"}
-                                paddingLeft={"15"}
-                                absolute
-                            />
-                            {report.rows.map((row, i) => (
-                            <View key={row.categoryId} style={{ marginBottom: spacing.md }}>
-                                <View style={styles.catHeader}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                                        <CategoryIcon name={row.category?.icon} size={14} />
-                                        <Text style={{ color: theme.colors.text, fontWeight: '600', marginLeft: spacing.sm }} numberOfLines={1}>
-                                            {row.category?.name || 'Uncategorized'}
-                                        </Text>
-                                    </View>
-                                    <Text style={{ color: theme.colors.textSecondary, fontSize: 13 }}>
-                                        {formatCurrency(row.amount, currency)} · {(row.share * 100).toFixed(0)}%
-                                    </Text>
-                                </View>
-                                <View style={[styles.track, { backgroundColor: theme.colors.separator }]}>
-                                    <View
-                                        style={[
-                                            styles.fill,
-                                            { width: `${Math.max(2, row.share * 100)}%`, backgroundColor: barColors[i % barColors.length] },
-                                        ]}
-                                    />
-                                </View>
-                            </View>
-                            ))}
-                        </>
+                        <Text style={{ color: theme.colors.textTertiary, fontSize: 12, marginTop: spacing.md }}>
+                            Not enough data yet — trend insights appear once you have activity across two periods.
+                        </Text>
                     )}
-                </Card>
+                </Section>
 
                 <View style={{ height: spacing.xl }} />
             </ScrollView>
         </SafeAreaView>
     );
 }
+
+const InsightTile: React.FC<{ label: string; value: string; rgb: string }> = ({ label, value, rgb }) => {
+    const { theme } = useTheme();
+    return (
+        <View style={[styles.tile, { borderColor: theme.colors.cardBorder }]}>
+            <LinearGradient
+                colors={[`rgba(${rgb},${theme.dark ? 0.2 : 0.1})`, `rgba(${rgb},0.02)`]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFill}
+            />
+            <Text style={{ color: theme.colors.textTertiary, fontSize: 10, fontWeight: '700', letterSpacing: 0.3 }} numberOfLines={1}>
+                {label.toUpperCase()}
+            </Text>
+            <Text style={{ color: theme.colors.text, fontSize: 16, fontWeight: '900', marginTop: 4 }} numberOfLines={1}>
+                {value}
+            </Text>
+        </View>
+    );
+};
+
+const InsightLine: React.FC<{ icon: keyof typeof MaterialCommunityIcons.glyphMap; color: string; text: string }> = ({ icon, color, text }) => {
+    const { theme } = useTheme();
+    return (
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }}>
+            <MaterialCommunityIcons name={icon} size={18} color={color} style={{ marginTop: 1 }} />
+            <Text style={{ color: theme.colors.textSecondary, fontSize: 13, lineHeight: 19, flex: 1 }}>{text}</Text>
+        </View>
+    );
+};
 
 const styles = StyleSheet.create({
     header: {
@@ -274,47 +573,63 @@ const styles = StyleSheet.create({
         fontSize: 20,
         fontWeight: '800',
     },
-    monthRow: {
+    periodNav: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: spacing.lg,
-        paddingBottom: spacing.md,
+        borderWidth: 1,
+        borderRadius: radius.md,
+        paddingVertical: spacing.sm,
+        paddingHorizontal: spacing.md,
+        marginBottom: spacing.md,
     },
-    cardLabel: {
-        fontSize: 13,
-        fontWeight: '500',
-        marginBottom: 4,
+    carryRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderRadius: radius.md,
+        padding: spacing.md,
+        marginBottom: spacing.md,
+    },
+    statRow: {
+        flexDirection: 'row',
+        gap: spacing.sm,
+        marginBottom: spacing.md,
+    },
+    statCard: {
+        flex: 1,
+        borderWidth: 1,
+        borderRadius: radius.md,
+        padding: spacing.sm,
+        overflow: 'hidden',
+    },
+    statIcon: {
+        width: 30,
+        height: 30,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    sectionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: spacing.md,
     },
     sectionTitle: {
         fontSize: 16,
-        fontWeight: '700',
-        marginBottom: spacing.md,
+        fontWeight: '800',
     },
-    insightRow: {
+    tileGrid: {
         flexDirection: 'row',
-        alignItems: 'flex-start',
+        flexWrap: 'wrap',
         gap: spacing.sm,
-        marginBottom: spacing.sm,
     },
-    insightText: {
-        flex: 1,
-        fontSize: 13,
-        lineHeight: 19,
-    },
-    catHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 6,
-    },
-    track: {
-        height: 8,
-        borderRadius: 4,
+    tile: {
+        width: '47%',
+        flexGrow: 1,
+        borderWidth: 1,
+        borderRadius: radius.md,
+        padding: spacing.md,
         overflow: 'hidden',
-    },
-    fill: {
-        height: 8,
-        borderRadius: 4,
     },
 });

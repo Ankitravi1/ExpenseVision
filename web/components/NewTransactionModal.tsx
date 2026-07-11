@@ -3,6 +3,7 @@ import React, { useState, useContext, useEffect, useRef } from 'react';
 import { AppContext } from '../App';
 import { useToast } from '../context/ToastContext';
 import { Icon } from './Icon';
+import { ConfirmDialog } from './ConfirmDialog';
 import { TransactionType } from '../types';
 import { getCurrencySymbol, formatCurrency } from '../utils/currency';
 import { api } from '../services/api';
@@ -36,12 +37,16 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
     const [isParsingVoiceText, setIsParsingVoiceText] = useState(false);
     const [voiceParseError, setVoiceParseError] = useState('');
     const [aiEnabled, setAiEnabled] = useState(false);
+    const [amountError, setAmountError] = useState('');
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const nativeDateInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         setIsMounted(true);
         if (isOpen) {
-            getAiSettings().then(settings => setAiEnabled(settings.enabled));
+            getAiSettings()
+                .then(settings => setAiEnabled(settings.enabled))
+                .catch(() => setAiEnabled(false));
         }
     }, [isOpen]);
 
@@ -78,15 +83,7 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
         }
     }, [transaction, isOpen]); // Reset when opening
 
-    // Removed auto-select category useEffect to allow blank default
-    // useEffect(() => {
-    //     if (!transaction && context?.categories && type !== 'transfer') {
-    //         const firstCat = context.categories.find(c => c.type === type);
-    //         if (firstCat) setCategoryId(firstCat.id);
-    //     }
-    // }, [context?.categories, type, transaction]);
-
-    if (!isMounted || !context) return null;
+    if (!isMounted || !context || !isOpen) return null;
 
     const { accounts, categories, addTransaction, updateTransaction, currency } = context;
 
@@ -133,10 +130,17 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
         }
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (!amount || !note || !accountId) {
+        const numericAmount = parseFloat(amount);
+        if (!amount || isNaN(numericAmount) || numericAmount <= 0) {
+            setAmountError('Enter an amount greater than 0.');
+            return;
+        }
+        setAmountError('');
+
+        if (!note || !accountId) {
             showToast('Please fill required fields.', 'error');
             return;
         }
@@ -167,7 +171,7 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
         const transactionData = {
             date: dateTimeString,
             note,
-            amount: parseFloat(amount),
+            amount: numericAmount,
             type,
             categoryId: (type === 'transfer' || !categoryId) ? undefined : categoryId,
             accountId,
@@ -175,11 +179,13 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
         };
 
         if (transaction) {
-            updateTransaction(transaction.id, transactionData);
+            // Await the update; only close/reset if it actually succeeded so edits
+            // aren't discarded on failure.
+            const ok = await updateTransaction(transaction.id, transactionData);
+            if (!ok) return;
         } else {
-            addTransaction(transactionData).then(() => {
-                window.dispatchEvent(new CustomEvent('transaction-created'));
-            });
+            await addTransaction(transactionData);
+            window.dispatchEvent(new CustomEvent('transaction-created'));
         }
 
         // Reset form and close
@@ -294,12 +300,16 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
                                         type="number"
                                         id="amount"
                                         value={amount}
-                                        onChange={e => setAmount(e.target.value)}
+                                        onChange={e => { setAmount(e.target.value); if (amountError) setAmountError(''); }}
                                         placeholder="0.00"
+                                        min="0.01"
                                         step="0.01"
-                                        className={`${inputStyles} pl-8 text-xl font-semibold`}
+                                        className={`${inputStyles} pl-8 text-xl font-semibold ${amountError ? 'ring-2 ring-danger/50 border-danger' : ''}`}
                                     />
                                 </div>
+                                {amountError && (
+                                    <p className="mt-1 text-sm text-danger">{amountError}</p>
+                                )}
                             </div>
 
                         <div>
@@ -396,12 +406,7 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
                         {transaction && onDelete && (
                             <button
                                 type="button"
-                                onClick={() => {
-                                    if (window.confirm('Are you sure you want to delete this transaction?')) {
-                                        onDelete(transaction.id);
-                                        onClose();
-                                    }
-                                }}
+                                onClick={() => setShowDeleteConfirm(true)}
                                 className="mt-3 w-full bg-red-50 text-red-600 font-semibold px-4 py-3 rounded-lg shadow-sm hover:bg-red-100 transition-colors dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30 flex justify-center items-center"
                             >
                                 <Icon name="Trash2" size={20} className="mr-2" />
@@ -411,6 +416,23 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
                     </div>
                 </form>
             </div>
+
+            {transaction && onDelete && (
+                <ConfirmDialog
+                    isOpen={showDeleteConfirm}
+                    onClose={() => setShowDeleteConfirm(false)}
+                    onConfirm={() => {
+                        onDelete(transaction.id);
+                        setShowDeleteConfirm(false);
+                        onClose();
+                    }}
+                    title="Delete Transaction"
+                    message="Are you sure you want to delete this transaction? This action cannot be undone."
+                    confirmText="Delete"
+                    cancelText="Cancel"
+                    variant="danger"
+                />
+            )}
         </>
     );
 };

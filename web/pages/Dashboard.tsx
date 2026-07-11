@@ -14,7 +14,6 @@ const StatCard: React.FC<{ title: string; amount: number; change: number; type: 
   let gradientClass = '';
   let borderClass = '';
   let textClass = '';
-  let trendColorClass = '';
   let iconName = '';
 
   switch (type) {
@@ -22,24 +21,28 @@ const StatCard: React.FC<{ title: string; amount: number; change: number; type: 
       gradientClass = 'from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20';
       borderClass = 'border-emerald-200 dark:border-emerald-800/30';
       textClass = 'text-emerald-900 dark:text-emerald-100';
-      trendColorClass = 'text-emerald-600 dark:text-emerald-400';
       iconName = 'TrendingUp';
       break;
     case 'expense':
       gradientClass = 'from-rose-50 to-rose-100 dark:from-rose-900/20 dark:to-rose-800/20';
       borderClass = 'border-rose-200 dark:border-rose-800/30';
       textClass = 'text-rose-900 dark:text-rose-100';
-      trendColorClass = 'text-rose-600 dark:text-rose-400';
       iconName = 'TrendingDown';
       break;
     case 'net':
       gradientClass = 'from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-800/20';
       borderClass = 'border-blue-200 dark:border-blue-800/30';
       textClass = 'text-blue-900 dark:text-blue-100';
-      trendColorClass = 'text-blue-600 dark:text-blue-400';
       iconName = 'Wallet';
       break;
   }
+
+  // Trend semantics differ by card type: a rising expense is unfavorable (red),
+  // whereas rising income / net flow is favorable (green).
+  const isFavorableChange = type === 'expense' ? change <= 0 : change >= 0;
+  const trendColorClass = isFavorableChange
+    ? 'text-emerald-600 dark:text-emerald-400'
+    : 'text-rose-600 dark:text-rose-400';
 
   return (
     <div className={`flex-1 p-6 rounded-2xl border bg-gradient-to-br shadow-sm ${gradientClass} ${borderClass}`}>
@@ -55,7 +58,7 @@ const StatCard: React.FC<{ title: string; amount: number; change: number; type: 
         </div>
       </div>
       <div className="mt-4 flex items-center text-sm">
-        <span className={`font-medium flex items-center ${isPositiveChange ? 'text-emerald-600' : 'text-rose-600'}`}>
+        <span className={`font-medium flex items-center ${trendColorClass}`}>
           <Icon name={isPositiveChange ? 'ArrowUp' : 'ArrowDown'} size={14} className="mr-1" />
           {Math.abs(change)}%
         </span>
@@ -223,7 +226,7 @@ export const Dashboard: React.FC = () => {
     const expenseChange = calculateChange(totalExpenses, lastMonthExpenses);
     const netFlowChange = calculateChange(netFlow, lastMonthNetFlow);
 
-    const recentTransactions = transactions
+    const recentTransactions = [...transactions]
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .slice(0, 5);
 

@@ -4,6 +4,7 @@ import { Icon } from '../components/Icon';
 import { api } from '../services/api';
 import { AppContext } from '../App';
 import { useToast } from '../context/ToastContext';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 
 interface UserItem {
     id: string;
@@ -138,6 +139,7 @@ export const Admin: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [resetUser, setResetUser] = useState<UserItem | null>(null);
+    const [deleteTarget, setDeleteTarget] = useState<UserItem | null>(null);
     const [successMsg, setSuccessMsg] = useState('');
 
     const fetchUsers = async () => {
@@ -160,9 +162,8 @@ export const Admin: React.FC = () => {
 
     useEffect(() => { fetchUsers(); }, []);
 
-    const handleDeleteUser = async (id: string, name: string) => {
+    const handleDeleteUser = async (id: string) => {
         if (id === deletingId) return;
-        if (!window.confirm(`Delete "${name}" and ALL their data?\n\nThis is permanent and cannot be undone.`)) return;
         setDeletingId(id);
         try {
             const res = await api.fetch(`/admin/users/${id}`, { method: 'DELETE' });
@@ -202,6 +203,17 @@ export const Admin: React.FC = () => {
                     onSuccess={() => showSuccess(`Password for ${resetUser.name} updated successfully.`)}
                 />
             )}
+
+            <ConfirmDialog
+                isOpen={!!deleteTarget}
+                onClose={() => setDeleteTarget(null)}
+                onConfirm={() => { if (deleteTarget) handleDeleteUser(deleteTarget.id); }}
+                title="Delete User"
+                message={deleteTarget ? `Delete "${deleteTarget.name}" and ALL their data? This is permanent and cannot be undone.` : ''}
+                confirmText="Delete User"
+                cancelText="Cancel"
+                variant="danger"
+            />
 
             <div className="flex flex-wrap justify-between items-center gap-4">
                 <div>
@@ -326,7 +338,7 @@ export const Admin: React.FC = () => {
                                                     {/* Reset Password */}
                                                     <button
                                                         onClick={() => setResetUser(user)}
-                                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/20 dark:hover:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-xs font-semibold border border-indigo-150 dark:border-indigo-900/30 transition"
+                                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/20 dark:hover:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-xs font-semibold border border-indigo-200 dark:border-indigo-900/30 transition"
                                                         title="Reset Password"
                                                     >
                                                         <Icon name="KeyRound" size={13} />
@@ -334,7 +346,7 @@ export const Admin: React.FC = () => {
                                                     </button>
                                                     {/* Delete */}
                                                     <button
-                                                        onClick={() => handleDeleteUser(user.id, user.name)}
+                                                        onClick={() => setDeleteTarget(user)}
                                                         disabled={deletingId === user.id}
                                                         className="p-1.5 rounded-lg btn btn-danger text-white shadow-sm hover:shadow transition"
                                                         title="Delete User & Data"

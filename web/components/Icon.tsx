@@ -76,7 +76,21 @@ import {
   RefreshCw,
   UserCheck,
   Filter,
-  SlidersHorizontal
+  SlidersHorizontal,
+  ArrowRight,
+  Eye,
+  EyeOff,
+  Play,
+  KeyRound,
+  Mail,
+  Zap,
+  FileSpreadsheet,
+  Heart,
+  Loader,
+  CheckCircle,
+  BellOff,
+  Lock,
+  Menu
 } from 'lucide-react';
 
 export type IconName = string;
@@ -163,7 +177,21 @@ const iconComponents: { [key: string]: React.ComponentType<any> } = {
   RefreshCw,
   UserCheck,
   Filter,
-  SlidersHorizontal
+  SlidersHorizontal,
+  ArrowRight,
+  Eye,
+  EyeOff,
+  Play,
+  KeyRound,
+  Mail,
+  Zap,
+  FileSpreadsheet,
+  Heart,
+  Loader,
+  CheckCircle,
+  BellOff,
+  Lock,
+  Menu
 };
 
 export const iconList = Object.keys(iconComponents);

@@ -1,4 +1,4 @@
-import React, { useContext, useMemo, useState, useRef } from 'react';
+import React, { useContext, useMemo, useState, useRef, useEffect } from 'react';
 import { AppContext } from '../App';
 import { Card } from '../components/Card';
 import { Icon } from '../components/Icon';
@@ -87,7 +87,7 @@ const TransactionRow: React.FC<{
                 </span>
             </td>
             {/* Transfer To */}
-            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-555 dark:text-gray-400 font-bold">
+            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 font-bold">
                 {isTransfer && destAccount ? (
                     <span className="inline-flex items-center gap-1 text-primary dark:text-indigo-400">
                         <Icon name="ArrowRight" size={12} />
@@ -116,6 +116,7 @@ export const TransactionsPage: React.FC = () => {
 
     const startDateRef = useRef<HTMLInputElement>(null);
     const endDateRef = useRef<HTMLInputElement>(null);
+    const amountFilterRef = useRef<HTMLTableCellElement>(null);
 
     // Helper to get YYYY-MM-DD in local time
     const getLocalDateString = (date: Date) => {
@@ -123,6 +124,13 @@ export const TransactionsPage: React.FC = () => {
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const day = String(date.getDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
+    };
+
+    // Parse a YYYY-MM-DD string as a LOCAL date (new Date("YYYY-MM-DD") parses as UTC,
+    // which breaks period navigation in UTC-negative timezones).
+    const parseLocalDate = (s: string) => {
+        const [y, m, d] = s.substring(0, 10).split('-').map(Number);
+        return new Date(y, m - 1, d);
     };
 
     // Default dates: 1st of current month to last day of current month
@@ -180,7 +188,7 @@ export const TransactionsPage: React.FC = () => {
                 end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
                 break;
             case '3 Month':
-                start = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+                start = new Date(now.getFullYear(), now.getMonth() - 2, 1);
                 end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
                 break;
             case 'Yearly':
@@ -199,9 +207,9 @@ export const TransactionsPage: React.FC = () => {
     const handleShiftPeriod = (direction: -1 | 1) => {
         if (viewMode === 'Custom') return;
 
-        const currentStart = new Date(startDate);
-        let newStart = new Date(startDate);
-        let newEnd = new Date(endDate);
+        const currentStart = parseLocalDate(startDate);
+        let newStart = parseLocalDate(startDate);
+        let newEnd = parseLocalDate(endDate);
 
         switch (viewMode) {
             case 'Daily':
@@ -262,10 +270,12 @@ export const TransactionsPage: React.FC = () => {
     };
 
     const toggleSelectAll = () => {
-        if (selectedIds.length === filteredAndSortedTransactions.length) {
+        const visibleIds = filteredAndSortedTransactions.map(t => t.id);
+        const allVisibleSelected = visibleIds.length > 0 && visibleIds.every(id => selectedIds.includes(id));
+        if (allVisibleSelected) {
             setSelectedIds([]);
         } else {
-            setSelectedIds(filteredAndSortedTransactions.map(t => t.id));
+            setSelectedIds(visibleIds);
         }
     };
 
@@ -274,6 +284,24 @@ export const TransactionsPage: React.FC = () => {
             prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
         );
     };
+
+    // Clear bulk-delete selection whenever the visible rows may change (date range or
+    // column filters). Prevents deleting rows the user can no longer see.
+    useEffect(() => {
+        setSelectedIds([]);
+    }, [startDate, endDate, colFilters]);
+
+    // Dismiss the amount filter popup when clicking outside of it.
+    useEffect(() => {
+        if (!showAmountFilterPopup) return;
+        const handleClickOutside = (e: MouseEvent) => {
+            if (amountFilterRef.current && !amountFilterRef.current.contains(e.target as Node)) {
+                setShowAmountFilterPopup(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [showAmountFilterPopup]);
 
     // Date-only filtered transactions memo (used as fallback for stats calculation)
     const dateFilteredTransactions = useMemo(() => {
@@ -314,12 +342,18 @@ export const TransactionsPage: React.FC = () => {
             }
             if (colFilters.amountLimit) {
                 const limit = parseFloat(colFilters.amountLimit);
-                if (t.type !== colFilters.amountType) return false;
-                if (t.amount > limit) return false;
+                // The limit only applies to rows of the selected type; rows of other
+                // types stay visible.
+                if (t.type === colFilters.amountType && t.amount > limit) return false;
             }
 
             return true;
         });
+
+        // id -> display name lookups so Account/Category columns sort by the name
+        // shown to the user rather than the raw cuid.
+        const accountNameById = new Map(accounts.map(a => [a.id, a.name] as const));
+        const categoryNameById = new Map(categories.map(c => [c.id, c.name] as const));
 
         return [...filtered].sort((a, b) => {
             const key = sortConfig.key;
@@ -329,6 +363,12 @@ export const TransactionsPage: React.FC = () => {
             if (key === 'date') {
                 valA = a.date;
                 valB = b.date;
+            } else if (key === 'accountId') {
+                valA = accountNameById.get(a.accountId) || '';
+                valB = accountNameById.get(b.accountId) || '';
+            } else if (key === 'categoryId') {
+                valA = categoryNameById.get(a.categoryId || '') || '';
+                valB = categoryNameById.get(b.categoryId || '') || '';
             }
 
             if (valA === undefined) return 1;
@@ -491,7 +531,7 @@ export const TransactionsPage: React.FC = () => {
                                 <button
                                     type="button"
                                     onClick={() => endDateRef.current?.showPicker?.()}
-                                    className="p-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded text-gray-455 hover:text-gray-300 flex items-center justify-center"
+                                    className="p-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded text-gray-500 hover:text-gray-300 flex items-center justify-center"
                                 >
                                     <Icon name="Calendar" size={13} />
                                 </button>
@@ -514,7 +554,7 @@ export const TransactionsPage: React.FC = () => {
                             </label>
                             <div className="relative group/tooltip">
                                 <Icon name="Info" size={12} className="text-gray-400 dark:text-gray-500 hover:text-primary dark:hover:text-indigo-400 cursor-pointer" />
-                                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-[10px] rounded-lg shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-205 z-50 leading-normal">
+                                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-[10px] rounded-lg shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-200 z-50 leading-normal">
                                     Includes your savings/expenses from previous months in the starting balance.
                                 </div>
                             </div>
@@ -535,7 +575,7 @@ export const TransactionsPage: React.FC = () => {
                 */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                     {/* Expense Card - Rose Gradient styled matching dashboard */}
-                    <Card className="flex items-center p-6 bg-gradient-to-br from-rose-50 to-rose-100/50 dark:from-rose-950/20 dark:to-gray-800/40 border border-rose-150 dark:border-rose-900/30 shadow-sm rounded-xl">
+                    <Card className="flex items-center p-6 bg-gradient-to-br from-rose-50 to-rose-100/50 dark:from-rose-950/20 dark:to-gray-800/40 border border-rose-200 dark:border-rose-900/30 shadow-sm rounded-xl">
                         <div className="w-12 h-12 rounded-xl bg-red-100/80 dark:bg-rose-950/40 flex items-center justify-center mr-4">
                             <Icon name="TrendingDown" className="text-danger dark:text-rose-400" size={24} />
                         </div>
@@ -548,20 +588,20 @@ export const TransactionsPage: React.FC = () => {
                     </Card>
 
                     {/* Income Card - Emerald Gradient styled matching dashboard */}
-                    <Card className="flex items-center p-6 bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-950/20 dark:to-gray-800/40 border border-emerald-150 dark:border-emerald-900/30 shadow-sm rounded-xl">
-                        <div className="w-12 h-12 rounded-xl bg-green-100/80 dark:bg-emerald-955/40 flex items-center justify-center mr-4">
-                            <Icon name="TrendingUp" className="text-success dark:text-emerald-405" size={24} />
+                    <Card className="flex items-center p-6 bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-950/20 dark:to-gray-800/40 border border-emerald-200 dark:border-emerald-900/30 shadow-sm rounded-xl">
+                        <div className="w-12 h-12 rounded-xl bg-green-100/80 dark:bg-emerald-950/40 flex items-center justify-center mr-4">
+                            <Icon name="TrendingUp" className="text-success dark:text-emerald-400" size={24} />
                         </div>
                         <div>
                             <p className="text-xs font-medium text-emerald-700 dark:text-gray-300">Total Income</p>
-                            <p className="text-2xl font-bold mt-1 text-success dark:text-emerald-405">
+                            <p className="text-2xl font-bold mt-1 text-success dark:text-emerald-400">
                                 +{formatCurrency(rangeIncome, currency)}
                             </p>
                         </div>
                     </Card>
 
                     {/* Balance Card - Blue/Indigo Gradient matching dashboard */}
-                    <Card className="flex items-center p-6 bg-gradient-to-br from-blue-50 to-indigo-50/50 dark:from-indigo-950/20 dark:to-gray-800/40 border border-blue-150 dark:border-indigo-900/30 shadow-sm rounded-xl">
+                    <Card className="flex items-center p-6 bg-gradient-to-br from-blue-50 to-indigo-50/50 dark:from-indigo-950/20 dark:to-gray-800/40 border border-blue-200 dark:border-indigo-900/30 shadow-sm rounded-xl">
                         <div className="w-12 h-12 rounded-xl bg-primary-light dark:bg-primary/20 text-primary dark:text-indigo-300 flex items-center justify-center mr-4">
                             <Icon name="CircleDollarSign" size={24} />
                         </div>
@@ -588,7 +628,7 @@ export const TransactionsPage: React.FC = () => {
                             onClick={() => setShowTableFilters(!showTableFilters)}
                             className={`flex items-center gap-1.5 py-1.5 px-3.5 rounded-xl text-xs font-bold transition-all border shadow-sm ${
                                 showTableFilters
-                                    ? 'bg-primary-dark border-primary-dark text-white'
+                                    ? 'bg-primary-hover border-primary-hover text-white'
                                     : 'bg-primary border-primary text-white hover:bg-primary-hover'
                             }`}
                         >
@@ -597,7 +637,7 @@ export const TransactionsPage: React.FC = () => {
                         </button>
 
                         {/* Apply filters to stats directly behind filter button on left side */}
-                        <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-gray-600 dark:text-gray-350 select-none bg-gray-100 dark:bg-gray-800 px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700">
+                        <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-gray-600 dark:text-gray-400 select-none bg-gray-100 dark:bg-gray-800 px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700">
                             <input
                                 type="checkbox"
                                 checked={applyFiltersToSummary}
@@ -611,7 +651,7 @@ export const TransactionsPage: React.FC = () => {
                     <div className="flex items-center gap-4 flex-wrap">
                         {selectedIds.length > 0 && (
                             <div className="flex items-center gap-2 bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/50 px-3 py-1 rounded-lg text-[10px]">
-                                <span className="font-extrabold text-rose-650 dark:text-rose-400">{selectedIds.length} selected</span>
+                                <span className="font-extrabold text-rose-600 dark:text-rose-400">{selectedIds.length} selected</span>
                                 <button
                                     onClick={() => setIsBulkDeleteConfirmOpen(true)}
                                     className="px-2 py-0.5 bg-rose-600 hover:bg-rose-700 text-white rounded font-bold transition-colors"
@@ -675,7 +715,7 @@ export const TransactionsPage: React.FC = () => {
                                              className="input text-xs py-1 px-2 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md outline-none focus:ring-1 focus:ring-primary text-gray-900 dark:text-gray-100"
                                          />
                                      </th>
-                                     <th className="px-4 py-1.5 relative">
+                                     <th ref={amountFilterRef} className="px-4 py-1.5 relative">
                                          <button
                                              type="button"
                                              onClick={() => setShowAmountFilterPopup(!showAmountFilterPopup)}
@@ -693,7 +733,7 @@ export const TransactionsPage: React.FC = () => {
                                              <Icon name="ChevronDown" size={12} className="ml-1 flex-shrink-0" />
                                          </button>
                                          {showAmountFilterPopup && (
-                                             <div className="absolute top-full right-0 mt-1 w-56 p-3 bg-white dark:bg-gray-800 border border-gray-255 dark:border-gray-700 rounded-lg shadow-xl z-50 flex flex-col gap-3">
+                                             <div className="absolute top-full right-0 mt-1 w-56 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 flex flex-col gap-3">
                                                  <div className="text-[10px] font-bold text-gray-400 dark:text-gray-400 uppercase tracking-wider">Amount Filter</div>
                                                  <div className="grid grid-cols-2 gap-1 bg-gray-100 dark:bg-gray-900 p-0.5 rounded-lg">
                                                      <button

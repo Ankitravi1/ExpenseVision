@@ -92,7 +92,7 @@ export default function ProfileScreen() {
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top']}>
             {/* Header */}
-            <View style={styles.header}>
+            <View style={[styles.header, { borderBottomColor: theme.colors.cardBorder }]}>
                 <TouchableOpacity
                     onPress={() => navigation.goBack()}
                     style={styles.backBtn}
@@ -194,7 +194,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.sm,
         borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: '#334155',
     },
     backBtn: {
         width: 40,

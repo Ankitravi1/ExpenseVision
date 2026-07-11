@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, RefreshControl } from 'react-native';
+import React, { useState, useMemo } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, RefreshControl, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useData } from '../../context/DataContext';
@@ -23,6 +23,7 @@ export default function BudgetsScreen() {
     const [showForm, setShowForm] = useState(false);
     const [editing, setEditing] = useState<Budget | null>(null);
     const [preSelectedCategoryId, setPreSelectedCategoryId] = useState<string | null>(null);
+    const [activeTab, setActiveTab] = useState<'All' | 'Over' | 'Warning' | 'Healthy'>('All');
     const currency = user?.currency || 'INR';
 
     const activeMonth = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
@@ -43,6 +44,56 @@ export default function BudgetsScreen() {
     const unbudgetedCategories = categories.filter(
         c => c.type === 'expense' && !budgetedCategoryIds.has(c.id)
     );
+
+    const expenseCategoryCount = categories.filter(c => c.type === 'expense').length;
+
+    // Overall progress across the (deduped) budgets for this month.
+    const { totalBudget, totalSpent } = filteredBudgets.reduce(
+        (acc, b) => ({
+            totalBudget: acc.totalBudget + (b.effectiveAmount ?? b.amount),
+            totalSpent: acc.totalSpent + b.spent,
+        }),
+        { totalBudget: 0, totalSpent: 0 }
+    );
+    const totalRemaining = totalBudget - totalSpent;
+    const overallPercentage = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
+
+    // Classify each budget for the status tabs — mirrors web/pages/Budgets.tsx
+    // (threshold defaults to 80; over > 100%, near limit >= threshold, else on track).
+    const groupedBudgets = useMemo(() => {
+        const over: Budget[] = [];
+        const warning: Budget[] = [];
+        const healthy: Budget[] = [];
+        filteredBudgets.forEach(b => {
+            const limit = b.effectiveAmount ?? b.amount;
+            const percentage = limit > 0 ? (b.spent / limit) * 100 : 100;
+            const threshold = b.alertThreshold ?? 80;
+            if (percentage > 100) over.push(b);
+            else if (percentage >= threshold) warning.push(b);
+            else healthy.push(b);
+        });
+        return { over, warning, healthy };
+    }, [filteredBudgets]);
+
+    const budgetsToDisplay = useMemo(() => {
+        switch (activeTab) {
+            case 'Over':
+                return groupedBudgets.over;
+            case 'Warning':
+                return groupedBudgets.warning;
+            case 'Healthy':
+                return groupedBudgets.healthy;
+            default:
+                return filteredBudgets;
+        }
+    }, [activeTab, groupedBudgets, filteredBudgets]);
+
+    const statusTabs: { key: typeof activeTab; label: string; count: number; accent: string; dot: boolean }[] = [
+        { key: 'All', label: 'All Budgets', count: filteredBudgets.length, accent: theme.colors.primary, dot: false },
+        { key: 'Over', label: 'Over Budget', count: groupedBudgets.over.length, accent: theme.colors.danger, dot: true },
+        { key: 'Warning', label: 'Near Limit', count: groupedBudgets.warning.length, accent: theme.colors.warning, dot: true },
+        { key: 'Healthy', label: 'On Track', count: groupedBudgets.healthy.length, accent: theme.colors.success, dot: true },
+    ];
 
     const confirmDelete = (b: Budget) => {
         const cat = categories.find(c => c.id === b.categoryId);
@@ -119,17 +170,87 @@ export default function BudgetsScreen() {
             </View>
 
             <FlatList
-                data={filteredBudgets}
+                data={budgetsToDisplay}
                 keyExtractor={b => b.id}
                 contentContainerStyle={{ padding: spacing.md, paddingTop: 0, gap: spacing.sm }}
                 refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refresh} tintColor={theme.colors.primary} />}
-                extraData={{ filteredBudgets, categories }}
+                extraData={{ budgetsToDisplay, categories, activeTab }}
+                ListHeaderComponent={
+                    <View style={{ gap: spacing.md, marginBottom: spacing.sm }}>
+                        {/* Overall Progress */}
+                        <View style={[styles.overallCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder }]}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm }}>
+                                <Text style={{ color: theme.colors.text, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                    Overall Progress
+                                </Text>
+                                <View style={{ backgroundColor: theme.colors.inputBg, borderRadius: radius.sm, paddingHorizontal: spacing.sm, paddingVertical: 2 }}>
+                                    <Text style={{ color: theme.colors.textSecondary, fontSize: 11, fontWeight: '600' }}>
+                                        {overallPercentage.toFixed(1)}% used
+                                    </Text>
+                                </View>
+                            </View>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: spacing.sm }}>
+                                <Text style={{ color: theme.colors.text, fontSize: 26, fontWeight: '800' }}>
+                                    {formatCurrency(totalSpent, currency)}
+                                </Text>
+                                <Text style={{ color: theme.colors.textSecondary, fontSize: 13 }}>
+                                    of {formatCurrency(totalBudget, currency)}
+                                </Text>
+                            </View>
+                            <View style={[styles.track, { backgroundColor: theme.colors.separator, height: 10, borderRadius: 5 }]}>
+                                <View
+                                    style={{
+                                        height: 10,
+                                        borderRadius: 5,
+                                        width: `${Math.min(overallPercentage, 105)}%`,
+                                        backgroundColor: overallPercentage > 100 ? theme.colors.danger : overallPercentage > 75 ? theme.colors.warning : theme.colors.primary,
+                                    }}
+                                />
+                            </View>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.sm }}>
+                                <Text style={{ color: theme.colors.textSecondary, fontSize: 12, fontWeight: '600' }}>
+                                    {filteredBudgets.length} of {expenseCategoryCount} categories budgeted
+                                </Text>
+                                <Text style={{ color: totalRemaining >= 0 ? theme.colors.success : theme.colors.danger, fontSize: 12, fontWeight: '700' }}>
+                                    {formatCurrency(Math.abs(totalRemaining), currency)} {totalRemaining >= 0 ? 'remaining' : 'over budget'}
+                                </Text>
+                            </View>
+                        </View>
+
+                        {/* Status filter tabs */}
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.sm, paddingVertical: 2 }}>
+                            {statusTabs.map(tab => {
+                                const selected = activeTab === tab.key;
+                                return (
+                                    <TouchableOpacity
+                                        key={tab.key}
+                                        onPress={() => setActiveTab(tab.key)}
+                                        style={[
+                                            styles.statusTab,
+                                            {
+                                                backgroundColor: selected ? tab.accent : theme.colors.card,
+                                                borderColor: selected ? tab.accent : theme.colors.cardBorder,
+                                            },
+                                        ]}
+                                    >
+                                        {tab.dot && (
+                                            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: selected ? '#fff' : tab.accent }} />
+                                        )}
+                                        <Text style={{ color: selected ? '#fff' : theme.colors.textSecondary, fontSize: 12, fontWeight: '700' }}>
+                                            {tab.label} ({tab.count})
+                                        </Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </ScrollView>
+                    </View>
+                }
                 renderItem={({ item: b }) => {
                     const cat = categories.find(c => c.id === b.categoryId);
                     const limit = b.effectiveAmount ?? b.amount;
                     const ratio = limit > 0 ? Math.min(1, b.spent / limit) : 1;
                     const over = b.spent > limit;
-                    const warnRatio = (b.alertThreshold ?? 100) / 100;
+                    const warnRatio = (b.alertThreshold ?? 80) / 100;
                     const barColor = over ? theme.colors.danger : ratio >= warnRatio ? theme.colors.warning : theme.colors.success;
                     return (
                         <TouchableOpacity
@@ -176,7 +297,11 @@ export default function BudgetsScreen() {
                     );
                 }}
                 ListEmptyComponent={
-                    <EmptyState icon="target" title="No budgets yet" subtitle="Tap + to set a monthly limit for a category." />
+                    filteredBudgets.length === 0 ? (
+                        <EmptyState icon="target" title="No budgets yet" subtitle="Tap + to set a monthly limit for a category." />
+                    ) : (
+                        <EmptyState icon="filter-variant" title="No budgets in this filter" subtitle="Adjust the status tab above or set a new limit." />
+                    )
                 }
                 ListFooterComponent={renderFooter}
             />
@@ -258,6 +383,20 @@ const styles = StyleSheet.create({
         borderRadius: radius.md,
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    overallCard: {
+        padding: spacing.md,
+        borderRadius: radius.lg,
+        borderWidth: 1,
+    },
+    statusTab: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: spacing.md,
+        paddingVertical: 8,
+        borderRadius: radius.lg,
+        borderWidth: 1,
     },
     budgetRow: {
         padding: spacing.md,

@@ -57,8 +57,10 @@ export const api = {
                     window.location.href = '/';
                 }
             } else {
-                // No refresh token, logout
+                // No refresh token — logout and redirect so React auth state
+                // resets instead of leaving a zombie authenticated UI.
                 authService.logout();
+                window.location.href = '/';
             }
         }
 
