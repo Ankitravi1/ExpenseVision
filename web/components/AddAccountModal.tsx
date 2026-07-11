@@ -79,7 +79,10 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ isOpen, onClos
         };
 
         if (account) {
-            updateAccount(account.id, accountData); // Handle update
+            // Preserve the existing frozen flag — this modal doesn't manage freeze
+            // state (that's handled from the Accounts page), so never let a save
+            // here accidentally thaw a frozen account.
+            updateAccount(account.id, { ...accountData, frozen: account.frozen ?? false }); // Handle update
         } else {
             addAccount(accountData); // Handle add
         }
@@ -116,6 +119,12 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ isOpen, onClos
                         </button>
                     </div>
                     <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
+                        {account?.frozen && (
+                            <div className="flex items-center gap-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-medium">
+                                <Icon name="Snowflake" size={16} className="flex-shrink-0" />
+                                <span>This account is frozen. Use the Unfreeze action on the Accounts page to reactivate it.</span>
+                            </div>
+                        )}
                         <div>
                             <label className={labelStyles}>Account Type</label>
                             <div className="grid grid-cols-3 gap-2 mt-2">

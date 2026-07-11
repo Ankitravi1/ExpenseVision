@@ -206,7 +206,11 @@ export const Recurring: React.FC = () => {
     runRecurring,
   } = context;
 
-  const [form, setForm] = useState<RuleForm>(() => emptyForm(accounts[0]?.id || ''));
+  // Frozen accounts are rejected by the backend for recurring rules, so keep
+  // them out of the account pickers entirely.
+  const selectableAccounts = useMemo(() => accounts.filter(a => !a.frozen), [accounts]);
+
+  const [form, setForm] = useState<RuleForm>(() => emptyForm(selectableAccounts[0]?.id || ''));
   const [deleteTarget, setDeleteTarget] = useState<RecurringRule | null>(null);
 
   const expenseCategories = categories.filter(category => category.type === form.type);
@@ -219,7 +223,7 @@ export const Recurring: React.FC = () => {
   const categoryName = (id: string) => categories.find(c => c.id === id)?.name || 'Unknown';
 
   const resetForm = () => {
-    setForm(emptyForm(accounts[0]?.id || ''));
+    setForm(emptyForm(selectableAccounts[0]?.id || ''));
   };
 
   const editRule = (rule: RecurringRule) => {
@@ -384,9 +388,14 @@ export const Recurring: React.FC = () => {
                 className="input"
               >
                 <option value="">Select account</option>
-                {accounts.map(account => (
+                {selectableAccounts.map(account => (
                   <option key={account.id} value={account.id}>{account.name}</option>
                 ))}
+                {/* Keep the currently-selected account visible even if it has since been
+                    frozen, so editing an existing rule doesn't silently blank the field. */}
+                {form.accountId && !selectableAccounts.some(a => a.id === form.accountId) && (
+                  <option value={form.accountId}>{accountName(form.accountId)} (frozen)</option>
+                )}
               </select>
             </label>
 
@@ -399,9 +408,12 @@ export const Recurring: React.FC = () => {
                   className="input"
                 >
                   <option value="">Select account</option>
-                  {accounts.filter(account => account.id !== form.accountId).map(account => (
+                  {selectableAccounts.filter(account => account.id !== form.accountId).map(account => (
                     <option key={account.id} value={account.id}>{account.name}</option>
                   ))}
+                  {form.transferToAccountId && !selectableAccounts.some(a => a.id === form.transferToAccountId) && (
+                    <option value={form.transferToAccountId}>{accountName(form.transferToAccountId)} (frozen)</option>
+                  )}
                 </select>
               </label>
             ) : (

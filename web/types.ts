@@ -45,6 +45,7 @@ export interface Account {
   color?: string;
   icon?: string; // Added icon support
   logo?: string;
+  frozen?: boolean;
 }
 
 export interface Budget {

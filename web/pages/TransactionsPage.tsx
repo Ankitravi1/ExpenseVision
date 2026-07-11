@@ -1,4 +1,5 @@
 import React, { useContext, useMemo, useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AppContext } from '../App';
 import { Card } from '../components/Card';
 import { Icon } from '../components/Icon';
@@ -6,7 +7,6 @@ import { Transaction } from '../types';
 import { formatCurrency } from '../utils/currency';
 import { NewTransactionModal } from '../components/NewTransactionModal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
-import { ImportTransactionsModal } from '../components/ImportTransactionsModal';
 import { formatTransactionDate, isoDateToDisplay } from '../utils/date';
 
 const TransactionRow: React.FC<{ 
@@ -113,6 +113,7 @@ const TransactionRow: React.FC<{
 
 export const TransactionsPage: React.FC = () => {
     const { transactions, deleteTransaction, bulkDeleteTransactions, accounts, categories, currency, theme } = useContext(AppContext)!;
+    const navigate = useNavigate();
 
     const startDateRef = useRef<HTMLInputElement>(null);
     const endDateRef = useRef<HTMLInputElement>(null);
@@ -152,7 +153,6 @@ export const TransactionsPage: React.FC = () => {
     // Bulk delete selections
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [isBulkDeleteConfirmOpen, setIsBulkDeleteConfirmOpen] = useState<boolean>(false);
-    const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
 
     // Excel-like Column Filters State
     const [colFilters, setColFilters] = useState({
@@ -561,7 +561,7 @@ export const TransactionsPage: React.FC = () => {
                         </div>
 
                         <button
-                            onClick={() => setIsImportModalOpen(true)}
+                            onClick={() => navigate('/import-export?section=import')}
                             className="btn btn-primary flex items-center gap-1.5 py-2 px-3.5 text-xs font-bold"
                         >
                             <Icon name="Upload" size={14} />
@@ -866,11 +866,6 @@ export const TransactionsPage: React.FC = () => {
                 confirmText="Delete Selected"
                 cancelText="Cancel"
                 variant="danger"
-            />
-
-            <ImportTransactionsModal
-                isOpen={isImportModalOpen}
-                onClose={() => setIsImportModalOpen(false)}
             />
         </>
     );

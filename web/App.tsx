@@ -9,6 +9,7 @@ import { Budgets } from './pages/Budgets';
 import { Categories } from './pages/Categories';
 import { TransactionsPage } from './pages/TransactionsPage';
 import { Reports } from './pages/Reports';
+import { ImportExportPage } from './pages/ImportExportPage';
 import { Recurring } from './pages/Recurring';
 import { Profile } from './pages/Profile';
 import { Settings } from './pages/Settings';
@@ -601,6 +602,7 @@ const App: React.FC = () => {
       <Route path="/accounts" element={<Accounts />} />
       <Route path="/categories" element={<Categories />} />
       <Route path="/reports" element={<Reports />} />
+      <Route path="/import-export" element={<ImportExportPage />} />
       <Route path="/profile" element={<Profile />} />
       <Route path="/settings" element={<Settings />} />
       <Route path="/admin" element={<Admin />} />

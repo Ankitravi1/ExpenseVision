@@ -5,6 +5,7 @@ import { Icon } from '../components/Icon';
 import { Account, Category, Transaction } from '../types';
 import { AddAccountModal } from '../components/AddAccountModal';
 import { NewTransactionModal } from '../components/NewTransactionModal';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import { formatCurrency } from '../utils/currency';
 import { formatTransactionDate } from '../utils/date';
 
@@ -182,9 +183,16 @@ const AccountDetailsModal: React.FC<AccountDetailsModalProps> = ({
     );
 };
 
-const AccountCard: React.FC<{ account: Account; onEdit: () => void; onClick: () => void }> = ({ account, onEdit, onClick }) => {
+const AccountCard: React.FC<{
+    account: Account;
+    onEdit: () => void;
+    onClick: () => void;
+    onFreeze: () => void;
+    onUnfreeze: () => void;
+}> = ({ account, onEdit, onClick, onFreeze, onUnfreeze }) => {
     const { currency } = useContext(AppContext)!;
     const isNegative = account.balance < 0;
+    const isFrozen = !!account.frozen;
 
     // Map standard types to icons, fallback to 'Wallet'
     const accountTypeIcons: Record<string, string> = {
@@ -240,8 +248,14 @@ const AccountCard: React.FC<{ account: Account; onEdit: () => void; onClick: () 
     }
 
     return (
-        <div onClick={onClick} className="cursor-pointer h-full">
-            <div className={`rounded-2xl p-6 border ${borderClass} ${cardClass} flex flex-col h-full transition-all duration-300 pointer-events-auto`}>
+        <div onClick={onClick} className={`cursor-pointer h-full ${isFrozen ? 'opacity-60 hover:opacity-80 transition-opacity' : ''}`}>
+            <div className={`rounded-2xl p-6 border ${borderClass} ${cardClass} flex flex-col h-full transition-all duration-300 pointer-events-auto relative`}>
+                {isFrozen && (
+                    <span className="absolute top-3 right-3 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 border border-blue-200 dark:border-blue-900/60">
+                        <Icon name="Snowflake" size={11} />
+                        Frozen
+                    </span>
+                )}
                 <div className="flex items-start justify-between mb-6">
                     <div className="min-w-0">
                         <h3 className={`font-bold text-lg truncate ${textClass}`}>{account.name}</h3>
@@ -258,16 +272,41 @@ const AccountCard: React.FC<{ account: Account; onEdit: () => void; onClick: () 
                             {formatCurrency(account.balance, currency)}
                         </p>
                     </div>
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onEdit();
-                        }}
-                        className={`p-2 transition-colors rounded-full hover:bg-white/10 ${isPredefined ? 'text-white/80 hover:text-white' : 'text-gray-400 hover:text-primary'}`}
-                        title="Edit account"
-                    >
-                        <Icon name="Settings" size={18} />
-                    </button>
+                    <div className="flex items-center">
+                        {isFrozen ? (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onUnfreeze();
+                                }}
+                                className={`p-2 transition-colors rounded-full hover:bg-white/10 ${isPredefined ? 'text-white/80 hover:text-white' : 'text-gray-400 hover:text-success'}`}
+                                title="Unfreeze account"
+                            >
+                                <Icon name="Snowflake" size={18} />
+                            </button>
+                        ) : (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onFreeze();
+                                }}
+                                className={`p-2 transition-colors rounded-full hover:bg-white/10 ${isPredefined ? 'text-white/80 hover:text-white' : 'text-gray-400 hover:text-primary'}`}
+                                title="Freeze account"
+                            >
+                                <Icon name="Lock" size={18} />
+                            </button>
+                        )}
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onEdit();
+                            }}
+                            className={`p-2 transition-colors rounded-full hover:bg-white/10 ${isPredefined ? 'text-white/80 hover:text-white' : 'text-gray-400 hover:text-primary'}`}
+                            title="Edit account"
+                        >
+                            <Icon name="Settings" size={18} />
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -275,16 +314,25 @@ const AccountCard: React.FC<{ account: Account; onEdit: () => void; onClick: () 
 };
 
 export const Accounts: React.FC = () => {
-    const { accounts, deleteAccount, transactions, categories, currency } = useContext(AppContext)!;
+    const { accounts, deleteAccount, updateAccount, transactions, categories, currency } = useContext(AppContext)!;
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editAccount, setEditAccount] = useState<Account | null>(null);
     const [selectedDetailAccount, setSelectedDetailAccount] = useState<Account | null>(null);
+    const [showFrozen, setShowFrozen] = useState(false);
+    const [freezeTarget, setFreezeTarget] = useState<Account | null>(null);
 
     // Edit transaction states
     const [editTransaction, setEditTransaction] = useState<Transaction | null>(null);
     const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
 
-    const totalBalance = useMemo(() => accounts.reduce((sum, acc) => sum + acc.balance, 0), [accounts]);
+    // Frozen accounts are paused everywhere: they're excluded from the active
+    // grid and from the summary totals below. They only reappear via the
+    // "Show frozen accounts" toggle, which is the sole way to find and
+    // unfreeze one.
+    const activeAccounts = useMemo(() => accounts.filter(a => !a.frozen), [accounts]);
+    const frozenAccounts = useMemo(() => accounts.filter(a => a.frozen), [accounts]);
+
+    const totalBalance = useMemo(() => activeAccounts.reduce((sum, acc) => sum + acc.balance, 0), [activeAccounts]);
 
     const allTimeExpenses = useMemo(() => {
         return transactions
@@ -311,6 +359,10 @@ export const Accounts: React.FC = () => {
     const handleDelete = async (id: string) => {
         await deleteAccount(id);
         setIsModalOpen(false);
+    };
+
+    const handleUnfreeze = async (account: Account) => {
+        await updateAccount(account.id, { frozen: false });
     };
 
     return (
@@ -382,16 +434,55 @@ export const Accounts: React.FC = () => {
                                 Add your first account using the <span className="font-semibold">Add Account</span> button above to start tracking balances.
                             </p>
                         </Card>
+                    ) : activeAccounts.length === 0 ? (
+                        <Card className="flex flex-col items-center justify-center text-center py-16">
+                            <div className="w-16 h-16 rounded-2xl bg-primary-light dark:bg-primary/20 flex items-center justify-center mb-4">
+                                <Icon name="Snowflake" className="text-primary dark:text-indigo-400" size={32} />
+                            </div>
+                            <h4 className="text-lg font-bold text-gray-darkest dark:text-gray-100">All accounts are frozen</h4>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 max-w-xs">
+                                Use "Show frozen accounts" below to unfreeze one.
+                            </p>
+                        </Card>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {accounts.map(account => (
+                            {activeAccounts.map(account => (
                                 <AccountCard
                                     key={account.id}
                                     account={account}
                                     onEdit={() => handleEdit(account)}
                                     onClick={() => setSelectedDetailAccount(account)}
+                                    onFreeze={() => setFreezeTarget(account)}
+                                    onUnfreeze={() => handleUnfreeze(account)}
                                 />
                             ))}
+                        </div>
+                    )}
+
+                    {frozenAccounts.length > 0 && (
+                        <div className="mt-4">
+                            <button
+                                onClick={() => setShowFrozen(v => !v)}
+                                className="flex items-center gap-1.5 text-sm font-semibold text-primary hover:text-primary-600 hover:underline transition-colors"
+                            >
+                                <Icon name={showFrozen ? 'ChevronUp' : 'ChevronDown'} size={16} />
+                                <span>{showFrozen ? 'Hide' : 'Show'} frozen accounts ({frozenAccounts.length})</span>
+                            </button>
+
+                            {showFrozen && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
+                                    {frozenAccounts.map(account => (
+                                        <AccountCard
+                                            key={account.id}
+                                            account={account}
+                                            onEdit={() => handleEdit(account)}
+                                            onClick={() => setSelectedDetailAccount(account)}
+                                            onFreeze={() => setFreezeTarget(account)}
+                                            onUnfreeze={() => handleUnfreeze(account)}
+                                        />
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
@@ -402,6 +493,19 @@ export const Accounts: React.FC = () => {
                 onClose={() => setIsModalOpen(false)}
                 account={editAccount || undefined}
                 onDelete={handleDelete}
+            />
+
+            <ConfirmDialog
+                isOpen={!!freezeTarget}
+                onClose={() => setFreezeTarget(null)}
+                onConfirm={() => {
+                    if (freezeTarget) updateAccount(freezeTarget.id, { frozen: true });
+                }}
+                title="Freeze Account"
+                message={`Freeze "${freezeTarget?.name || 'this account'}"? While frozen, it won't accept new transactions or recurring rules, and it will be excluded from balance totals until you unfreeze it.`}
+                confirmText="Freeze"
+                cancelText="Cancel"
+                variant="warning"
             />
 
             {selectedDetailAccount && (

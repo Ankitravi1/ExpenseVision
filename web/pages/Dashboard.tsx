@@ -193,7 +193,12 @@ export const Dashboard: React.FC = () => {
     });
   };
 
-  const netWorth = useMemo(() => accounts.reduce((sum, acc) => sum + acc.balance, 0), [accounts]);
+  // Frozen accounts are paused everywhere: they don't count toward net worth
+  // and are left out of the account summary list below. Historical
+  // transactions (already filtered elsewhere on this page) are unaffected.
+  const activeAccounts = useMemo(() => accounts.filter(a => !a.frozen), [accounts]);
+
+  const netWorth = useMemo(() => activeAccounts.reduce((sum, acc) => sum + acc.balance, 0), [activeAccounts]);
 
   const { totalIncome, totalExpenses, netFlow, incomeChange, expenseChange, netFlowChange, recentTransactions, expenseByCategory } = useMemo(() => {
     const currentMonthKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
@@ -443,12 +448,12 @@ export const Dashboard: React.FC = () => {
             </button>
           </div>
           <div className="space-y-4 flex-1">
-            {accounts.length === 0 ? (
+            {activeAccounts.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full py-8 text-center">
                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400">No accounts created yet.</p>
               </div>
             ) : (
-              accounts.map(acc => {
+              activeAccounts.map(acc => {
                 let accIcon = 'Wallet';
                 if (acc.type.toLowerCase().includes('savings') || acc.type.toLowerCase().includes('piggy')) accIcon = 'PiggyBank';
                 else if (acc.type.toLowerCase().includes('credit')) accIcon = 'CreditCard';

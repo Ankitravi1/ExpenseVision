@@ -1,13 +1,12 @@
 ﻿import React, { useState, useEffect, useContext } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card } from '../components/Card';
 import { Icon } from '../components/Icon';
 import { AppContext } from '../App';
 import { useToast } from '../context/ToastContext';
 import { ConfirmDialog } from '../components/ConfirmDialog';
-import { authService } from '../services/auth';
 import { pushService } from '../services/push';
 import { AiProvider, AiSettings, defaultAiSettings, getAiSettings, saveAiSettings } from '../services/aiSettings';
-import { ImportTransactionsModal } from '../components/ImportTransactionsModal';
 import { api } from '../services/api';
 
 interface ClearDataModalProps {
@@ -152,11 +151,11 @@ const ClearDataModal: React.FC<ClearDataModalProps> = ({ isOpen, onClose, onConf
 export const Settings: React.FC = () => {
     const context = useContext(AppContext);
     const { showToast } = useToast();
+    const navigate = useNavigate();
 
     const [notifications, setNotifications] = useState(false); // Default to false until checked
     const [budgetAlerts, setBudgetAlerts] = useState(false);
     const [isClearDataOpen, setIsClearDataOpen] = useState(false);
-    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [aiSettings, setAiSettings] = useState<AiSettings>(defaultAiSettings);
     const [aiSaved, setAiSaved] = useState(false);
     const [aiError, setAiError] = useState('');
@@ -250,34 +249,6 @@ export const Settings: React.FC = () => {
         await api.clearData(options);
         await refreshData();
         showToast('Selected data cleared successfully.', 'success');
-    };
-
-    const handleExportData = async () => {
-        try {
-            const token = authService.getToken();
-            if (!token) return;
-
-            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/transactions/export`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-
-            if (!response.ok) throw new Error('Export failed');
-
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `transactions_${new Date().toISOString().split('T')[0]}.csv`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);
-        } catch (error) {
-            console.error('Export failed:', error);
-            showToast('Failed to export data', 'error');
-        }
     };
 
     const handleSaveAiSettings = async (settingsToSave?: AiSettings) => {
@@ -841,35 +812,19 @@ export const Settings: React.FC = () => {
                     <div className="flex items-start justify-between p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
                         <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2">
-                                <Icon name="Upload" size={20} className="text-primary" />
-                                <h4 className="font-semibold text-gray-darkest dark:text-gray-50">Import Data</h4>
+                                <Icon name="ArrowLeftRight" size={20} className="text-primary" />
+                                <h4 className="font-semibold text-gray-darkest dark:text-gray-50">Import / Export</h4>
                             </div>
                             <p className="text-sm text-gray-600 dark:text-gray-400">
-                                Import transactions from a CSV file
+                                Import transactions from a statement, or export your data as CSV/Excel, on the dedicated Import/Export page
                             </p>
                         </div>
-                        <button 
-                            onClick={() => setIsImportModalOpen(true)} 
+                        <button
+                            onClick={() => navigate('/import-export')}
                             className="btn flex items-center gap-1.5 py-2 px-3.5 text-xs font-bold bg-primary hover:bg-primary-hover text-white border border-primary rounded-lg transition-colors shadow-sm ml-4"
                         >
-                            <Icon name="Upload" size={14} />
-                            Import Data
-                        </button>
-                    </div>
-
-                    <div className="flex items-start justify-between p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                        <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                                <Icon name="Download" size={20} className="text-primary" />
-                                <h4 className="font-semibold text-gray-darkest dark:text-gray-50">Export Data</h4>
-                            </div>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                                Download all your financial data as a CSV file for backup or analysis
-                            </p>
-                        </div>
-                        <button onClick={handleExportData} className="btn btn-secondary ml-4">
-                            <Icon name="Download" size={16} className="mr-2" />
-                            Export CSV
+                            <Icon name="ArrowLeftRight" size={14} />
+                            Go to Import / Export
                         </button>
                     </div>
                 </div>
@@ -916,11 +871,6 @@ export const Settings: React.FC = () => {
                 isOpen={isClearDataOpen}
                 onClose={() => setIsClearDataOpen(false)}
                 onConfirm={handleClearData}
-            />
-            <ImportTransactionsModal
-                isOpen={isImportModalOpen}
-                onClose={() => setIsImportModalOpen(false)}
-                onImportSuccess={() => {}}
             />
         </div>
     );

@@ -1,4 +1,5 @@
 import React, { useState, useContext, useMemo, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
     AreaChart, Area, XAxis, YAxis, CartesianGrid, BarChart, Bar, Legend,
@@ -8,7 +9,6 @@ import { Icon } from '../components/Icon';
 import { AppContext } from '../App';
 import { formatCurrency, getCurrencySymbol } from '../utils/currency';
 import { useToast } from '../context/ToastContext';
-import { ImportTransactionsModal } from '../components/ImportTransactionsModal';
 import { formatTransactionDate } from '../utils/date';
 import { Account, Transaction } from '../types';
 
@@ -537,6 +537,7 @@ export const Reports: React.FC = () => {
     const context = useContext(AppContext)!;
     const { transactions, categories, budgets, currency, accounts, theme } = context;
     const { showToast } = useToast();
+    const navigate = useNavigate();
     const startDateRef = useRef<HTMLInputElement>(null);
     const endDateRef = useRef<HTMLInputElement>(null);
 
@@ -549,7 +550,6 @@ export const Reports: React.FC = () => {
     const [viewMode, setViewMode] = useState<string>('Monthly');
     const [carryOver, setCarryOver] = useState<boolean>(true);
     const [showInsights, setShowInsights] = useState<boolean>(true);
-    const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
     const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
     const [calendarTab, setCalendarTab] = useState<'expense' | 'income'>('expense');
     const [accountChartView, setAccountChartView] = useState<'income_expense' | 'transfers'>('income_expense');
@@ -1050,14 +1050,7 @@ export const Reports: React.FC = () => {
                     </div>
 
                     <button
-                        onClick={() => setIsImportModalOpen(true)}
-                        className="btn flex items-center gap-1.5 py-2 px-3.5 text-xs font-bold bg-primary hover:bg-primary-hover text-white border border-primary rounded-lg transition-colors shadow-sm"
-                    >
-                        <Icon name="Upload" size={14} />
-                        Import Data
-                    </button>
-                    <button
-                        onClick={exportToCSV}
+                        onClick={() => navigate(`/import-export?section=export&from=${startDate}&to=${endDate}`)}
                         className="btn flex items-center gap-1.5 py-2 px-3.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-600 rounded-lg transition-colors shadow-sm"
                     >
                         <Icon name="Download" size={14} />
@@ -1476,11 +1469,6 @@ export const Reports: React.FC = () => {
                 categories={categories}
                 accounts={accounts}
                 onClose={() => setSelectedAccountId(null)}
-            />
-
-            <ImportTransactionsModal
-                isOpen={isImportModalOpen}
-                onClose={() => setIsImportModalOpen(false)}
             />
         </div>
     );

@@ -90,7 +90,9 @@ import {
   CheckCircle,
   BellOff,
   Lock,
-  Menu
+  Menu,
+  Snowflake,
+  FileText
 } from 'lucide-react';
 
 export type IconName = string;
@@ -191,7 +193,9 @@ const iconComponents: { [key: string]: React.ComponentType<any> } = {
   CheckCircle,
   BellOff,
   Lock,
-  Menu
+  Menu,
+  Snowflake,
+  FileText
 };
 
 export const iconList = Object.keys(iconComponents);

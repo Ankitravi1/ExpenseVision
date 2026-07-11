@@ -51,8 +51,9 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
     }, [isOpen]);
 
     useEffect(() => {
-        if (type !== 'transfer' && context?.accounts && context.accounts.length > 0 && !accountId) {
-            setAccountId(context.accounts[0].id);
+        const nonFrozenAccounts = context?.accounts?.filter(a => !a.frozen) || [];
+        if (type !== 'transfer' && nonFrozenAccounts.length > 0 && !accountId) {
+            setAccountId(nonFrozenAccounts[0].id);
         }
     }, [context?.accounts, accountId, type]);
 
@@ -86,6 +87,11 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
     if (!isMounted || !context || !isOpen) return null;
 
     const { accounts, categories, addTransaction, updateTransaction, currency } = context;
+
+    // Frozen accounts are blocked by the backend for new transactions/transfers,
+    // so keep them out of the pickers entirely (existing transactions being
+    // edited may still reference a since-frozen account; that's fine to display).
+    const selectableAccounts = accounts.filter(a => !a.frozen);
 
     const filteredCategories = categories.filter(c => c.type === type);
 
@@ -355,13 +361,20 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
                             </div>
                         </div>
 
+                        {selectableAccounts.length === 0 && (
+                            <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 text-amber-700 dark:text-amber-300 text-xs font-medium">
+                                <Icon name="AlertCircle" size={16} className="flex-shrink-0 mt-0.5" />
+                                <span>All your accounts are frozen — unfreeze one in Accounts to add a transaction.</span>
+                            </div>
+                        )}
+
                         {type === 'transfer' ? (
                             <div className="space-y-4 p-4 bg-gray-50 dark:bg-gray-700/30 rounded-lg border border-gray-100 dark:border-gray-700">
                                 <div>
                                     <label htmlFor="fromAccount" className={labelStyles}>From Account</label>
                                     <select id="fromAccount" value={accountId} onChange={e => setAccountId(e.target.value)} className={inputStyles}>
                                         <option value="">Select source account</option>
-                                        {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name} ({formatCurrency(acc.balance, currency)})</option>)}
+                                        {selectableAccounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name} ({formatCurrency(acc.balance, currency)})</option>)}
                                     </select>
                                 </div>
                                 <div className="flex justify-center -my-2 relative z-10">
@@ -373,7 +386,7 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
                                     <label htmlFor="toAccount" className={labelStyles}>To Account</label>
                                     <select id="toAccount" value={transferToAccountId} onChange={e => setTransferToAccountId(e.target.value)} className={inputStyles}>
                                         <option value="">Select destination account</option>
-                                        {accounts.filter(a => a.id !== accountId).map(acc => <option key={acc.id} value={acc.id}>{acc.name} ({formatCurrency(acc.balance, currency)})</option>)}
+                                        {selectableAccounts.filter(a => a.id !== accountId).map(acc => <option key={acc.id} value={acc.id}>{acc.name} ({formatCurrency(acc.balance, currency)})</option>)}
                                     </select>
                                 </div>
                             </div>
@@ -382,7 +395,7 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
                                 <div>
                                     <label htmlFor="account" className={labelStyles}>Account</label>
                                     <select id="account" value={accountId} onChange={e => setAccountId(e.target.value)} className={inputStyles}>
-                                        {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
+                                        {selectableAccounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
                                     </select>
                                 </div>
                                 <div>
