@@ -80,10 +80,10 @@ export default function DashboardScreen() {
         });
     };
 
-    // Frozen accounts are excluded from account-level aggregates (net worth,
-    // accounts summary) — transaction-level lists/charts below are untouched.
+    // Frozen accounts are excluded from account-level aggregates (accounts
+    // summary) — transaction-level lists/charts below are untouched. Net worth
+    // itself is shown in the header (ScreenHeader), not duplicated here.
     const activeAccounts = useMemo(() => accounts.filter(a => !a.frozen), [accounts]);
-    const netWorth = useMemo(() => activeAccounts.reduce((sum, a) => sum + a.balance, 0), [activeAccounts]);
 
     const { totalIncome, totalExpenses, netFlow, incomeChange, expenseChange, netFlowChange, recent, expenseByCategory } = useMemo(() => {
         const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -166,15 +166,6 @@ export default function DashboardScreen() {
                     </TouchableOpacity>
                 </View>
 
-                {/* Net worth */}
-                <Card style={{ marginBottom: spacing.md }}>
-                    <Text style={[styles.cardLabel, { color: theme.colors.textSecondary }]}>Net Worth</Text>
-                    <Text style={[styles.netWorth, { color: theme.colors.text }]}>{formatCurrency(netWorth, currency)}</Text>
-                    <Text style={{ color: theme.colors.textTertiary, fontSize: 12 }}>
-                        Across {activeAccounts.length} account{activeAccounts.length === 1 ? '' : 's'}
-                    </Text>
-                </Card>
-
                 {/* Stat cards with % change vs previous month */}
                 <View style={styles.row}>
                     <StatCard title="Expenses" amount={totalExpenses} change={expenseChange} type="expense" currency={currency} />
@@ -184,9 +175,28 @@ export default function DashboardScreen() {
                     <StatCard title="Balance (net flow)" amount={netFlow} change={netFlowChange} type="net" currency={currency} />
                 </View>
 
+                {/* Net worth now lives in the header — a small pointer instead of
+                    repeating the bold total here saves vertical space. */}
+                <View style={styles.netWorthNote}>
+                    <MaterialCommunityIcons name="information-outline" size={13} color={theme.colors.textTertiary} />
+                    <Text style={{ color: theme.colors.textTertiary, fontSize: 11, marginLeft: 4 }}>
+                        Your net worth is shown in the header above
+                    </Text>
+                </View>
+
                 {/* Expense distribution donut */}
                 <Card style={{ marginTop: spacing.md }}>
-                    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Expense Distribution</Text>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
+                        <Text style={[styles.sectionTitle, { color: theme.colors.text, marginBottom: 0 }]}>Expense Distribution</Text>
+                        <TouchableOpacity
+                            onPress={() => navigation.navigate('Reports' as never)}
+                            style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                            <MaterialCommunityIcons name="chart-pie" size={14} color={theme.colors.primary} />
+                            <Text style={{ color: theme.colors.primary, fontWeight: '600', fontSize: 13 }}>Report</Text>
+                        </TouchableOpacity>
+                    </View>
                     {expenseByCategory.length === 0 ? (
                         <EmptyState icon="chart-pie" title="No expenses this month" />
                     ) : (
@@ -251,40 +261,6 @@ export default function DashboardScreen() {
                     )}
                 </Card>
 
-                {/* Recent transactions */}
-                <Card style={{ marginTop: spacing.md }}>
-                    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Recent transactions</Text>
-                    {recent.length === 0 ? (
-                        <EmptyState icon="swap-horizontal" title="No transactions yet" subtitle="Tap + to add your first transaction" />
-                    ) : (
-                        recent.map(t => {
-                            const cat = categories.find(c => c.id === t.categoryId);
-                            const isIncome = t.type === 'income';
-                            return (
-                                <View key={t.id} style={[styles.txRow, { borderBottomColor: theme.colors.separator }]}>
-                                    <CategoryIcon name={t.type === 'transfer' ? 'CreditCard' : cat?.icon} size={16} />
-                                    <View style={{ flex: 1, marginLeft: spacing.sm }}>
-                                        <Text style={{ color: theme.colors.text, fontWeight: '600' }} numberOfLines={1}>
-                                            {t.note}
-                                        </Text>
-                                        <Text style={{ color: theme.colors.textTertiary, fontSize: 12 }}>
-                                            {isoDateToDisplay(t.date)}{cat ? ` · ${cat.name}` : ''}
-                                        </Text>
-                                    </View>
-                                    <Text
-                                        style={{
-                                            fontWeight: '700',
-                                            color: isIncome ? theme.colors.success : t.type === 'expense' ? theme.colors.danger : theme.colors.textSecondary,
-                                        }}
-                                    >
-                                        {isIncome ? '+' : t.type === 'expense' ? '-' : ''}{formatCurrency(t.amount, currency)}
-                                    </Text>
-                                </View>
-                            );
-                        })
-                    )}
-                </Card>
-
                 {/* Accounts summary */}
                 <Card style={{ marginTop: spacing.md }}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
@@ -313,6 +289,40 @@ export default function DashboardScreen() {
                                     </View>
                                     <Text style={{ fontWeight: '700', fontSize: 13, color: acc.balance < 0 ? theme.colors.danger : theme.colors.text }}>
                                         {formatCurrency(acc.balance, currency)}
+                                    </Text>
+                                </View>
+                            );
+                        })
+                    )}
+                </Card>
+
+                {/* Recent transactions */}
+                <Card style={{ marginTop: spacing.md }}>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Recent transactions</Text>
+                    {recent.length === 0 ? (
+                        <EmptyState icon="swap-horizontal" title="No transactions yet" subtitle="Tap + to add your first transaction" />
+                    ) : (
+                        recent.map(t => {
+                            const cat = categories.find(c => c.id === t.categoryId);
+                            const isIncome = t.type === 'income';
+                            return (
+                                <View key={t.id} style={[styles.txRow, { borderBottomColor: theme.colors.separator }]}>
+                                    <CategoryIcon name={t.type === 'transfer' ? 'CreditCard' : cat?.icon} size={16} />
+                                    <View style={{ flex: 1, marginLeft: spacing.sm }}>
+                                        <Text style={{ color: theme.colors.text, fontWeight: '600' }} numberOfLines={1}>
+                                            {t.note}
+                                        </Text>
+                                        <Text style={{ color: theme.colors.textTertiary, fontSize: 12 }}>
+                                            {isoDateToDisplay(t.date)}{cat ? ` · ${cat.name}` : ''}
+                                        </Text>
+                                    </View>
+                                    <Text
+                                        style={{
+                                            fontWeight: '700',
+                                            color: isIncome ? theme.colors.success : t.type === 'expense' ? theme.colors.danger : theme.colors.textSecondary,
+                                        }}
+                                    >
+                                        {isIncome ? '+' : t.type === 'expense' ? '-' : ''}{formatCurrency(t.amount, currency)}
                                     </Text>
                                 </View>
                             );
@@ -352,10 +362,11 @@ const styles = StyleSheet.create({
         fontWeight: '500',
         marginBottom: 4,
     },
-    netWorth: {
-        fontSize: 30,
-        fontWeight: '800',
-        marginBottom: 4,
+    netWorthNote: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: spacing.sm,
     },
     row: {
         flexDirection: 'row',

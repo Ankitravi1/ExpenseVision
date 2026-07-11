@@ -441,21 +441,6 @@ export default function TransactionsScreen() {
         <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top']}>
             <ScreenHeader title="Transactions" />
 
-            {/* Import button row */}
-            <View style={styles.actionsRow}>
-                <TouchableOpacity
-                    onPress={() => {
-                        lightHaptic();
-                        navigation.navigate('ImportTransactions' as never);
-                    }}
-                    style={[styles.importButton, { backgroundColor: theme.colors.primary }]}
-                    activeOpacity={0.85}
-                >
-                    <MaterialCommunityIcons name="upload" size={16} color="#fff" />
-                    <Text style={styles.importButtonText}>Import</Text>
-                </TouchableOpacity>
-            </View>
-
             {/* Period Swiper Navigator */}
             <View style={[styles.periodNavigator, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder }]}>
                 {viewMode !== 'Custom' ? (
@@ -715,27 +700,6 @@ export default function TransactionsScreen() {
 }
 
 const styles = StyleSheet.create({
-    actionsRow: {
-        flexDirection: 'row',
-        justifyContent: 'flex-end',
-        alignItems: 'center',
-        paddingHorizontal: spacing.md,
-        paddingTop: spacing.sm,
-        marginBottom: spacing.sm,
-    },
-    importButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        paddingHorizontal: spacing.md,
-        paddingVertical: 8,
-        borderRadius: radius.md,
-    },
-    importButtonText: {
-        color: '#fff',
-        fontWeight: '700',
-        fontSize: 13,
-    },
     periodNavigator: {
         flexDirection: 'row',
         alignItems: 'center',

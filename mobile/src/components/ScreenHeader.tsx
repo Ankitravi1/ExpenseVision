@@ -21,7 +21,8 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({ title }) => {
     const [unreadCount, setUnreadCount] = useState(0);
 
     const currency = user?.currency || 'INR';
-    const netWorth = accounts.reduce((sum, a) => sum + a.balance, 0);
+    // Frozen accounts are paused everywhere — excluded here too, matching Dashboard.
+    const netWorth = accounts.filter(a => !a.frozen).reduce((sum, a) => sum + a.balance, 0);
 
     const fetchUnreadCount = () => {
         apiFetch('/notifications')
@@ -55,22 +56,6 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({ title }) => {
             </View>
 
             <View style={styles.right}>
-                <View style={styles.netWorthContainer}>
-                    <Text style={[styles.netWorthLabel, { color: theme.colors.textTertiary }]}>NET WORTH</Text>
-                    <Text style={[styles.netWorthValue, { color: theme.colors.primary }]} numberOfLines={1}>
-                        {formatCurrency(netWorth, currency)}
-                    </Text>
-                </View>
-
-                {/* Reports Icon */}
-                <TouchableOpacity
-                    onPress={() => navigation.navigate('Reports' as never)}
-                    style={styles.iconButton}
-                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                >
-                    <MaterialCommunityIcons name="chart-pie" size={22} color={theme.colors.textSecondary} />
-                </TouchableOpacity>
-
                 {/* Notifications Bell */}
                 <TouchableOpacity
                     onPress={() => navigation.navigate('Notifications' as never)}
@@ -84,6 +69,13 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({ title }) => {
                         </View>
                     )}
                 </TouchableOpacity>
+
+                <View style={styles.netWorthContainer}>
+                    <Text style={[styles.netWorthLabel, { color: theme.colors.textTertiary }]}>NET WORTH</Text>
+                    <Text style={[styles.netWorthValue, { color: theme.colors.primary }]} numberOfLines={1}>
+                        {formatCurrency(netWorth, currency)}
+                    </Text>
+                </View>
             </View>
         </View>
     );
