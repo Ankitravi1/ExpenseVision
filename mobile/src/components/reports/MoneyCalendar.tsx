@@ -16,15 +16,17 @@ export const MoneyCalendar: React.FC<{
     monthOffset: number;
     onMonthOffsetChange: (offset: number) => void;
     baseStartDate: string; // anchor (report period start), YYYY-MM-DD
-    dayTotals: Record<string, number>;
+    expenseByDay: Record<string, number>;
+    incomeByDay: Record<string, number>;
     currency: string;
     rangeStart: string;
     rangeEnd: string;
-}> = ({ monthOffset, onMonthOffsetChange, baseStartDate, dayTotals, currency, rangeStart, rangeEnd }) => {
+}> = ({ monthOffset, onMonthOffsetChange, baseStartDate, expenseByDay, incomeByDay, currency, rangeStart, rangeEnd }) => {
     const { theme } = useTheme();
     const [tab, setTab] = useState<'expense' | 'income'>('expense');
     const [selected, setSelected] = useState<string | null>(null);
     const isExpense = tab === 'expense';
+    const dayTotals = isExpense ? expenseByDay : incomeByDay;
 
     const anchor = useMemo(() => {
         const [y, m, d] = baseStartDate.split('-').map(Number);

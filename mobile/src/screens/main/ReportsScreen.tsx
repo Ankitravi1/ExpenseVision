@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -229,8 +229,24 @@ export default function ReportsScreen() {
         const topCategory = expenseSlices[0]?.name || 'None';
         const savingsRate = totalIncome > 0 ? Math.max(0, ((totalIncome - totalExpenses) / totalIncome) * 100) : 0;
 
+        // Collect every YYYY-MM month spanned by [startDate, endDate] (not just the
+        // start month) so month-specific budgets later in a 3-Month/Yearly period
+        // are still recognized as "budgeted".
+        const spannedMonths = new Set<string>();
+        {
+            const s = parseLocalDate(startDate);
+            const e = parseLocalDate(endDate);
+            let cursor = new Date(s.getFullYear(), s.getMonth(), 1);
+            const endAnchor = new Date(e.getFullYear(), e.getMonth(), 1);
+            let guard = 0;
+            while (cursor.getTime() <= endAnchor.getTime() && guard < 240) {
+                spannedMonths.add(`${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`);
+                cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+                guard++;
+            }
+        }
         const activeBudgetCatIds = budgets
-            .filter(b => !b.month || b.month === startDate.substring(0, 7))
+            .filter(b => !b.month || spannedMonths.has(b.month))
             .map(b => b.categoryId);
         const unbudgetedSpent = filtered
             .filter(t => t.type === 'expense' && !activeBudgetCatIds.includes(t.categoryId || ''))
@@ -329,8 +345,11 @@ export default function ReportsScreen() {
         const csv = [headers.map(csvField).join(','), ...rows.map(r => r.join(','))].join('\n');
         try {
             await shareReportCsv(csv, `expensevision_${startDate}_to_${endDate}.csv`);
-        } catch {
-            /* sharing unavailable / cancelled — silent */
+        } catch (err: any) {
+            // expo-sharing resolves (rather than rejecting) when the user dismisses
+            // the native share sheet, so any error caught here is a genuine failure
+            // (e.g. sharing unavailable, file write failure) — surface it.
+            Alert.alert('Export Failed', err?.message || 'Could not export the report as CSV.');
         }
     };
 
@@ -468,7 +487,8 @@ export default function ReportsScreen() {
                         monthOffset={calendarMonthOffset}
                         onMonthOffsetChange={setCalendarMonthOffset}
                         baseStartDate={startDate}
-                        dayTotals={daySeries.expenseByDay}
+                        expenseByDay={daySeries.expenseByDay}
+                        incomeByDay={daySeries.incomeByDay}
                         currency={currency}
                         rangeStart={startDate}
                         rangeEnd={endDate}

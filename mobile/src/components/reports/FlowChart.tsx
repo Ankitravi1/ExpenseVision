@@ -98,6 +98,7 @@ export const FlowChart: React.FC<{
                 width={width}
                 height={200}
                 withDots={chart.income.length <= 14}
+                {...(chart.income.length >= 2 ? { bezier: true } : {})}
                 withInnerLines={false}
                 withShadow={false}
                 formatYLabel={(v) => formatAxis(Number(v))}
@@ -110,7 +111,6 @@ export const FlowChart: React.FC<{
                     propsForDots: { r: '2.5' },
                     propsForBackgroundLines: { stroke: theme.colors.separator },
                 }}
-                bezier
                 style={{ borderRadius: 12, marginLeft: -spacing.sm }}
             />
         </View>

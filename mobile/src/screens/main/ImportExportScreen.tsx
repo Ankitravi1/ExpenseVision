@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Switch } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Switch, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -97,7 +97,14 @@ export default function ImportExportScreen() {
 
     const handleParse = async () => {
         setImportError('');
-        if (!aiSettingsLoading && !isAiImportEnabled) {
+        // Defense-in-depth: even though the "Parse with AI" button is disabled while
+        // aiSettingsLoading is true, keep this check so any other path into handleParse
+        // can't bypass the gate before settings have resolved.
+        if (aiSettingsLoading) {
+            setImportError('Still checking AI settings — please wait a moment and try again.');
+            return;
+        }
+        if (!isAiImportEnabled) {
             setImportError('AI Statement Import is disabled or has no API key configured. Enable it in Settings → AI Settings first.');
             return;
         }
@@ -120,9 +127,9 @@ export default function ImportExportScreen() {
             const result = await res.json();
             const rawDrafts: any[] = result.drafts || [];
 
-            const mapped: DraftRow[] = rawDrafts.map((d: any) => {
+            const bases = rawDrafts.map((d: any) => {
                 const type: TransactionType = ['income', 'expense', 'transfer'].includes(d.type) ? d.type : 'expense';
-                const base = {
+                return {
                     localId: genId(),
                     date: d.date || formatIsoDate(new Date()),
                     time: '12:00',
@@ -133,7 +140,19 @@ export default function ImportExportScreen() {
                     categoryId: type === 'transfer' ? '' : (d.categoryId || categories.find(c => c.type === type)?.id || ''),
                     transferToAccountId: type === 'transfer' ? (d.transferToAccountId || '') : '',
                 };
-                const dup = detectDuplicates && checkIsDuplicate(base);
+            });
+
+            // Flag duplicates both against existing (already-saved) transactions AND against
+            // earlier rows within this same pasted batch — two identical rows from the same
+            // AI parse (e.g. a repeated fee or a mis-parsed duplicate line) would otherwise both
+            // come back "not duplicate" since neither exists in the DB yet.
+            const mapped: DraftRow[] = bases.map((base, i) => {
+                const isDbDuplicate = detectDuplicates && checkIsDuplicate(base);
+                const rowDate = base.date.substring(0, 10);
+                const isBatchDuplicate = detectDuplicates && bases.slice(0, i).some(
+                    prev => prev.date.substring(0, 10) === rowDate && Math.abs(prev.amount - base.amount) < 0.01
+                );
+                const dup = isDbDuplicate || isBatchDuplicate;
                 return { ...base, isDuplicate: dup, included: !dup };
             });
 
@@ -165,8 +184,13 @@ export default function ImportExportScreen() {
 
     const applyDuplicateDetection = (enabled: boolean) => {
         setDetectDuplicates(enabled);
-        setDrafts(prev => prev.map(r => {
-            const dup = enabled && checkIsDuplicate(r);
+        setDrafts(prev => prev.map((r, i) => {
+            const isDbDuplicate = enabled && checkIsDuplicate(r);
+            const rowDate = r.date.substring(0, 10);
+            const isBatchDuplicate = enabled && prev.slice(0, i).some(
+                other => other.date.substring(0, 10) === rowDate && Math.abs(other.amount - r.amount) < 0.01
+            );
+            const dup = isDbDuplicate || isBatchDuplicate;
             return { ...r, isDuplicate: dup, included: dup ? false : r.included };
         }));
     };
@@ -356,12 +380,16 @@ export default function ImportExportScreen() {
         switch (viewMode) {
             case 'Daily':
                 start = exportDate; end = exportDate; break;
-            case 'Weekly':
+            case 'Weekly': {
+                // Monday-first week, matching the Reports screen's convention.
+                const day = exportDate.getDay();
+                const diffToMonday = exportDate.getDate() - day + (day === 0 ? -6 : 1);
                 start = new Date(exportDate);
-                start.setDate(exportDate.getDate() - exportDate.getDay());
+                start.setDate(diffToMonday);
                 end = new Date(start);
                 end.setDate(start.getDate() + 6);
                 break;
+            }
             case '3 Month':
                 start = new Date(exportDate.getFullYear(), exportDate.getMonth() - 2, 1);
                 end = new Date(exportDate.getFullYear(), exportDate.getMonth() + 1, 0);
@@ -381,8 +409,11 @@ export default function ImportExportScreen() {
         if (viewMode === 'Custom') return `${isoDateToDisplay(exportRange.start)} - ${isoDateToDisplay(exportRange.end)}`;
         if (viewMode === 'Daily') return exportDate.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
         if (viewMode === 'Weekly') {
+            // Monday-first week, matching the Reports screen's convention.
+            const day = exportDate.getDay();
+            const diffToMonday = exportDate.getDate() - day + (day === 0 ? -6 : 1);
             const start = new Date(exportDate);
-            start.setDate(exportDate.getDate() - exportDate.getDay());
+            start.setDate(diffToMonday);
             const end = new Date(start);
             end.setDate(start.getDate() + 6);
             return `${start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} - ${end.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
@@ -469,6 +500,7 @@ export default function ImportExportScreen() {
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top']}>
             <ScreenHeader title="Import / Export" />
+            <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: spacing.xl }} keyboardShouldPersistTaps="handled">
                 <ChipSelector
                     options={[
@@ -579,7 +611,18 @@ export default function ImportExportScreen() {
                                 <Text style={{ color: theme.colors.danger, fontSize: 12, marginBottom: spacing.md }}>{importError}</Text>
                             ) : null}
 
-                            <Button title={parsing ? 'Parsing...' : 'Parse with AI'} onPress={handleParse} loading={parsing} />
+                            {aiSettingsLoading ? (
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: spacing.sm }}>
+                                    <ActivityIndicator size="small" color={theme.colors.textSecondary} />
+                                    <Text style={{ color: theme.colors.textSecondary, fontSize: 12 }}>Checking AI settings…</Text>
+                                </View>
+                            ) : null}
+                            <Button
+                                title={parsing ? 'Parsing...' : 'Parse with AI'}
+                                onPress={handleParse}
+                                loading={parsing}
+                                disabled={aiSettingsLoading}
+                            />
                         </>
                     )
                 ) : (
@@ -698,6 +741,7 @@ export default function ImportExportScreen() {
                     </>
                 )}
             </ScrollView>
+            </KeyboardAvoidingView>
         </SafeAreaView>
     );
 }

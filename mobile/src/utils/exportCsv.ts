@@ -6,7 +6,7 @@ import { api } from '../services/api';
 // when the value contains a comma, quote, or newline.
 export const csvField = (value: unknown): string => {
     const str = value === null || value === undefined ? '' : String(value);
-    if (/[",\n]/.test(str)) {
+    if (/[",\n\r]/.test(str)) {
         return `"${str.replace(/"/g, '""')}"`;
     }
     return str;
