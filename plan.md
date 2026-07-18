@@ -262,6 +262,14 @@ This document tracks what has been built, what is in progress, and what is plann
 - `Card` now forwards arbitrary DOM props (e.g. `data-tour`) so sections can be targeted by the tour.
 - **Not yet ported to mobile** — the tour/tips currently exist on web only.
 
+### 5.9 Global Readiness, Tools & Invoices (Completed — web)
+
+- **Locale-aware dates**: new `formatDisplayDate()` (Intl) — on-screen dates follow the viewer's locale (US MM/DD/YYYY, UK DD/MM/YYYY); **exports stay DD-MM-YYYY** for the import-template contract. Currency was already Intl-based. (Target market decided: **global, US/UK first** — see `docs/roadmap/07`.)
+- **Tools drawer**: a toggle-away slide-out with a full **calculator** (four-function + %, keyboard support), available on every page — room for finance calculators.
+- **Invoice generator** (`/invoices`): create invoices (from/to, line items, tax, notes), **print-to-PDF via the browser** (no PDF lib), optional "record as income". Not yet Pro-gated.
+- **UX-audit batch 2**: "so far"→"All-time", "Combined Balance"→"Current Balance", "Burn Rate"→"Avg Daily Spending", amount filter "Range"→"Amount", removed dead `<a href="#">` sidebar nav (a11y).
+- **Still web-only** (mobile parity pending). Invoice PDF still uses browser print — a real PDF library is the upgrade path (also unblocks Phase 7.4 PDF export).
+
 ---
 
 ## 📋 Phase 6 — Stability, Performance & Production Readiness
