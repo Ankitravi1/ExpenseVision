@@ -10,6 +10,7 @@ import { Categories } from './pages/Categories';
 import { TransactionsPage } from './pages/TransactionsPage';
 import { Reports } from './pages/Reports';
 import { ImportExportPage } from './pages/ImportExportPage';
+import { InvoicePage } from './pages/InvoicePage';
 import { Recurring } from './pages/Recurring';
 import { Profile } from './pages/Profile';
 import { Settings } from './pages/Settings';
@@ -44,6 +45,7 @@ const PAGE_PATHS: Record<Page, string> = {
   Categories: '/categories',
   Reports: '/reports',
   ImportExport: '/import-export',
+  Invoices: '/invoices',
   Profile: '/profile',
   Settings: '/settings',
   Admin: '/admin',
@@ -628,6 +630,7 @@ const App: React.FC = () => {
       <Route path="/categories" element={<Categories />} />
       <Route path="/reports" element={<Reports />} />
       <Route path="/import-export" element={<ImportExportPage />} />
+      <Route path="/invoices" element={<InvoicePage />} />
       <Route path="/profile" element={<Profile />} />
       <Route path="/settings" element={<Settings />} />
       <Route path="/admin" element={<Admin />} />

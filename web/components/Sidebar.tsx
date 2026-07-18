@@ -43,6 +43,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activePage, setActivePage, isC
       { icon: 'RefreshCw', label: 'Recurring' },
       { icon: 'PieChart', label: 'Reports' },
       { icon: 'Upload', label: 'ImportExport' },
+      { icon: 'FileText', label: 'Invoices' },
     ];
     if (user?.role === 'superadmin') {
       items.push({ icon: 'UserCheck', label: 'Admin' });

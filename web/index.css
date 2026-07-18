@@ -669,3 +669,24 @@ input[type="date"]::-webkit-clear-button {
   -webkit-appearance: none !important;
   margin: 0 !important;
 }
+
+/* Print: show only the invoice preview, forced to clean black-on-white so it
+   looks right regardless of the app theme (used by the Invoice generator). */
+@media print {
+  body * { visibility: hidden !important; }
+  .invoice-print-area, .invoice-print-area * { visibility: visible !important; }
+  .invoice-print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    background: #fff !important;
+  }
+  .invoice-print-area * {
+    color: #111827 !important;
+    background-color: transparent !important;
+    border-color: #e5e7eb !important;
+    box-shadow: none !important;
+  }
+  .no-print { display: none !important; }
+}

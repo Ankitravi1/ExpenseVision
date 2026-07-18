@@ -28,6 +28,8 @@ const getPageSubtitle = (title: string) => {
       return 'Super admin console';
     case 'importexport':
       return 'Import statements with AI, or export your filtered data';
+    case 'invoices':
+      return 'Create invoices and download them as PDF';
     default:
       return 'Track and optimize your finances';
   }
