@@ -7,7 +7,7 @@ import { Transaction } from '../types';
 import { formatCurrency } from '../utils/currency';
 import { NewTransactionModal } from '../components/NewTransactionModal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
-import { formatTransactionDate, isoDateToDisplay } from '../utils/date';
+import { formatDisplayDate } from '../utils/date';
 
 const TransactionRow: React.FC<{ 
     transaction: Transaction; 
@@ -49,7 +49,7 @@ const TransactionRow: React.FC<{
             </td>
             {/* Date */}
             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                {formatTransactionDate(transaction.date, true)}
+                {formatDisplayDate(transaction.date, true)}
             </td>
             {/* Note */}
             <td className="px-6 py-4 whitespace-nowrap">
@@ -670,7 +670,7 @@ export const TransactionsPage: React.FC = () => {
 
                         {/* Showing transactions badge moved to right side */}
                         <span className="text-xs font-bold text-primary bg-primary-light/60 dark:bg-primary/20 dark:text-indigo-300 border border-primary-light px-3 py-1.5 rounded-lg inline-block shadow-sm">
-                            Showing transactions from <span className="font-extrabold">{isoDateToDisplay(startDate)}</span> to <span className="font-extrabold">{isoDateToDisplay(endDate)}</span>
+                            Showing transactions from <span className="font-extrabold">{formatDisplayDate(startDate)}</span> to <span className="font-extrabold">{formatDisplayDate(endDate)}</span>
                         </span>
                     </div>
                 </div>

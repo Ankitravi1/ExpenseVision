@@ -9,7 +9,7 @@ import { Icon } from '../components/Icon';
 import { AppContext } from '../App';
 import { formatCurrency, getCurrencySymbol } from '../utils/currency';
 import { useToast } from '../context/ToastContext';
-import { formatTransactionDate } from '../utils/date';
+import { formatTransactionDate, formatDisplayDate } from '../utils/date';
 import { Account, Transaction } from '../types';
 
 const COLORS = ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#8b5cf6', '#ec4899', '#6b7280', '#14b8a6', '#d946ef'];
@@ -209,7 +209,7 @@ const FlowChart: React.FC<{
                                     formatCurrency(value, currency),
                                     name === 'income' ? 'Income' : 'Expense'
                                 ]}
-                                labelFormatter={(_, payload) => payload?.[0]?.payload?.date ? formatTransactionDate(payload[0].payload.date) : ''}
+                                labelFormatter={(_, payload) => payload?.[0]?.payload?.date ? formatDisplayDate(payload[0].payload.date) : ''}
                                 contentStyle={{
                                     backgroundColor: 'rgba(31, 41, 55, 0.95)',
                                     border: 'none',
@@ -357,8 +357,8 @@ const MoneyCalendar: React.FC<{
                         <div
                             key={cell.iso}
                             title={inRange && amount > 0
-                                ? `${formatTransactionDate(cell.iso)}: ${formatCurrency(amount, currency)}`
-                                : formatTransactionDate(cell.iso)}
+                                ? `${formatDisplayDate(cell.iso)}: ${formatCurrency(amount, currency)}`
+                                : formatDisplayDate(cell.iso)}
                             className={`h-12 rounded-lg flex flex-col items-center justify-between p-1 transition-all ${
                                 !inRange
                                     ? 'bg-transparent text-gray-300 dark:text-gray-700 border border-transparent'
@@ -501,7 +501,7 @@ const AccountOverviewModal: React.FC<{
                                             return (
                                                 <tr key={t.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/40">
                                                     <td className="px-3 py-2 whitespace-nowrap text-gray-600 dark:text-gray-300">
-                                                        {formatTransactionDate(t.date)}
+                                                        {formatDisplayDate(t.date)}
                                                     </td>
                                                     <td className="px-3 py-2 text-gray-900 dark:text-gray-100 max-w-[12rem] truncate" title={t.note}>
                                                         {t.type === 'transfer'

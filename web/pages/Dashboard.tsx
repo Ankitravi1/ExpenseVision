@@ -6,7 +6,7 @@ import { Icon } from '../components/Icon';
 import { Transaction } from '../types';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { formatCurrency } from '../utils/currency';
-import { formatTransactionDate } from '../utils/date';
+import { formatDisplayDate } from '../utils/date';
 import { TipBanner } from '../components/TipBanner';
 
 const StatCard: React.FC<{ title: string; subtitle?: string; amount: number; change: number; type: 'income' | 'expense' | 'net'; currency: string }> = ({ title, subtitle, amount, change, type, currency }) => {
@@ -137,7 +137,7 @@ const TransactionRow: React.FC<{ transaction: Transaction }> = ({ transaction })
           <p className="font-medium text-gray-900 dark:text-gray-100 truncate">{displayNote}</p>
           <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mt-0.5">
             <span className="sm:hidden">{account?.name} • </span>
-            <span>{formatTransactionDate(transaction.date)}</span>
+            <span>{formatDisplayDate(transaction.date)}</span>
           </div>
         </div>
       </div>
@@ -278,13 +278,8 @@ export const Dashboard: React.FC = () => {
   const dateRangeLabel = useMemo(() => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
+    const format = (d: Date) => new Intl.DateTimeFormat(undefined, { year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
     const firstDay = new Date(year, month, 1);
-    const format = (d: Date) => {
-      const dd = String(d.getDate()).padStart(2, '0');
-      const mm = String(d.getMonth() + 1).padStart(2, '0');
-      const yyyy = d.getFullYear();
-      return `${dd}-${mm}-${yyyy}`;
-    };
     // For the current month, don't show future dates the user hasn't reached
     // yet — cap the range at today. Past months always show the full month.
     if (isAtCurrentMonth) {

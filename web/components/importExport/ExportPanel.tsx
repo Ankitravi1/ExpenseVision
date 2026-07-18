@@ -4,7 +4,7 @@ import { useToast } from '../../context/ToastContext';
 import { Icon } from '../Icon';
 import { Transaction } from '../../types';
 import { formatCurrency } from '../../utils/currency';
-import { formatTransactionDate, isoDateToDisplay } from '../../utils/date';
+import { formatTransactionDate, formatDisplayDate } from '../../utils/date';
 import { loadXlsx } from './fileLoaders';
 
 // Local-date helpers (mirrors TransactionsPage/Reports — avoids the UTC
@@ -383,7 +383,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({ initialStartDate, init
                 </button>
                 <span className="text-xs font-bold text-primary bg-primary-light/60 dark:bg-primary/20 dark:text-indigo-300 border border-primary-light px-3 py-1.5 rounded-lg inline-block shadow-sm">
                     Showing <span className="font-extrabold">{filteredTransactions.length}</span> transactions from{' '}
-                    <span className="font-extrabold">{isoDateToDisplay(startDate)}</span> to <span className="font-extrabold">{isoDateToDisplay(endDate)}</span>
+                    <span className="font-extrabold">{formatDisplayDate(startDate)}</span> to <span className="font-extrabold">{formatDisplayDate(endDate)}</span>
                 </span>
             </div>
 
@@ -476,7 +476,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({ initialStartDate, init
                             const prefix = isTransfer ? '' : isExpense ? '-' : '+';
                             return (
                                 <tr key={transaction.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                                    <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">{formatTransactionDate(transaction.date, true)}</td>
+                                    <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">{formatDisplayDate(transaction.date, true)}</td>
                                     <td className="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-950 dark:text-gray-100 truncate max-w-xs" title={transaction.note}>{transaction.note}</td>
                                     <td className={`px-6 py-3 whitespace-nowrap text-sm font-bold ${amountColor}`}>{prefix}{formatCurrency(transaction.amount, currency)}</td>
                                     <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 font-medium">{account?.name}</td>

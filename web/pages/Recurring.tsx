@@ -6,7 +6,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 import { Icon } from '../components/Icon';
 import { RecurringFrequency, RecurringRule, Transaction, TransactionType } from '../types';
 import { formatCurrency } from '../utils/currency';
-import { todayIsoDate, formatTransactionDate } from '../utils/date';
+import { todayIsoDate, formatDisplayDate } from '../utils/date';
 
 type RuleForm = {
   id?: string;
@@ -119,7 +119,7 @@ const RecurringRuleCard: React.FC<{
           <div className="mt-2 bg-gray-50 dark:bg-gray-900/30 p-2.5 rounded-lg border border-gray-100 dark:border-gray-700 max-h-[120px] overflow-y-auto space-y-1.5 scrollbar-thin">
             {ruleTransactions.map(t => (
               <div key={t.id} className="flex justify-between items-center text-[10px] text-gray-600 dark:text-gray-400 border-b border-gray-100 dark:border-gray-800 pb-1 last:border-b-0 last:pb-0">
-                <span className="font-semibold">{formatTransactionDate(t.date, true)}</span>
+                <span className="font-semibold">{formatDisplayDate(t.date, true)}</span>
                 <span className="font-medium text-gray-500 dark:text-gray-400 truncate max-w-[130px]">{t.note}</span>
               </div>
             ))}

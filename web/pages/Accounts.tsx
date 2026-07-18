@@ -7,7 +7,7 @@ import { AddAccountModal } from '../components/AddAccountModal';
 import { NewTransactionModal } from '../components/NewTransactionModal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { formatCurrency } from '../utils/currency';
-import { formatTransactionDate } from '../utils/date';
+import { formatDisplayDate } from '../utils/date';
 
 interface AccountDetailsModalProps {
     isOpen: boolean;
@@ -158,7 +158,7 @@ const AccountDetailsModal: React.FC<AccountDetailsModalProps> = ({
                                                                     {t.note || (t.type === 'transfer' ? 'Transfer' : category?.name || 'Uncategorized')}
                                                                 </p>
                                                                 <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">
-                                                                    {formatTransactionDate(t.date, true)}
+                                                                    {formatDisplayDate(t.date, true)}
                                                                 </p>
                                                             </div>
                                                         </div>
