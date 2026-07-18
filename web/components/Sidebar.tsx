@@ -19,38 +19,10 @@ interface SidebarProps {
   setMobileOpen: (open: boolean) => void;
 }
 
-interface NavItemProps {
-  icon: IconName;
-  label: Page;
-  isActive: boolean;
-  onClick: () => void;
-  isCollapsed: boolean;
-}
-
 // A few Page values need friendlier, spaced-out sidebar text.
 const NAV_LABELS: Partial<Record<Page, string>> = {
   ImportExport: 'Import / Export',
 };
-
-const NavItem: React.FC<NavItemProps> = ({ icon, label, isActive, onClick, isCollapsed }) => (
-  <li>
-    <a
-      href="#"
-      onClick={(e) => {
-        e.preventDefault();
-        onClick();
-      }}
-      className={`flex items-center p-3 rounded-lg transition-colors duration-200 ${isActive
-        ? 'bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white font-semibold'
-        : 'text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
-        } ${isCollapsed ? 'justify-center' : ''}`}
-      title={isCollapsed ? label : undefined}
-    >
-      <Icon name={icon} className={!isCollapsed ? "mr-3" : ""} size={20} />
-      {!isCollapsed && <span>{label}</span>}
-    </a>
-  </li>
-);
 
 export const Sidebar: React.FC<SidebarProps> = ({ activePage, setActivePage, isCollapsed, setCollapsed, theme, setTheme, onLogout, isMobileOpen, setMobileOpen }) => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);

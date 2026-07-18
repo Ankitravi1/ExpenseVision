@@ -466,7 +466,7 @@ export const Accounts: React.FC = () => {
                             <Icon name="TrendingDown" className="text-danger dark:text-rose-400" size={24} />
                         </div>
                         <div>
-                            <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Expense so far</h4>
+                            <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">All-time Expenses</h4>
                             <p className="text-2xl font-bold mt-1 text-danger dark:text-rose-400">
                                 {formatCurrency(allTimeExpenses, currency)}
                             </p>
@@ -478,7 +478,7 @@ export const Accounts: React.FC = () => {
                             <Icon name="TrendingUp" className="text-success dark:text-emerald-400" size={24} />
                         </div>
                         <div>
-                            <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Income so far</h4>
+                            <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">All-time Income</h4>
                             <p className="text-2xl font-bold mt-1 text-success dark:text-emerald-400">
                                 {formatCurrency(allTimeIncome, currency)}
                             </p>
@@ -490,7 +490,7 @@ export const Accounts: React.FC = () => {
                             <Icon name="Landmark" className="text-primary dark:text-indigo-300" size={24} />
                         </div>
                         <div>
-                            <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Combined Balance</h4>
+                            <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Current Balance</h4>
                             <p className="text-2xl font-bold mt-1 text-primary dark:text-indigo-400">
                                 {formatCurrency(totalBalance, currency)}
                             </p>

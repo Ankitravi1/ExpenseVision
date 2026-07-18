@@ -1395,7 +1395,7 @@ export const Reports: React.FC = () => {
                             {/* The 4 clean borderless metrics */}
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 divide-y md:divide-y-0 md:divide-x divide-gray-200 dark:divide-gray-700">
                                 <div className="flex flex-col justify-between py-2">
-                                    <span className="text-[10px] font-bold text-gray-500 dark:text-gray-500 uppercase tracking-wider">Daily Burn Rate</span>
+                                    <span className="text-[10px] font-bold text-gray-500 dark:text-gray-500 uppercase tracking-wider">Avg Daily Spending</span>
                                     <p className="text-lg font-black text-gray-900 dark:text-white mt-1.5 tabular-nums">
                                         {formatCurrency(burnRateMetrics.dailyBurn, currency)}
                                         <span className="text-xs font-normal text-gray-400">/day</span>

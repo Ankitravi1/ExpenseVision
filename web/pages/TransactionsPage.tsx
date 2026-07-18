@@ -728,7 +728,7 @@ export const TransactionsPage: React.FC = () => {
                                              <span className="truncate">
                                                  {colFilters.amountLimit
                                                      ? `${colFilters.amountType === 'expense' ? 'Exp' : 'Inc'} ≤ ${colFilters.amountLimit}`
-                                                     : 'Range'}
+                                                     : 'Amount'}
                                              </span>
                                              <Icon name="ChevronDown" size={12} className="ml-1 flex-shrink-0" />
                                          </button>
