@@ -77,6 +77,7 @@ export const Header: React.FC<HeaderProps> = ({ pageTitle, onNewTransaction, onM
         <NotificationCenter />
         <button
           onClick={onNewTransaction}
+          data-tour="new-transaction"
           className="btn btn-primary flex items-center gap-2 py-2 px-3 sm:px-4"
         >
           <Icon name="Plus" size={20} />

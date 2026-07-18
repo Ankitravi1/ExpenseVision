@@ -8,6 +8,7 @@ const settingsSchema = z.object({
     enabled: z.boolean(),
     importEnabled: z.boolean().optional(),
     autoParseEnabled: z.boolean().optional(),
+    useOwnKey: z.boolean().optional(),
     provider: z.string().min(1),
     model: z.string(), // Allow empty string for model initially
     baseUrl: z.union([z.string(), z.record(z.string())]).nullish(),
@@ -19,6 +20,7 @@ const defaultSettings = {
     enabled: false,
     importEnabled: true,
     autoParseEnabled: true,
+    useOwnKey: false,
     provider: 'deepseek',
     model: '',
     baseUrl: {},
@@ -32,7 +34,7 @@ const getKey = (): Buffer | null => {
     return crypto.createHash('sha256').update(secret).digest();
 };
 
-const encrypt = (value: string): string => {
+export const encrypt = (value: string): string => {
     const key = getKey();
     if (!key) throw new Error('AI_SETTINGS_SECRET is not configured');
     const iv = crypto.randomBytes(12);
@@ -56,13 +58,141 @@ export const decrypt = (value?: string | null): string => {
     ]).toString('utf8');
 };
 
+// ---------------------------------------------------------------------------
+// Shared AI resolution used by the transaction parsing routes.
+//
+// A user relies on the host/platform AI key by default (`useOwnKey = false`)
+// and can switch to their own key. Whichever source is preferred, we fall back
+// to the other if the preferred one isn't usable — so a brand-new user with no
+// key gets platform AI, and existing users with their own key keep working even
+// if the platform key isn't set.
+// ---------------------------------------------------------------------------
+
+const DEFAULT_PROVIDERS = ['deepseek', 'openai', 'openrouter', 'gemini'];
+
+// Shown to users who rely on the platform key — they must never see internal
+// details (missing key, provider errors, etc.). Advanced users who brought
+// their own key still get the real error so they can fix their config.
+export const GENERIC_AI_UNAVAILABLE = 'AI features are temporarily unavailable. Please try again later.';
+
+export interface ResolvedAi {
+    provider: string;
+    model: string;
+    apiKey: string;
+    baseUrl: string;
+    source: 'own' | 'platform';
+    /** True when the caller should hide internal errors behind a generic message. */
+    maskErrors: boolean;
+}
+
+const parseUserKey = (aiConfig: any): string => {
+    if (!aiConfig?.keys) return '';
+    try {
+        const keysMap = JSON.parse(aiConfig.keys);
+        const providerKeys = keysMap[aiConfig.provider] || [];
+        if (Array.isArray(providerKeys) && providerKeys.length > 0) return decrypt(providerKeys[0]);
+    } catch (e) {
+        console.error('Failed to parse user AI keys:', e);
+    }
+    return '';
+};
+
+const parseUserBaseUrl = (aiConfig: any): string => {
+    if (!aiConfig?.baseUrl) return '';
+    try {
+        const parsed = JSON.parse(aiConfig.baseUrl);
+        if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+            return parsed[aiConfig.provider] || '';
+        }
+        return aiConfig.baseUrl;
+    } catch (e) {
+        return aiConfig.baseUrl;
+    }
+};
+
+const EMPTY_PLATFORM = { enabled: false, provider: '', model: '', baseUrl: '', apiKey: '' };
+
+export const getPlatformAiConfig = async (prisma: any): Promise<{ enabled: boolean; provider: string; model: string; baseUrl: string; apiKey: string }> => {
+    let p;
+    try {
+        p = await prisma.platformSettings.findUnique({ where: { id: 'platform' } });
+    } catch (e) {
+        // Table may not exist yet (before `prisma db push`) — degrade to "no
+        // platform config" so users relying on their own key keep working.
+        return EMPTY_PLATFORM;
+    }
+    if (!p) return EMPTY_PLATFORM;
+    let apiKey = '';
+    try { apiKey = decrypt(p.aiKey); } catch (e) { /* misconfigured/rotated secret -> treat as no key */ }
+    return { enabled: p.aiEnabled, provider: p.aiProvider, model: p.aiModel, baseUrl: p.aiBaseUrl || '', apiKey };
+};
+
+export const resolveAiForUser = async (
+    prisma: any,
+    userId: string,
+    feature: 'import' | 'autoparse'
+): Promise<{ ok: true; config: ResolvedAi } | { ok: false; status: number; error: string }> => {
+    const aiConfig = await prisma.aiSettings.findUnique({ where: { userId } });
+    const platform = await getPlatformAiConfig(prisma);
+
+    // Advanced users (they chose to bring their own key) see real errors; anyone
+    // relying on the platform key sees only a generic "unavailable" message.
+    const maskErrors = aiConfig?.useOwnKey !== true;
+    const detail = (real: string) => (maskErrors ? GENERIC_AI_UNAVAILABLE : real);
+
+    // Respect the user's per-feature toggle when they have settings; brand-new
+    // users (no row) default to on so platform AI works with zero setup.
+    const featureOn = aiConfig
+        ? (feature === 'import' ? aiConfig.importEnabled !== false : aiConfig.autoParseEnabled !== false)
+        : true;
+    if (!featureOn) {
+        // A disabled toggle is the user's own choice, not an internal fault.
+        return {
+            ok: false,
+            status: 400,
+            error: feature === 'import' ? 'AI statement import is disabled' : 'AI quick entry transaction parsing is disabled',
+        };
+    }
+
+    const ownKey = parseUserKey(aiConfig);
+    const ownConfig: ResolvedAi | null = ownKey
+        ? { provider: aiConfig.provider, model: aiConfig.model, apiKey: ownKey, baseUrl: parseUserBaseUrl(aiConfig), source: 'own', maskErrors }
+        : null;
+    const platformConfig: ResolvedAi | null = (platform.enabled && platform.apiKey)
+        ? { provider: platform.provider, model: platform.model, apiKey: platform.apiKey, baseUrl: platform.baseUrl, source: 'platform', maskErrors }
+        : null;
+
+    const preferOwn = aiConfig?.useOwnKey === true;
+    const chosen = preferOwn ? (ownConfig || platformConfig) : (platformConfig || ownConfig);
+
+    if (!chosen) {
+        return {
+            ok: false,
+            status: maskErrors ? 503 : 400,
+            error: detail('No AI key available. Add your own key in Settings, or ask the admin to enable the platform AI key.'),
+        };
+    }
+    if (!DEFAULT_PROVIDERS.includes(chosen.provider) && !chosen.baseUrl) {
+        return { ok: false, status: maskErrors ? 503 : 400, error: detail(`AI provider ${chosen.provider} requires a base URL`) };
+    }
+    if (!chosen.model) {
+        return { ok: false, status: maskErrors ? 503 : 400, error: detail('No AI model configured for the selected provider.') };
+    }
+    return { ok: true, config: chosen };
+};
+
 router.get('/', async (req, res, next) => {
     try {
         const prisma = (req as any).prisma;
         const userId = (req as any).userId;
         const settings = await prisma.aiSettings.findUnique({ where: { userId } });
 
-        if (!settings) return res.json(defaultSettings);
+        // Surface whether the host has a usable platform AI key so the UI can
+        // tell the user they can rely on it without adding their own.
+        const platform = await getPlatformAiConfig(prisma);
+        const platformAvailable = platform.enabled && !!platform.apiKey;
+
+        if (!settings) return res.json({ ...defaultSettings, platformAvailable });
 
         let decryptedKeys: Record<string, string[]> = {};
         let parsedCustomModels: Record<string, string[]> = {};
@@ -102,11 +232,13 @@ router.get('/', async (req, res, next) => {
             enabled: settings.enabled,
             importEnabled: settings.importEnabled ?? true,
             autoParseEnabled: settings.autoParseEnabled ?? true,
+            useOwnKey: settings.useOwnKey ?? false,
             provider: settings.provider,
             model: settings.model,
             baseUrl: cleanBaseUrl,
             keys: decryptedKeys,
-            customModels: parsedCustomModels
+            customModels: parsedCustomModels,
+            platformAvailable
         });
     } catch (error: any) {
         if (error.message?.includes('AI_SETTINGS_SECRET')) {
@@ -152,6 +284,7 @@ router.put('/', async (req, res, next) => {
                 enabled: data.enabled,
                 importEnabled: data.importEnabled ?? true,
                 autoParseEnabled: data.autoParseEnabled ?? true,
+                useOwnKey: data.useOwnKey ?? false,
                 provider: data.provider,
                 model: data.model,
                 baseUrl: baseUrlJson,
@@ -162,6 +295,7 @@ router.put('/', async (req, res, next) => {
                 enabled: data.enabled,
                 importEnabled: data.importEnabled ?? true,
                 autoParseEnabled: data.autoParseEnabled ?? true,
+                useOwnKey: data.useOwnKey ?? false,
                 provider: data.provider,
                 model: data.model,
                 baseUrl: baseUrlJson,
@@ -184,6 +318,7 @@ router.put('/', async (req, res, next) => {
             enabled: saved.enabled,
             importEnabled: saved.importEnabled,
             autoParseEnabled: saved.autoParseEnabled,
+            useOwnKey: saved.useOwnKey,
             provider: saved.provider,
             model: saved.model,
             baseUrl: cleanReturnedBaseUrl,

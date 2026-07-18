@@ -22,6 +22,10 @@ import { openApiSpec } from './docs/openapi.js';
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Trust the proxy to ensure rate limiting uses the real client IP (X-Forwarded-For)
+// rather than instantly blocking the Vite dev server proxy (127.0.0.1).
+app.set('trust proxy', 1);
+
 // CORS: allow local dev origins + any extras from env (e.g. LAN IP for mobile dev)
 const extraOrigins = (process.env.CORS_ORIGINS || '')
     .split(',')

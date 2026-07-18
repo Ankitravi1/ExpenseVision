@@ -9,8 +9,8 @@ export interface AppContextValue {
   recurring: RecurringRule[];
   currency: string;
   setCurrency: (currency: string) => void;
-  theme: 'light' | 'dark';
-  setTheme: (theme: 'light' | 'dark') => void;
+  theme: 'light' | 'dark' | 'paper';
+  setTheme: (theme: 'light' | 'dark' | 'paper') => void;
   addTransaction: (transaction: Omit<Transaction, 'id'>) => Promise<boolean>;
   updateTransaction: (id: string, transaction: Partial<Transaction>) => Promise<boolean>;
   deleteTransaction: (id: string) => Promise<boolean>;

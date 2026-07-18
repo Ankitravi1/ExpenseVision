@@ -69,9 +69,12 @@ export const ImportWizard: React.FC = () => {
     if (!context) return null;
     const { accounts, categories, transactions, refreshData } = context;
 
-    const isAiImportEnabled = aiSettings?.enabled === true &&
-        aiSettings?.importEnabled !== false &&
-        aiSettings?.keys?.[aiSettings.provider]?.length > 0;
+    // A user can use AI import if the feature isn't turned off AND a key is
+    // available — either their own (advanced) or the host/platform key (default).
+    const hasOwnKey = (aiSettings?.keys?.[aiSettings?.provider]?.length ?? 0) > 0;
+    const canUseAi = aiSettings?.useOwnKey ? hasOwnKey : (aiSettings?.platformAvailable === true || hasOwnKey);
+    const isAiImportEnabled = aiSettings?.importEnabled !== false && canUseAi;
+    const isAdvancedAiUser = aiSettings?.useOwnKey === true;
 
     const requestPdfPassword = (attempt: number): Promise<string | null> => {
         return new Promise(resolve => {
@@ -174,6 +177,49 @@ export const ImportWizard: React.FC = () => {
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             processFile(e.target.files[0]);
+        }
+    };
+
+    // Sample rows shared by the CSV and Excel templates so users have a
+    // correctly-shaped file to fill in and re-import.
+    const TEMPLATE_HEADERS = ['Date', 'Time', 'Note', 'Amount', 'Account', 'Type', 'Category', 'Transfer To'];
+    const TEMPLATE_ROWS = [
+        ['01-01-2025', '12:00', 'Groceries', '50.00', 'Savings Account', 'expense', 'Groceries', ''],
+        ['02-01-2025', '09:00', 'Salary', '2000.00', 'Savings Account', 'income', 'Salary', ''],
+        ['03-01-2025', '18:30', 'Transfer to Credit Card', '1000.00', 'Savings Account', 'transfer', '', 'Credit Card'],
+    ];
+
+    const triggerDownload = (blob: Blob, filename: string) => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+    };
+
+    const downloadCsvTemplate = () => {
+        const csvContent = [TEMPLATE_HEADERS, ...TEMPLATE_ROWS]
+            .map(row => row.join(','))
+            .join('\n') + '\n';
+        triggerDownload(new Blob([csvContent], { type: 'text/csv' }), 'transaction_import_template.csv');
+    };
+
+    const downloadExcelTemplate = async () => {
+        try {
+            const XLSX = await loadXlsx();
+            const worksheet = XLSX.utils.aoa_to_sheet([TEMPLATE_HEADERS, ...TEMPLATE_ROWS]);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'Transactions');
+            const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+            triggerDownload(
+                new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
+                'transaction_import_template.xlsx'
+            );
+        } catch (err: any) {
+            showToast(err.message || 'Failed to generate Excel template', 'error');
         }
     };
 
@@ -383,8 +429,11 @@ export const ImportWizard: React.FC = () => {
                 <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 flex items-start gap-3">
                     <Icon name="AlertTriangle" className="text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" size={18} />
                     <p className="text-sm text-amber-800 dark:text-amber-300">
-                        AI Statement Import is disabled or has no API key configured. Enable it and add an API key in
-                        {' '}<span className="font-bold">Settings → AI Settings</span> before parsing a statement.
+                        {isAdvancedAiUser ? (
+                            <>AI Statement Import is disabled or has no API key configured. Enable it and add an API key in <span className="font-bold">Settings → AI Settings</span> before parsing a statement.</>
+                        ) : (
+                            <>AI-assisted import is temporarily unavailable. You can still add transactions manually, or download a CSV/Excel template above to fill in and import.</>
+                        )}
                     </p>
                 </div>
             )}
@@ -475,6 +524,40 @@ export const ImportWizard: React.FC = () => {
                         </div>
                     )}
 
+                    {/* Template download — for users who'd rather fill in a clean
+                        spreadsheet than import a bank statement. */}
+                    {!isProcessing && !pdfPasswordPrompt && inputMode === 'file' && (
+                        <div className="bg-gray-50 dark:bg-gray-800/40 border border-gray-200 dark:border-gray-700 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
+                            <div className="flex items-start gap-2.5 min-w-0">
+                                <Icon name="FileSpreadsheet" size={18} className="text-primary dark:text-indigo-400 mt-0.5 flex-shrink-0" />
+                                <div className="min-w-0">
+                                    <p className="text-sm font-bold text-gray-800 dark:text-gray-200">Prefer to start from a template?</p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                        Download our standard format, fill it in, and upload it above. If your file doesn't match this layout, the AI parser will still map the columns for you.
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                                <button
+                                    type="button"
+                                    onClick={downloadCsvTemplate}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-gray-800 text-primary dark:text-indigo-400 rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-all text-xs font-bold border border-gray-200 dark:border-gray-700"
+                                >
+                                    <Icon name="Download" size={14} />
+                                    CSV
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={downloadExcelTemplate}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-gray-800 text-primary dark:text-indigo-400 rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-all text-xs font-bold border border-gray-200 dark:border-gray-700"
+                                >
+                                    <Icon name="Download" size={14} />
+                                    Excel
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
                     {!isProcessing && !pdfPasswordPrompt && inputMode === 'paste' && (
                         <div className="flex flex-col gap-3">
                             <textarea
@@ -552,8 +635,8 @@ export const ImportWizard: React.FC = () => {
                     <div className="bg-gray-50 dark:bg-gray-800/40 border border-gray-200 dark:border-gray-700 rounded-xl p-4 space-y-1.5">
                         <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">How the AI will map fields</p>
                         <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-1 leading-relaxed">
-                            <li><strong className="text-gray-800 dark:text-gray-200">Expense</strong> = Debit entries</li>
-                            <li><strong className="text-gray-800 dark:text-gray-200">Income</strong> = Credit entries</li>
+                            <li><strong className="text-gray-800 dark:text-gray-200">Expense</strong> = Money Out (debit entries)</li>
+                            <li><strong className="text-gray-800 dark:text-gray-200">Income</strong> = Money In (credit entries)</li>
                             <li><strong className="text-gray-800 dark:text-gray-200">Category</strong> = decided by AI from your existing categories</li>
                             <li><strong className="text-gray-800 dark:text-gray-200">Note</strong> = transaction detail / summary line</li>
                             <li><strong className="text-gray-800 dark:text-gray-200">Date</strong> = transaction date</li>

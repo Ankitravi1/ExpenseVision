@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { hashPassword } from '../utils/auth.js';
 import { z } from 'zod';
+import { encrypt } from './aiSettings.js';
 
 const router = Router();
 
@@ -112,6 +113,77 @@ router.delete('/users/:id', requireSuperAdmin, async (req: any, res, next) => {
         await prisma.user.delete({ where: { id } });
         res.status(204).send();
     } catch (error) {
+        next(error);
+    }
+});
+
+// ---- Platform AI key (host-provided key that normal users rely on) ----------
+
+// GET /api/admin/platform-ai - Read the platform AI config (key masked)
+router.get('/platform-ai', requireSuperAdmin, async (_req, res, next) => {
+    try {
+        const p = await prisma.platformSettings.findUnique({ where: { id: 'platform' } });
+        res.json({
+            aiEnabled: p?.aiEnabled ?? false,
+            aiProvider: p?.aiProvider ?? 'deepseek',
+            aiModel: p?.aiModel ?? '',
+            aiBaseUrl: p?.aiBaseUrl ?? '',
+            hasKey: !!p?.aiKey,
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
+const platformAiSchema = z.object({
+    aiEnabled: z.boolean(),
+    aiProvider: z.string().min(1),
+    aiModel: z.string(),
+    aiBaseUrl: z.string().nullish(),
+    // Non-empty -> set/replace the stored key. Omitted or empty -> keep existing.
+    aiKey: z.string().optional(),
+    clearKey: z.boolean().optional(),
+});
+
+// PUT /api/admin/platform-ai - Configure the platform AI key
+router.put('/platform-ai', requireSuperAdmin, async (req, res, next) => {
+    try {
+        const data = platformAiSchema.parse(req.body);
+
+        // Only touch the encrypted key when the admin actually supplies one (or
+        // explicitly clears it) — an empty field means "leave the key as-is".
+        let keyUpdate: { aiKey?: string | null } = {};
+        if (data.clearKey) {
+            keyUpdate = { aiKey: null };
+        } else if (data.aiKey && data.aiKey.trim()) {
+            keyUpdate = { aiKey: encrypt(data.aiKey.trim()) };
+        }
+
+        const base = {
+            aiEnabled: data.aiEnabled,
+            aiProvider: data.aiProvider,
+            aiModel: data.aiModel,
+            aiBaseUrl: data.aiBaseUrl || null,
+        };
+
+        const saved = await prisma.platformSettings.upsert({
+            where: { id: 'platform' },
+            create: { id: 'platform', ...base, ...keyUpdate },
+            update: { ...base, ...keyUpdate },
+        });
+
+        res.json({
+            aiEnabled: saved.aiEnabled,
+            aiProvider: saved.aiProvider,
+            aiModel: saved.aiModel,
+            aiBaseUrl: saved.aiBaseUrl ?? '',
+            hasKey: !!saved.aiKey,
+        });
+    } catch (error: any) {
+        if (error instanceof z.ZodError) return res.status(400).json({ error: 'Validation error', details: error.errors });
+        if (error.message?.includes('AI_SETTINGS_SECRET')) {
+            return res.status(503).json({ error: 'AI settings encryption is not configured' });
+        }
         next(error);
     }
 });

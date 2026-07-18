@@ -332,11 +332,6 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({ initialStartDate, init
                                         <Icon name="FileSpreadsheet" size={14} />
                                         {isExporting ? 'Building Excel file...' : 'Export as Excel (.xlsx)'}
                                     </button>
-                                    <button disabled className="w-full text-left px-4 py-2.5 text-sm font-semibold text-gray-400 dark:text-gray-600 flex items-center gap-2 cursor-not-allowed">
-                                        <Icon name="FileText" size={14} />
-                                        Export as PDF
-                                        <span className="ml-auto text-[9px] font-bold uppercase bg-gray-100 dark:bg-gray-700 text-gray-400 px-1.5 py-0.5 rounded">Soon</span>
-                                    </button>
                                 </div>
                             </>
                         )}

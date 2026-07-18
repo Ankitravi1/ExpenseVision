@@ -534,7 +534,7 @@ export const Recurring: React.FC = () => {
             <Card className="text-center py-14">
               <Icon name="RefreshCw" size={48} className="mx-auto mb-4 text-gray-400" />
               <p className="text-lg font-semibold text-gray-darkest dark:text-gray-50">No recurring rules yet</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Add rent, salary, EMI, or subscriptions to automate future entries.</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Add rent, salary, loan payments, or subscriptions to automate future entries.</p>
             </Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

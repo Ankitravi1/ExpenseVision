@@ -7,13 +7,20 @@ import { Transaction } from '../types';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { formatCurrency } from '../utils/currency';
 import { formatTransactionDate } from '../utils/date';
+import { TipBanner } from '../components/TipBanner';
 
-const StatCard: React.FC<{ title: string; amount: number; change: number; type: 'income' | 'expense' | 'net'; currency: string }> = ({ title, amount, change, type, currency }) => {
+const StatCard: React.FC<{ title: string; subtitle?: string; amount: number; change: number; type: 'income' | 'expense' | 'net'; currency: string }> = ({ title, subtitle, amount, change, type, currency }) => {
   const isPositiveChange = change >= 0;
+
+  // The balance card flips to a red "you spent more than you earned" look
+  // whenever the month's balance is negative, so non-finance users can tell at
+  // a glance that money went out the door.
+  const isNegativeNet = type === 'net' && amount < 0;
 
   let gradientClass = '';
   let borderClass = '';
   let textClass = '';
+  let titleColorClass = '';
   let iconName = '';
 
   switch (type) {
@@ -21,19 +28,30 @@ const StatCard: React.FC<{ title: string; amount: number; change: number; type: 
       gradientClass = 'from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20';
       borderClass = 'border-emerald-200 dark:border-emerald-800/30';
       textClass = 'text-emerald-900 dark:text-emerald-100';
+      titleColorClass = 'text-emerald-700';
       iconName = 'TrendingUp';
       break;
     case 'expense':
       gradientClass = 'from-rose-50 to-rose-100 dark:from-rose-900/20 dark:to-rose-800/20';
       borderClass = 'border-rose-200 dark:border-rose-800/30';
       textClass = 'text-rose-900 dark:text-rose-100';
+      titleColorClass = 'text-rose-700';
       iconName = 'TrendingDown';
       break;
     case 'net':
-      gradientClass = 'from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-800/20';
-      borderClass = 'border-blue-200 dark:border-blue-800/30';
-      textClass = 'text-blue-900 dark:text-blue-100';
-      iconName = 'Wallet';
+      if (isNegativeNet) {
+        gradientClass = 'from-rose-50 to-red-100 dark:from-rose-900/25 dark:to-red-900/25';
+        borderClass = 'border-rose-300 dark:border-rose-700/50 ring-1 ring-rose-300 dark:ring-rose-700/40';
+        textClass = 'text-rose-900 dark:text-rose-100';
+        titleColorClass = 'text-rose-700';
+        iconName = 'AlertTriangle';
+      } else {
+        gradientClass = 'from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-800/20';
+        borderClass = 'border-blue-200 dark:border-blue-800/30';
+        textClass = 'text-blue-900 dark:text-blue-100';
+        titleColorClass = 'text-blue-700';
+        iconName = 'Wallet';
+      }
       break;
   }
 
@@ -48,10 +66,13 @@ const StatCard: React.FC<{ title: string; amount: number; change: number; type: 
     <div className={`flex-1 p-6 rounded-2xl border bg-gradient-to-br shadow-sm ${gradientClass} ${borderClass}`}>
       <div className="flex justify-between items-start">
         <div>
-          <p className={`text-sm font-medium mb-1 ${type === 'income' ? 'text-emerald-700' : type === 'expense' ? 'text-rose-700' : 'text-blue-700'} dark:text-gray-300`}>{title}</p>
+          <p className={`text-sm font-medium mb-1 ${titleColorClass} dark:text-gray-300`}>{title}</p>
           <h3 className={`text-3xl font-bold ${textClass}`}>
             {formatCurrency(amount, currency)}
           </h3>
+          {subtitle && (
+            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1">{subtitle}</p>
+          )}
         </div>
         <div className={`p-2 rounded-lg bg-white/50 dark:bg-white/10 ${textClass}`}>
           <Icon name={iconName} size={20} />
@@ -258,22 +279,29 @@ export const Dashboard: React.FC = () => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
     const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
     const format = (d: Date) => {
       const dd = String(d.getDate()).padStart(2, '0');
       const mm = String(d.getMonth() + 1).padStart(2, '0');
       const yyyy = d.getFullYear();
       return `${dd}-${mm}-${yyyy}`;
     };
-    return `Showing transaction date from ${format(firstDay)} to ${format(lastDay)}`;
-  }, [currentDate]);
+    // For the current month, don't show future dates the user hasn't reached
+    // yet — cap the range at today. Past months always show the full month.
+    if (isAtCurrentMonth) {
+      return `Showing transactions from ${format(firstDay)} to today (${format(now)})`;
+    }
+    const lastDay = new Date(year, month + 1, 0);
+    return `Showing transactions from ${format(firstDay)} to ${format(lastDay)}`;
+  }, [currentDate, isAtCurrentMonth]);
 
   const topSpendingCategories = expenseByCategory.slice(0, 5);
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto">
+      <TipBanner />
+
       {/* Month Navigator Header with Date Range Label */}
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+      <div data-tour="month-nav" className="flex flex-col sm:flex-row justify-between items-center gap-4">
         {/* Month slider on the left */}
         <div className="flex items-center bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-300 dark:border-gray-700 p-1">
           <button
@@ -303,18 +331,18 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* Stats Cards (Total Expenses card swapped to first column) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div data-tour="stat-cards" className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <StatCard title="Total Expenses" amount={totalExpenses} change={expenseChange} type="expense" currency={currency} />
         <StatCard title="Total Income" amount={totalIncome} change={incomeChange} type="income" currency={currency} />
-        <StatCard title="Balance (net flow)" amount={netFlow} change={netFlowChange} type="net" currency={currency} />
+        <StatCard title="This Month's Balance" subtitle="Income minus Expenses" amount={netFlow} change={netFlowChange} type="net" currency={currency} />
       </div>
 
       {/* Merged Expense Distribution Layout (spans full 3 columns) */}
       <Card className="lg:col-span-3">
         <div className="flex justify-between items-center gap-4 mb-6">
           <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-baseline flex-wrap">
-            <span>Expense Distribution</span>
-            <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 ml-1.5">(Monthly Category Breakdown)</span>
+            <span>Where Your Money Went</span>
+            <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 ml-1.5">(This month, by category)</span>
           </h3>
           <button
             onClick={() => setActivePage('Reports')}

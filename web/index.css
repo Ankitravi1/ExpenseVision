@@ -46,30 +46,27 @@
   --danger-700: #be123c;
   --danger-900: #881337;
 
-  /* Neutral Colors */
-  --gray-50: #f8fafc;
-  --gray-100: #f1f5f9;
-  --gray-200: #e2e8f0;
-  --gray-300: #cbd5e1;
-  --gray-400: #94a3b8;
-  --gray-500: #64748b;
-  --gray-600: #475569;
-  --gray-700: #334155;
-  --gray-800: #1e293b;
-  --gray-900: #0f172a;
+/* Neutral Colors (Pure Gray/Zinc scale instead of slate/blueish) */
+  --gray-50: #fafafa;
+  --gray-100: #f4f4f5;
+  --gray-200: #e4e4e7;
+  --gray-300: #d4d4d8;
+  --gray-400: #a1a1aa;
+  --gray-500: #71717a;
+  --gray-600: #52525b;
+  --gray-700: #3f3f46;
+  --gray-800: #27272a;
+  --gray-900: #18181b;
 
   /* Gradients */
   --gradient-primary: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
   --gradient-success: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
-  /* Income Card Bg */
   --gradient-danger: linear-gradient(135deg, #fff1f2 0%, #fce7f3 100%);
-  /* Expense Card Bg */
   --gradient-info: linear-gradient(135deg, #eff6ff 0%, #eef2ff 100%);
-  /* Net Flow Card Bg */
-  --gradient-sidebar: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+  --gradient-sidebar: linear-gradient(180deg, #18181b 0%, #000000 100%);
 
   /* Shadows */
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
   --shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.1);
@@ -80,15 +77,10 @@
 
   /* Border Radius */
   --radius-sm: 0.5rem;
-  /* 8px */
   --radius-md: 0.75rem;
-  /* 12px */
   --radius-lg: 1rem;
-  /* 16px */
   --radius-xl: 1.5rem;
-  /* 24px */
   --radius-2xl: 2rem;
-  /* 32px */
   --radius-full: 9999px;
 
   /* Transitions */
@@ -97,29 +89,46 @@
   --transition-slow: 500ms ease-in-out;
 }
 
-/* Dark Mode Variables */
+/* Dark Mode Variables (Pure black and neutral gray) */
 .dark {
-  --bg-primary: #0f172a;
-  --bg-secondary: #1e293b;
-  --bg-tertiary: #334155;
-  --text-primary: #f1f5f9;
-  --text-secondary: #cbd5e1;
-  --text-tertiary: #94a3b8;
-  --border-color: #334155;
-  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.4);
-  --shadow-glow: 0 0 24px rgba(129, 140, 248, 0.5);
+  --bg-primary: #000000;
+  --bg-secondary: #09090b;
+  --bg-tertiary: #18181b;
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-tertiary: #71717a;
+  --border-color: #27272a;
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.8), 0 10px 10px -5px rgba(0, 0, 0, 0.6);
+  --shadow-glow: 0 0 24px rgba(129, 140, 248, 0.3);
 }
 
+/* Paper Mode Variables (Parchment color) */
+.paper {
+  --bg-primary: #fdfbf7;
+  --bg-secondary: #f4f0e6;
+  --bg-tertiary: #e8e2d2;
+  --text-primary: #2d2a26;
+  --text-secondary: #5c554d;
+  --text-tertiary: #8b8276;
+  --border-color: #d6cfbf;
+  /* subtle grain */
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+}
+
+/* Force Paper Mode onto hardcoded Tailwind utilities globally */
+.paper .bg-white { background-color: var(--bg-primary) !important; }
+.paper .bg-gray-50, .paper .bg-gray-light { background-color: var(--bg-secondary) !important; }
+.paper .border-gray-100, .paper .border-gray-200 { border-color: var(--border-color) !important; }
+
 /* Light Mode Variables */
-:root:not(.dark) {
+:root:not(.dark):not(.paper) {
   --bg-primary: #ffffff;
-  --bg-secondary: #f8fafc;
-  /* Main background */
-  --bg-tertiary: #f1f5f9;
-  --text-primary: #1e293b;
-  --text-secondary: #64748b;
-  --text-tertiary: #94a3b8;
-  --border-color: #e2e8f0;
+  --bg-secondary: #fafafa;
+  --bg-tertiary: #f4f4f5;
+  --text-primary: #18181b;
+  --text-secondary: #71717a;
+  --text-tertiary: #a1a1aa;
+  --border-color: #e4e4e7;
 }
 
 /* Global Styles */
@@ -130,12 +139,10 @@
 }
 
 /*
- * Global scale: the app was designed around `body { zoom: 0.8 }`.
- * Tailwind is rem-based, so shrinking the root font size (16px * 0.8 = 12.8px)
- * reproduces the same visual size without the non-standard zoom property.
+ * Global scale: adjusted for a compact look.
  */
 html {
-  font-size: 12.8px;
+  font-size: 11.5px;
 }
 
 body {

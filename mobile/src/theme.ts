@@ -25,12 +25,12 @@ export interface Theme {
 export const lightTheme: Theme = {
     dark: false,
     colors: {
-        background: '#f8fafc',
+        background: '#fafafa', // zinc-50
         card: '#ffffff',
-        cardBorder: '#e2e8f0',
-        text: '#1e293b',
-        textSecondary: '#64748b',
-        textTertiary: '#94a3b8',
+        cardBorder: '#e4e4e7', // zinc-200
+        text: '#18181b',       // zinc-900
+        textSecondary: '#71717a', // zinc-500
+        textTertiary: '#a1a1aa',  // zinc-400
         primary: '#4f46e5',
         primaryLight: '#e0e7ff',
         success: '#10b981',
@@ -39,21 +39,21 @@ export const lightTheme: Theme = {
         dangerBg: '#fff1f2',
         warning: '#f59e0b',
         inputBg: '#ffffff',
-        inputBorder: '#cbd5e1',
+        inputBorder: '#d4d4d8', // zinc-300
         tabBar: '#ffffff',
-        separator: '#f1f5f9',
+        separator: '#f4f4f5',   // zinc-100
     },
 };
 
 export const darkTheme: Theme = {
     dark: true,
     colors: {
-        background: '#0f172a',
-        card: '#1e293b',
-        cardBorder: '#334155',
-        text: '#f1f5f9',
-        textSecondary: '#cbd5e1',
-        textTertiary: '#94a3b8',
+        background: '#000000', // Pure black
+        card: '#09090b',       // zinc-950
+        cardBorder: '#27272a', // zinc-800
+        text: '#fafafa',       // zinc-50
+        textSecondary: '#a1a1aa', // zinc-400
+        textTertiary: '#71717a',  // zinc-500
         primary: '#818cf8',
         primaryLight: '#312e81',
         success: '#34d399',
@@ -61,10 +61,10 @@ export const darkTheme: Theme = {
         danger: '#fb7185',
         dangerBg: '#881337',
         warning: '#fbbf24',
-        inputBg: '#1e293b',
-        inputBorder: '#475569',
-        tabBar: '#1e293b',
-        separator: '#334155',
+        inputBg: '#18181b',    // zinc-900
+        inputBorder: '#3f3f46', // zinc-700
+        tabBar: '#09090b',     // zinc-950
+        separator: '#27272a',  // zinc-800
     },
 };
 

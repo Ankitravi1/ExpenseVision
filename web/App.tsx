@@ -28,6 +28,7 @@ import { api } from './services/api';
 import { Icon } from './components/Icon';
 import { useToast } from './context/ToastContext';
 import { AppContext } from './context/AppContext';
+import { TourProvider } from './context/TourContext';
 import { transactionDateToIso } from './utils/date';
 
 // Re-export so existing `import { AppContext } from '../App'` keeps working
@@ -63,9 +64,9 @@ const App: React.FC = () => {
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [currency, setCurrencyState] = useState('INR');
   const [user, setUser] = useState<User | null>(null);
-  const [theme, setThemeState] = useState<'light' | 'dark'>(() => {
+  const [theme, setThemeState] = useState<'light' | 'dark' | 'paper'>(() => {
     const savedTheme = localStorage.getItem('theme');
-    return (savedTheme as 'light' | 'dark') || 'light';
+    return (savedTheme as 'light' | 'dark' | 'paper') || 'light';
   });
 
   // Data States
@@ -82,13 +83,13 @@ const App: React.FC = () => {
     navigate(PAGE_PATHS[page]);
   }, [navigate]);
 
-  const setTheme = useCallback((newTheme: 'light' | 'dark') => {
+  const setTheme = useCallback((newTheme: 'light' | 'dark' | 'paper') => {
     setThemeState(newTheme);
     localStorage.setItem('theme', newTheme);
-    if (newTheme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
+    
+    document.documentElement.classList.remove('dark', 'paper');
+    if (newTheme !== 'light') {
+      document.documentElement.classList.add(newTheme);
     }
 
     // Persist to DB if authenticated
@@ -106,10 +107,9 @@ const App: React.FC = () => {
   }, [isAuthenticated]);
 
   useEffect(() => {
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
+    document.documentElement.classList.remove('dark', 'paper');
+    if (theme !== 'light') {
+      document.documentElement.classList.add(theme);
     }
   }, [theme]);
 
@@ -125,7 +125,10 @@ const App: React.FC = () => {
       setUser(storedUser);
       setNeedsProfileCompletion(storedUser.profileComplete !== true);
       if (storedUser.currency) setCurrencyState(storedUser.currency);
-      if (storedUser.theme) setThemeState(storedUser.theme as 'light' | 'dark');
+      if (storedUser.theme) {
+        setThemeState(storedUser.theme as 'light' | 'dark' | 'paper');
+        localStorage.setItem('theme', storedUser.theme);
+      }
     }
   }, []);
 
@@ -512,6 +515,7 @@ const App: React.FC = () => {
       setCategories([]);
       setBudgets([]);
       setRecurring([]);
+      setThemeState('light');
     });
     navigate('/');
   };
@@ -635,6 +639,7 @@ const App: React.FC = () => {
 
   return (
     <AppContext.Provider value={appContextValue}>
+     <TourProvider navigateToPage={setActivePage}>
       <div className="bg-gray-light font-sans text-gray-darkest min-h-screen dark:bg-gray-900 dark:text-gray-100">
         <div className="flex">
           {/* Backdrop for the mobile drawer; hidden on desktop */}
@@ -670,6 +675,7 @@ const App: React.FC = () => {
           onClose={() => setIsModalOpen(false)}
         />
       </div>
+     </TourProvider>
     </AppContext.Provider>
   );
 };

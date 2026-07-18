@@ -8,6 +8,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 import { pushService } from '../services/push';
 import { AiProvider, AiSettings, defaultAiSettings, getAiSettings, saveAiSettings } from '../services/aiSettings';
 import { api } from '../services/api';
+import { useTour } from '../context/TourContext';
 
 interface ClearDataModalProps {
     isOpen: boolean;
@@ -152,6 +153,7 @@ export const Settings: React.FC = () => {
     const context = useContext(AppContext);
     const { showToast } = useToast();
     const navigate = useNavigate();
+    const { startTour, tipsEnabled, setTipsEnabled } = useTour();
 
     const [notifications, setNotifications] = useState(false); // Default to false until checked
     const [budgetAlerts, setBudgetAlerts] = useState(false);
@@ -404,7 +406,51 @@ export const Settings: React.FC = () => {
         <div className="space-y-6 max-w-4xl">
             <h2 className="text-3xl font-bold text-gray-darkest dark:text-gray-50">Settings</h2>
 
+            {/* Help & Tips */}
+            <Card>
+                <h3 className="text-xl font-semibold mb-4 text-gray-darkest dark:text-gray-50">Help &amp; Tips</h3>
+                <div className="space-y-4">
+                    <div className="flex items-start justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                        <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                                <Icon name="GraduationCap" size={18} className="text-primary" />
+                                <h4 className="font-medium text-gray-darkest dark:text-gray-50">Product Tour</h4>
+                            </div>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                                Replay the guided walkthrough of the app anytime.
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => { startTour(); navigate('/'); }}
+                            className="btn btn-secondary ml-4 flex items-center gap-1.5 whitespace-nowrap"
+                        >
+                            <Icon name="GraduationCap" size={16} />
+                            Take the Tour
+                        </button>
+                    </div>
 
+                    <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                        <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                                <Icon name="Lightbulb" size={18} className="text-gray-600 dark:text-gray-400" />
+                                <h4 className="font-medium text-gray-darkest dark:text-gray-50">Show Tips</h4>
+                            </div>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                                Display helpful hints at the top of your dashboard. Turn off if you don't need them.
+                            </p>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer ml-4">
+                            <input
+                                type="checkbox"
+                                checked={tipsEnabled}
+                                onChange={(e) => setTipsEnabled(e.target.checked)}
+                                className="sr-only peer"
+                            />
+                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 dark:peer-focus:ring-primary/40 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
+                        </label>
+                    </div>
+                </div>
+            </Card>
 
             {/* Notifications */}
             <Card>
@@ -463,32 +509,10 @@ export const Settings: React.FC = () => {
                         </label>
                     </div>
 
-                    <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg opacity-60">
-                        <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                                <Icon name="Mail" size={18} className="text-gray-600 dark:text-gray-400" />
-                                <h4 className="font-medium text-gray-darkest dark:text-gray-50">Email Reports</h4>
-                                <span className="px-1.5 py-0.5 text-[10px] font-bold rounded uppercase tracking-wider bg-gray-200 text-gray-600 dark:bg-gray-600 dark:text-gray-300">Coming soon</span>
-                            </div>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                                Receive monthly financial summary reports via email
-                            </p>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-not-allowed ml-4">
-                            <input
-                                type="checkbox"
-                                checked={false}
-                                disabled
-                                readOnly
-                                className="sr-only peer"
-                            />
-                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 dark:peer-focus:ring-primary/40 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
-                        </label>
-                    </div>
             </Card>
 
             {/* AI */}
-            <Card>
+            <Card data-tour="ai-settings">
                 <h3 className="text-xl font-semibold mb-1 text-gray-darkest dark:text-gray-50">AI Settings</h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">Configure providers, models, and API keys for AI transaction parsing.</p>
                 <div className="space-y-5">
@@ -552,10 +576,46 @@ export const Settings: React.FC = () => {
                         </label>
                     </div>
 
+                    {/* Key source: rely on the host's built-in AI (default) or bring your own key */}
+                    <div className="p-4 bg-gray-50 dark:bg-gray-700/10 rounded-lg border border-gray-200 dark:border-gray-700/50">
+                        <h4 className="font-medium text-gray-darkest dark:text-gray-50 mb-1">Which AI to use</h4>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+                            Most people can use the app's built-in AI — no setup needed. Advanced users can plug in their own provider and API key.
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <button
+                                type="button"
+                                onClick={() => { setAiSaved(false); setAiSettings(prev => ({ ...prev, useOwnKey: false })); }}
+                                className={`text-left p-4 rounded-xl border-2 transition-all ${!aiSettings.useOwnKey ? 'border-primary bg-primary/5 dark:bg-primary/10' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'}`}
+                            >
+                                <div className="flex items-center gap-2 mb-1">
+                                    <Icon name="Sparkles" size={16} className={!aiSettings.useOwnKey ? 'text-primary' : 'text-gray-400'} />
+                                    <span className="font-semibold text-sm text-gray-darkest dark:text-gray-50">Use the app's built-in AI</span>
+                                    <span className="px-1.5 py-0.5 text-[10px] font-bold rounded uppercase tracking-wider bg-primary/10 text-primary">Recommended</span>
+                                </div>
+                                <p className={`text-xs ${aiSettings.platformAvailable ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                                    {aiSettings.platformAvailable ? '✓ Ready to use — nothing to set up' : 'Not set up on this server yet'}
+                                </p>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => { setAiSaved(false); setAiSettings(prev => ({ ...prev, useOwnKey: true })); }}
+                                className={`text-left p-4 rounded-xl border-2 transition-all ${aiSettings.useOwnKey ? 'border-primary bg-primary/5 dark:bg-primary/10' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'}`}
+                            >
+                                <div className="flex items-center gap-2 mb-1">
+                                    <Icon name="KeyRound" size={16} className={aiSettings.useOwnKey ? 'text-primary' : 'text-gray-400'} />
+                                    <span className="font-semibold text-sm text-gray-darkest dark:text-gray-50">Use my own API key</span>
+                                </div>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">Bring your own provider (OpenAI, Gemini, etc.)</p>
+                            </button>
+                        </div>
+                    </div>
+
                     {aiError && (
                         <p className="text-sm text-danger">{aiError}</p>
                     )}
 
+                    {aiSettings.useOwnKey && (<>
                     {/* Provider selector */}
                     <div>
                         <label htmlFor="ai-provider" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Provider</label>
@@ -756,7 +816,10 @@ export const Settings: React.FC = () => {
                         </div>
                     </div>
 
+                    </>)}
+
                     <div className="flex justify-end pt-1 gap-3">
+                        {aiSettings.useOwnKey && (
                         <button
                             type="button"
                             onClick={handleTestConnection}
@@ -772,6 +835,7 @@ export const Settings: React.FC = () => {
                                 <>🧪 Test Connection</>
                             )}
                         </button>
+                        )}
                         <button
                             type="button"
                             onClick={() => handleSaveAiSettings()}

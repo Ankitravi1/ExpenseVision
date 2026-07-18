@@ -6,22 +6,26 @@ export interface AiSettings {
     enabled: boolean;
     importEnabled: boolean;
     autoParseEnabled: boolean;
+    useOwnKey: boolean;                       // false = rely on the host/platform key (default)
     provider: AiProvider;
     model: string;
     keys: Record<string, string[]>;          // per-provider list of encrypted API keys
     customModels: Record<string, string[]>;  // per-provider list of user-added model names
     baseUrl: Record<string, string>;
+    platformAvailable?: boolean;             // read-only: host has a usable platform AI key
 }
 
 export const defaultAiSettings: AiSettings = {
     enabled: false,
     importEnabled: true,
     autoParseEnabled: true,
+    useOwnKey: false,
     provider: 'deepseek',
     model: '',
     keys: {},
     customModels: {},
-    baseUrl: {}
+    baseUrl: {},
+    platformAvailable: false
 };
 
 

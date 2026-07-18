@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { decrypt } from './aiSettings.js';
+import { resolveAiForUser, GENERIC_AI_UNAVAILABLE } from './aiSettings.js';
 import { syncAccountBalances } from './accounts.js';
 
 const router = Router();
@@ -270,47 +270,13 @@ router.post('/parse-text', async (req, res, next) => {
         const userId = (req as any).userId;
         const { text, preferredType } = parseTextSchema.parse(req.body);
 
-        const aiConfig = await prisma.aiSettings.findUnique({ where: { userId } });
-
-        if (!aiConfig?.enabled || aiConfig.autoParseEnabled === false) {
-            return res.status(400).json({ error: 'AI quick entry transaction parsing is disabled' });
+        // Resolve which AI key to use (the user's own, or the host/platform key
+        // they rely on by default) — see resolveAiForUser in aiSettings.
+        const resolution = await resolveAiForUser(prisma, userId, 'autoparse');
+        if (!resolution.ok) {
+            return res.status(resolution.status).json({ error: resolution.error });
         }
-        
-        let apiKey = '';
-        if (aiConfig.keys) {
-            try {
-                const keysMap = JSON.parse(aiConfig.keys);
-                const providerKeys = keysMap[aiConfig.provider] || [];
-                if (providerKeys.length > 0) {
-                    apiKey = decrypt(providerKeys[0]); // Use the first key for the current provider
-                }
-            } catch (e) {
-                console.error('Failed to parse keys in transactions route:', e);
-            }
-        }
-
-        if (!apiKey) {
-            return res.status(400).json({ error: `AI API key is missing for provider: ${aiConfig.provider}` });
-        }
-
-        const isDefaultProvider = ['deepseek', 'openai', 'openrouter', 'gemini'].includes(aiConfig.provider);
-        let resolvedBaseUrl = '';
-        if (aiConfig.baseUrl) {
-            try {
-                const parsed = JSON.parse(aiConfig.baseUrl);
-                if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
-                    resolvedBaseUrl = parsed[aiConfig.provider] || '';
-                } else {
-                    resolvedBaseUrl = aiConfig.baseUrl;
-                }
-            } catch (e) {
-                resolvedBaseUrl = aiConfig.baseUrl;
-            }
-        }
-
-        if (!isDefaultProvider && !resolvedBaseUrl) {
-            return res.status(400).json({ error: `AI provider ${aiConfig.provider} requires a base URL` });
-        }
+        const ai = resolution.config;
 
         const [accounts, categories] = await Promise.all([
             prisma.account.findMany({ where: { userId }, select: { id: true, name: true, type: true } }),
@@ -340,15 +306,15 @@ router.post('/parse-text', async (req, res, next) => {
             `User text: ${text}`
         ].join('\n');
 
-        const response = await fetch(getAiEndpoint(aiConfig.provider, resolvedBaseUrl), {
+        const response = await fetch(getAiEndpoint(ai.provider, ai.baseUrl), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`,
-                ...(aiConfig.provider === 'openrouter' ? { 'HTTP-Referer': 'http://localhost:3000', 'X-Title': 'ExpenseVision' } : {})
+                'Authorization': `Bearer ${ai.apiKey}`,
+                ...(ai.provider === 'openrouter' ? { 'HTTP-Referer': 'http://localhost:3000', 'X-Title': 'ExpenseVision' } : {})
             },
             body: JSON.stringify({
-                model: aiConfig.model,
+                model: ai.model,
                 messages: [
                     { role: 'system', content: 'You convert short personal finance notes into strict JSON transaction drafts.' },
                     { role: 'user', content: prompt }
@@ -360,13 +326,13 @@ router.post('/parse-text', async (req, res, next) => {
 
         if (!response.ok) {
             const errorBody = await response.text();
-            return res.status(502).json({ error: `AI provider request failed: ${errorBody.slice(0, 180)}` });
+            return res.status(ai.maskErrors ? 503 : 502).json({ error: ai.maskErrors ? GENERIC_AI_UNAVAILABLE : `AI provider request failed: ${errorBody.slice(0, 180)}` });
         }
 
         const data = await response.json() as any;
         const content = data.choices?.[0]?.message?.content;
         if (!content) {
-            return res.status(502).json({ error: 'AI provider returned an empty response' });
+            return res.status(ai.maskErrors ? 503 : 502).json({ error: ai.maskErrors ? GENERIC_AI_UNAVAILABLE : 'AI provider returned an empty response' });
         }
 
         const parsed = extractJsonObject(content);
@@ -428,53 +394,13 @@ router.post('/parse-statement', async (req, res, next) => {
             return res.status(400).json({ error: 'Please enter statement text to parse' });
         }
 
-        const aiConfig = await prisma.aiSettings.findUnique({ where: { userId } });
-
-        if (!aiConfig?.enabled || aiConfig.importEnabled === false) {
-            return res.status(400).json({ error: 'AI statement parsing is disabled' });
+        // Resolve which AI key to use (the user's own, or the host/platform key
+        // they rely on by default) — see resolveAiForUser in aiSettings.
+        const resolution = await resolveAiForUser(prisma, userId, 'import');
+        if (!resolution.ok) {
+            return res.status(resolution.status).json({ error: resolution.error });
         }
-
-        let apiKey = '';
-        if (aiConfig.keys) {
-            try {
-                const parsedKeys = JSON.parse(aiConfig.keys);
-                if (typeof parsedKeys === 'object' && parsedKeys !== null) {
-                    const providerKeys = parsedKeys[aiConfig.provider];
-                    if (Array.isArray(providerKeys) && providerKeys.length > 0) {
-                        const activeKey = providerKeys[0];
-                        if (activeKey) {
-                            const { decrypt } = await import('./aiSettings.js');
-                            apiKey = decrypt(activeKey);
-                        }
-                    }
-                }
-            } catch (e) {
-                console.error('Failed to parse keys in transactions route:', e);
-            }
-        }
-
-        if (!apiKey) {
-            return res.status(400).json({ error: `AI API key is missing for provider: ${aiConfig.provider}` });
-        }
-
-        const isDefaultProvider = ['deepseek', 'openai', 'openrouter', 'gemini'].includes(aiConfig.provider);
-        let resolvedBaseUrl = '';
-        if (aiConfig.baseUrl) {
-            try {
-                const parsed = JSON.parse(aiConfig.baseUrl);
-                if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
-                    resolvedBaseUrl = parsed[aiConfig.provider] || '';
-                } else {
-                    resolvedBaseUrl = aiConfig.baseUrl;
-                }
-            } catch (e) {
-                resolvedBaseUrl = aiConfig.baseUrl;
-            }
-        }
-
-        if (!isDefaultProvider && !resolvedBaseUrl) {
-            return res.status(400).json({ error: `AI provider ${aiConfig.provider} requires a base URL` });
-        }
+        const ai = resolution.config;
 
         const [accounts, categories] = await Promise.all([
             prisma.account.findMany({ where: { userId }, select: { id: true, name: true, type: true } }),
@@ -499,15 +425,15 @@ router.post('/parse-statement', async (req, res, next) => {
             text
         ].join('\n');
 
-        const response = await fetch(getAiEndpoint(aiConfig.provider, resolvedBaseUrl), {
+        const response = await fetch(getAiEndpoint(ai.provider, ai.baseUrl), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`,
-                ...(aiConfig.provider === 'openrouter' ? { 'HTTP-Referer': 'http://localhost:3000', 'X-Title': 'ExpenseVision' } : {})
+                'Authorization': `Bearer ${ai.apiKey}`,
+                ...(ai.provider === 'openrouter' ? { 'HTTP-Referer': 'http://localhost:3000', 'X-Title': 'ExpenseVision' } : {})
             },
             body: JSON.stringify({
-                model: aiConfig.model,
+                model: ai.model,
                 messages: [
                     { role: 'system', content: 'You extract lists of financial transactions from raw text into JSON arrays.' },
                     { role: 'user', content: prompt }
@@ -518,13 +444,13 @@ router.post('/parse-statement', async (req, res, next) => {
 
         if (!response.ok) {
             const errorBody = await response.text();
-            return res.status(502).json({ error: `AI provider request failed: ${errorBody.slice(0, 180)}` });
+            return res.status(ai.maskErrors ? 503 : 502).json({ error: ai.maskErrors ? GENERIC_AI_UNAVAILABLE : `AI provider request failed: ${errorBody.slice(0, 180)}` });
         }
 
         const resData = await response.json() as any;
         const content = resData.choices?.[0]?.message?.content;
         if (!content) {
-            return res.status(502).json({ error: 'AI provider returned an empty response' });
+            return res.status(ai.maskErrors ? 503 : 502).json({ error: ai.maskErrors ? GENERIC_AI_UNAVAILABLE : 'AI provider returned an empty response' });
         }
 
         const extractJsonArray = (val: string) => {

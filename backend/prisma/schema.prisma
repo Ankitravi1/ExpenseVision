@@ -75,8 +75,8 @@ model Account {
   userId    String
   name      String
   type      String
-  balance   Float    @default(0)
-  initialBalance Float @default(0)
+  balance   Decimal  @default(0)
+  initialBalance Decimal @default(0)
   color     String?
   icon      String?
   logo      String?
@@ -113,7 +113,7 @@ model Transaction {
   accountId            String
   transferToAccountId  String?
   categoryId           String?
-  amount               Float
+  amount               Decimal
   type                 String   // 'income' | 'expense' | 'transfer'
   date                 String   // Stored as ISO date string (YYYY-MM-DD)
   note                 String
@@ -133,10 +133,10 @@ model Budget {
   id             String   @id @default(cuid())
   userId         String
   categoryId     String
-  amount         Float
+  amount         Decimal
   month          String   @default("")  // YYYY-MM format; "" = repeats every month
   rollover       Boolean  @default(false) // carry last month's leftover/overspend into this month
-  alertThreshold Float    @default(100)   // percent of budget at which to send an alert
+  alertThreshold Decimal  @default(100)   // percent of budget at which to send an alert
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -150,7 +150,7 @@ model RecurringRule {
   id                  String   @id @default(cuid())
   userId              String
   note                String
-  amount              Float
+  amount              Decimal
   type                String   // 'income' | 'expense' | 'transfer'
   accountId           String
   transferToAccountId String?
@@ -190,6 +190,10 @@ model AiSettings {
   enabled         Boolean  @default(false)
   importEnabled   Boolean  @default(true)
   autoParseEnabled Boolean @default(true)
+  // When false (default) the user relies on the platform/host AI key; when true
+  // they use their own provider/key configured below. Falls back to the other
+  // source if the preferred one isn't available.
+  useOwnKey       Boolean  @default(false)
   provider        String   @default("deepseek")
   model           String   @default("deepseek-v4-flash")
   baseUrl         String?
@@ -199,4 +203,18 @@ model AiSettings {
   updatedAt       DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Singleton (id = "platform") holding the host-provided AI key that normal
+// users rely on by default. Only the superadmin can read/write it. The key is
+// stored encrypted with the same AES-256-GCM scheme as per-user keys.
+model PlatformSettings {
+  id          String   @id @default("platform")
+  aiEnabled   Boolean  @default(false)
+  aiProvider  String   @default("deepseek")
+  aiModel     String   @default("")
+  aiBaseUrl   String?
+  aiKey       String?  // encrypted single key (iv.tag.ciphertext)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

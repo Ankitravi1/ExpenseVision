@@ -45,7 +45,13 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
         setIsMounted(true);
         if (isOpen) {
             getAiSettings()
-                .then(settings => setAiEnabled(settings.enabled))
+                .then(settings => {
+                    // Available via the user's own key (advanced) or the host key (default).
+                    const hasOwnKey = (settings.keys[settings.provider]?.length ?? 0) > 0;
+                    const canUse = settings.autoParseEnabled !== false &&
+                        (settings.useOwnKey ? hasOwnKey : (settings.platformAvailable === true || hasOwnKey));
+                    setAiEnabled(canUse);
+                })
                 .catch(() => setAiEnabled(false));
         }
     }, [isOpen]);
@@ -97,12 +103,15 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
 
     const handleParseVoiceText = async () => {
         const aiSettings = await getAiSettings();
-        if (!aiSettings.enabled) {
-            setVoiceParseError('Enable AI transaction parsing in Settings first.');
-            return;
-        }
-        if (!aiSettings.keys[aiSettings.provider]?.length) {
-            setVoiceParseError(`Add an AI API key for ${aiSettings.provider} in Settings first.`);
+        const hasOwnKey = (aiSettings.keys[aiSettings.provider]?.length ?? 0) > 0;
+        const canUse = aiSettings.autoParseEnabled !== false &&
+            (aiSettings.useOwnKey ? hasOwnKey : (aiSettings.platformAvailable === true || hasOwnKey));
+        if (!canUse) {
+            // Advanced (own-key) users get an actionable message; everyone else
+            // just sees that the built-in AI isn't available right now.
+            setVoiceParseError(aiSettings.useOwnKey
+                ? 'Enable AI and add an API key in Settings first.'
+                : 'AI quick entry is temporarily unavailable.');
             return;
         }
         if (!voiceText.trim()) {
@@ -288,7 +297,7 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
                                         setVoiceText(e.target.value);
                                         setVoiceParseError('');
                                     }}
-                                    placeholder="Example: spent 20 on food from SBI savings"
+                                    placeholder="Example: spent 20 on groceries from checking account"
                                     rows={3}
                                     className="block w-full resize-none bg-white border-transparent rounded-lg p-3 focus:ring-2 focus:ring-primary text-base dark:bg-gray-700 dark:text-gray-100"
                                 />

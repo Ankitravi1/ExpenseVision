@@ -148,6 +148,7 @@ export const authService = {
         localStorage.removeItem('token');
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
+        localStorage.removeItem('theme');
     },
 
     isAuthenticated: (): boolean => {
