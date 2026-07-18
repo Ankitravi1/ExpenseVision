@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { resolveAiForUser, GENERIC_AI_UNAVAILABLE } from './aiSettings.js';
+import { resolveAiForUser, GENERIC_AI_UNAVAILABLE, checkAndCountPlatformUsage } from './aiSettings.js';
 import { syncAccountBalances } from './accounts.js';
 
 const router = Router();
@@ -277,6 +277,12 @@ router.post('/parse-text', async (req, res, next) => {
             return res.status(resolution.status).json({ error: resolution.error });
         }
         const ai = resolution.config;
+
+        // Only host-funded (platform-key) usage is capped; own-key users are unlimited.
+        if (ai.source === 'platform') {
+            const usage = await checkAndCountPlatformUsage(prisma, userId, 'autoparse');
+            if (!usage.ok) return res.status(usage.status).json({ error: usage.error });
+        }
 
         const [accounts, categories] = await Promise.all([
             prisma.account.findMany({ where: { userId }, select: { id: true, name: true, type: true } }),

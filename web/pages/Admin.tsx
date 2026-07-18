@@ -5,12 +5,14 @@ import { api } from '../services/api';
 import { AppContext } from '../App';
 import { useToast } from '../context/ToastContext';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { AiProviderConfig, AiProviderConfigValue } from '../components/AiProviderConfig';
 
 interface UserItem {
     id: string;
     email: string;
     name: string;
     role: string;
+    plan?: string;
     googleId?: string | null;
     createdAt: string;
 }
@@ -129,17 +131,16 @@ const ResetPasswordModal: React.FC<{
     );
 };
 
-// ─── Platform AI Key Card ─────────────────────────────────────────────────────
-// Lets the superadmin configure a host-provided AI key that normal users rely
-// on by default (they don't have to bring their own). The stored key is never
-// sent back to the browser — we only show whether one exists.
-const DEFAULT_AI_PROVIDERS = ['deepseek', 'openai', 'gemini', 'openrouter'];
+// ─── Platform AI Card ─────────────────────────────────────────────────────────
+// Lets the superadmin configure the host-provided AI (same multi-provider UI as
+// a user's own AI settings). Users rely on this by default; anyone who adds
+// their own key uses that instead (and isn't billed to the host).
+const emptyAiConfig: AiProviderConfigValue = { provider: 'deepseek', model: '', keys: {}, customModels: {}, baseUrl: {} };
 
 const PlatformAiCard: React.FC = () => {
     const { showToast } = useToast();
-    const [cfg, setCfg] = useState({ aiEnabled: false, aiProvider: 'deepseek', aiModel: '', aiBaseUrl: '' });
-    const [hasKey, setHasKey] = useState(false);
-    const [keyInput, setKeyInput] = useState('');
+    const [aiEnabled, setAiEnabled] = useState(false);
+    const [cfg, setCfg] = useState<AiProviderConfigValue>(emptyAiConfig);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [testing, setTesting] = useState(false);
@@ -149,28 +150,29 @@ const PlatformAiCard: React.FC = () => {
             .then(r => r.ok ? r.json() : null)
             .then(data => {
                 if (data) {
-                    setCfg({ aiEnabled: data.aiEnabled, aiProvider: data.aiProvider, aiModel: data.aiModel, aiBaseUrl: data.aiBaseUrl || '' });
-                    setHasKey(data.hasKey);
+                    setAiEnabled(!!data.aiEnabled);
+                    setCfg({
+                        provider: data.provider || 'deepseek',
+                        model: data.model || '',
+                        keys: data.keys || {},
+                        customModels: data.customModels || {},
+                        baseUrl: data.baseUrl || {},
+                    });
                 }
             })
             .catch(() => {})
             .finally(() => setLoading(false));
     }, []);
 
-    const save = async (clearKey = false) => {
+    const hasActiveKey = (cfg.keys[cfg.provider]?.length ?? 0) > 0;
+
+    const save = async () => {
         setSaving(true);
         try {
-            const body: any = { ...cfg, clearKey };
-            if (!clearKey && keyInput.trim()) body.aiKey = keyInput.trim();
-            const res = await api.fetch('/admin/platform-ai', { method: 'PUT', body: JSON.stringify(body) });
+            const res = await api.fetch('/admin/platform-ai', { method: 'PUT', body: JSON.stringify({ aiEnabled, ...cfg }) });
             const data = await res.json().catch(() => ({}));
-            if (res.ok) {
-                setHasKey(data.hasKey);
-                setKeyInput('');
-                showToast(clearKey ? 'Platform key removed.' : 'Platform AI settings saved.', 'success');
-            } else {
-                showToast(data.error || 'Failed to save platform AI settings', 'error');
-            }
+            if (res.ok) showToast('Platform AI settings saved.', 'success');
+            else showToast(data.error || 'Failed to save platform AI settings', 'error');
         } catch (e: any) {
             showToast(e.message || 'Failed to save', 'error');
         } finally {
@@ -179,15 +181,13 @@ const PlatformAiCard: React.FC = () => {
     };
 
     const testConnection = async () => {
-        if (!keyInput.trim()) {
-            showToast('Enter a key above to test it (the saved key cannot be read back).', 'info');
-            return;
-        }
+        const apiKey = cfg.keys[cfg.provider]?.[0] || '';
+        if (!apiKey) { showToast('Add an API key for this provider first.', 'info'); return; }
         setTesting(true);
         try {
             const res = await api.fetch('/ai-settings/test', {
                 method: 'POST',
-                body: JSON.stringify({ provider: cfg.aiProvider, model: cfg.aiModel, apiKey: keyInput.trim(), baseUrl: cfg.aiBaseUrl }),
+                body: JSON.stringify({ provider: cfg.provider, model: cfg.model, apiKey, baseUrl: cfg.baseUrl[cfg.provider] || '' }),
             });
             const data = await res.json().catch(() => ({}));
             showToast(res.ok && data.success ? `Connection OK: ${data.message || ''}` : `Failed: ${data.error || 'Unknown error'}`, res.ok && data.success ? 'success' : 'error');
@@ -198,85 +198,40 @@ const PlatformAiCard: React.FC = () => {
         }
     };
 
-    const isCustom = !DEFAULT_AI_PROVIDERS.includes(cfg.aiProvider);
-
     return (
         <Card>
             <div className="flex items-start justify-between gap-3 mb-1">
                 <h3 className="text-xl font-semibold text-gray-darkest dark:text-gray-50 flex items-center gap-2">
                     <Icon name="Sparkles" size={20} className="text-primary" />
-                    Platform AI Key
+                    Platform AI
                 </h3>
-                <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wider ${cfg.aiEnabled && hasKey ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300'}`}>
-                    {cfg.aiEnabled && hasKey ? 'Active' : 'Off'}
+                <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wider ${aiEnabled && hasActiveKey ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300'}`}>
+                    {aiEnabled && hasActiveKey ? 'Active' : 'Off'}
                 </span>
             </div>
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
-                The AI key all users fall back on by default. Users can still add their own key in Settings. Note: usage on this key is billed to the host — consider your provider's spend limits.
+                The AI all users rely on by default. Usage on this key is billed to the host — free users get 10/day and Pro users 40/day; anyone who adds their own key in Settings is unlimited and not billed to you.
             </p>
 
             {loading ? (
                 <div className="py-6 flex justify-center"><Icon name="Loader2" size={24} className="animate-spin text-primary" /></div>
             ) : (
-                <div className="space-y-4">
+                <div className="space-y-5">
                     <label className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/30 rounded-lg cursor-pointer">
                         <div>
                             <p className="font-medium text-gray-darkest dark:text-gray-50">Enable platform AI for all users</p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">When off, users must configure their own key.</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">When off, users must add their own key to use AI.</p>
                         </div>
-                        <input type="checkbox" checked={cfg.aiEnabled} onChange={e => setCfg(c => ({ ...c, aiEnabled: e.target.checked }))} className="w-5 h-5 rounded text-primary focus:ring-primary" />
+                        <input type="checkbox" checked={aiEnabled} onChange={e => setAiEnabled(e.target.checked)} className="w-5 h-5 rounded text-primary focus:ring-primary" />
                     </label>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Provider</label>
-                            <select value={isCustom ? 'custom' : cfg.aiProvider} onChange={e => setCfg(c => ({ ...c, aiProvider: e.target.value === 'custom' ? '' : e.target.value }))}
-                                className="block w-full bg-gray-100 dark:bg-gray-700 border-transparent rounded-lg p-3 text-sm dark:text-gray-100 focus:ring-2 focus:ring-primary outline-none">
-                                <option value="deepseek">DeepSeek</option>
-                                <option value="openai">OpenAI</option>
-                                <option value="gemini">Gemini</option>
-                                <option value="openrouter">OpenRouter</option>
-                                <option value="custom">Custom (OpenAI-compatible)</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Model</label>
-                            <input type="text" value={cfg.aiModel} onChange={e => setCfg(c => ({ ...c, aiModel: e.target.value }))} placeholder="e.g. gpt-4o-mini"
-                                className="block w-full bg-gray-100 dark:bg-gray-700 border-transparent rounded-lg p-3 text-sm dark:text-gray-100 focus:ring-2 focus:ring-primary outline-none" />
-                        </div>
-                    </div>
-
-                    {isCustom && (
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Provider name & Base URL</label>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                <input type="text" value={cfg.aiProvider} onChange={e => setCfg(c => ({ ...c, aiProvider: e.target.value }))} placeholder="e.g. groq"
-                                    className="block w-full bg-gray-100 dark:bg-gray-700 border-transparent rounded-lg p-3 text-sm dark:text-gray-100 focus:ring-2 focus:ring-primary outline-none" />
-                                <input type="text" value={cfg.aiBaseUrl} onChange={e => setCfg(c => ({ ...c, aiBaseUrl: e.target.value }))} placeholder="https://api.groq.com/openai/v1"
-                                    className="block w-full bg-gray-100 dark:bg-gray-700 border-transparent rounded-lg p-3 text-sm dark:text-gray-100 focus:ring-2 focus:ring-primary outline-none" />
-                            </div>
-                        </div>
-                    )}
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                            API Key {hasKey && <span className="text-emerald-600 dark:text-emerald-400 font-normal">· a key is saved (hidden)</span>}
-                        </label>
-                        <input type="password" value={keyInput} onChange={e => setKeyInput(e.target.value)} placeholder={hasKey ? 'Enter a new key to replace the saved one' : 'Paste the platform API key'}
-                            className="block w-full bg-gray-100 dark:bg-gray-700 border-transparent rounded-lg p-3 text-sm font-mono dark:text-gray-100 focus:ring-2 focus:ring-primary outline-none" autoComplete="off" />
-                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Stored encrypted. It is never sent back to the browser — leave blank to keep the existing key.</p>
-                    </div>
+                    <AiProviderConfig value={cfg} onChange={setCfg} />
 
                     <div className="flex flex-wrap justify-end gap-3 pt-1">
-                        {hasKey && (
-                            <button type="button" onClick={() => save(true)} disabled={saving} className="btn btn-danger text-sm">
-                                <Icon name="Trash2" size={15} className="mr-1.5" /> Remove Key
-                            </button>
-                        )}
                         <button type="button" onClick={testConnection} disabled={testing} className="btn btn-secondary text-sm min-w-[130px] flex items-center justify-center">
                             {testing ? <><Icon name="Loader2" size={15} className="animate-spin mr-2" />Testing...</> : <>🧪 Test Connection</>}
                         </button>
-                        <button type="button" onClick={() => save(false)} disabled={saving} className="btn btn-primary text-sm flex items-center justify-center">
+                        <button type="button" onClick={save} disabled={saving} className="btn btn-primary text-sm flex items-center justify-center">
                             {saving ? <Icon name="Loader2" size={15} className="animate-spin mr-2" /> : <Icon name="Save" size={15} className="mr-2" />}
                             Save
                         </button>
@@ -336,6 +291,22 @@ export const Admin: React.FC = () => {
             showToast(e.message || 'Failed to delete user', 'error');
         } finally {
             setDeletingId(null);
+        }
+    };
+
+    const handleSetPlan = async (user: UserItem, plan: 'free' | 'pro') => {
+        try {
+            const res = await api.fetch(`/admin/users/${user.id}/plan`, { method: 'PUT', body: JSON.stringify({ plan }) });
+            if (res.ok) {
+                const updated = await res.json();
+                setUsers(prev => prev.map(u => u.id === user.id ? { ...u, plan: updated.plan } : u));
+                showSuccess(`${user.name} is now on the ${plan} plan.`);
+            } else {
+                const err = await res.json();
+                showToast(err.error || 'Failed to update plan', 'error');
+            }
+        } catch (e: any) {
+            showToast(e.message || 'Failed to update plan', 'error');
         }
     };
 
@@ -495,6 +466,19 @@ export const Admin: React.FC = () => {
                                                 <span className="text-xs text-gray-400 italic">Protected</span>
                                             ) : (
                                                 <div className="flex items-center justify-end gap-2">
+                                                    {/* Plan toggle (free / pro) */}
+                                                    <button
+                                                        onClick={() => handleSetPlan(user, user.plan === 'pro' ? 'free' : 'pro')}
+                                                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition ${
+                                                            user.plan === 'pro'
+                                                                ? 'bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/20 dark:hover:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-900/30'
+                                                                : 'bg-gray-50 hover:bg-gray-100 dark:bg-gray-800/40 dark:hover:bg-gray-700/40 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700'
+                                                        }`}
+                                                        title={user.plan === 'pro' ? 'Click to downgrade to Free' : 'Click to upgrade to Pro'}
+                                                    >
+                                                        <Icon name={user.plan === 'pro' ? 'Star' : 'User'} size={13} className={user.plan === 'pro' ? 'fill-current' : ''} />
+                                                        {user.plan === 'pro' ? 'Pro' : 'Free'}
+                                                    </button>
                                                     {/* Reset Password */}
                                                     <button
                                                         onClick={() => setResetUser(user)}

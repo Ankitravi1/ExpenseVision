@@ -20,6 +20,9 @@ model User {
   profilePicture  String?
   expoPushToken   String?
   role            String   @default("user")
+  // Billing tier. Controls how much host-funded (platform-key) AI a user gets
+  // per day. Users on their own key are unlimited and don't touch this.
+  plan            String   @default("free") // free | pro
 
   // Auth fields
   emailVerified       Boolean   @default(false)
@@ -205,16 +208,31 @@ model AiSettings {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-// Singleton (id = "platform") holding the host-provided AI key that normal
-// users rely on by default. Only the superadmin can read/write it. The key is
-// stored encrypted with the same AES-256-GCM scheme as per-user keys.
+// Singleton (id = "platform") holding the host-provided AI config that users
+// rely on by default. Only the superadmin can read/write it. Mirrors the
+// per-user AiSettings shape (multi-provider) so the admin UI matches the user
+// UI. Keys are encrypted with the same AES-256-GCM scheme as per-user keys.
 model PlatformSettings {
-  id          String   @id @default("platform")
-  aiEnabled   Boolean  @default(false)
-  aiProvider  String   @default("deepseek")
-  aiModel     String   @default("")
-  aiBaseUrl   String?
-  aiKey       String?  // encrypted single key (iv.tag.ciphertext)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id             String   @id @default("platform")
+  aiEnabled      Boolean  @default(false)
+  aiProvider     String   @default("deepseek") // active provider
+  aiModel        String   @default("")          // active model
+  aiBaseUrl      String?  // JSON map: { provider: url }
+  aiKeys         String?  // JSON map: { provider: ["encryptedKey", ...] }
+  aiCustomModels String?  // JSON map: { provider: ["model", ...] }
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+// Per-user, per-day AI usage counter for host-funded (platform-key) calls.
+// Own-key usage is never counted. Used to enforce the free/pro daily caps.
+model AiUsage {
+  id      String @id @default(cuid())
+  userId  String
+  date    String // YYYY-MM-DD (server/UTC)
+  feature String // 'autoparse' | 'import'
+  count   Int    @default(0)
+
+  @@unique([userId, date, feature])
+  @@index([userId, date])
 }

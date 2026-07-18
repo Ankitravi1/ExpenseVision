@@ -112,6 +112,10 @@ const parseUserBaseUrl = (aiConfig: any): string => {
 
 const EMPTY_PLATFORM = { enabled: false, provider: '', model: '', baseUrl: '', apiKey: '' };
 
+// Daily host-funded (platform-key) AI call caps by billing plan. Users on their
+// own key are unlimited and never counted.
+export const AI_DAILY_LIMITS: Record<string, number> = { free: 10, pro: 40 };
+
 export const getPlatformAiConfig = async (prisma: any): Promise<{ enabled: boolean; provider: string; model: string; baseUrl: string; apiKey: string }> => {
     let p;
     try {
@@ -122,9 +126,55 @@ export const getPlatformAiConfig = async (prisma: any): Promise<{ enabled: boole
         return EMPTY_PLATFORM;
     }
     if (!p) return EMPTY_PLATFORM;
+
     let apiKey = '';
-    try { apiKey = decrypt(p.aiKey); } catch (e) { /* misconfigured/rotated secret -> treat as no key */ }
-    return { enabled: p.aiEnabled, provider: p.aiProvider, model: p.aiModel, baseUrl: p.aiBaseUrl || '', apiKey };
+    try {
+        if (p.aiKeys) {
+            const map = JSON.parse(p.aiKeys);
+            const arr = map[p.aiProvider];
+            if (Array.isArray(arr) && arr.length > 0) apiKey = decrypt(arr[0]);
+        }
+    } catch (e) { /* misconfigured/rotated secret -> treat as no key */ }
+
+    let baseUrl = '';
+    try {
+        if (p.aiBaseUrl) {
+            const parsed = JSON.parse(p.aiBaseUrl);
+            baseUrl = (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? (parsed[p.aiProvider] || '') : p.aiBaseUrl;
+        }
+    } catch (e) { baseUrl = p.aiBaseUrl || ''; }
+
+    return { enabled: p.aiEnabled, provider: p.aiProvider, model: p.aiModel, baseUrl, apiKey };
+};
+
+// Enforces and increments the per-day platform-key cap for a user. Only call
+// this when the resolved AI source is 'platform' (host-funded). Own-key usage
+// must never be counted or capped.
+export const checkAndCountPlatformUsage = async (
+    prisma: any,
+    userId: string,
+    feature: 'autoparse' | 'import'
+): Promise<{ ok: true } | { ok: false; status: number; error: string }> => {
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { plan: true } });
+    const plan = user?.plan === 'pro' ? 'pro' : 'free';
+    const limit = AI_DAILY_LIMITS[plan] ?? AI_DAILY_LIMITS.free;
+    const date = new Date().toISOString().slice(0, 10);
+
+    const existing = await prisma.aiUsage.findUnique({ where: { userId_date_feature: { userId, date, feature } } });
+    if ((existing?.count ?? 0) >= limit) {
+        return {
+            ok: false,
+            status: 429,
+            error: `Daily AI limit reached (${limit}/day on the ${plan} plan).` +
+                (plan === 'free' ? ' Upgrade to Pro for more, or add your own AI key in Settings for unlimited use.' : ' Add your own AI key in Settings for unlimited use.'),
+        };
+    }
+    await prisma.aiUsage.upsert({
+        where: { userId_date_feature: { userId, date, feature } },
+        create: { userId, date, feature, count: 1 },
+        update: { count: { increment: 1 } },
+    });
+    return { ok: true };
 };
 
 export const resolveAiForUser = async (

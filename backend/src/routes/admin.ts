@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { hashPassword } from '../utils/auth.js';
 import { z } from 'zod';
-import { encrypt } from './aiSettings.js';
+import { encrypt, decrypt } from './aiSettings.js';
 
 const router = Router();
 
@@ -32,6 +32,7 @@ router.get('/users', requireSuperAdmin, async (req, res, next) => {
                 email: true,
                 name: true,
                 role: true,
+                plan: true,
                 googleId: true,
                 createdAt: true
             },
@@ -117,75 +118,116 @@ router.delete('/users/:id', requireSuperAdmin, async (req: any, res, next) => {
     }
 });
 
-// ---- Platform AI key (host-provided key that normal users rely on) ----------
+// PUT /api/admin/users/:id/plan - Set a user's billing plan (free | pro)
+router.put('/users/:id/plan', requireSuperAdmin, async (req: any, res, next) => {
+    try {
+        const { id } = req.params;
+        const { plan } = z.object({ plan: z.enum(['free', 'pro']) }).parse(req.body);
+        const target = await prisma.user.findUnique({ where: { id } });
+        if (!target) return res.status(404).json({ error: 'User not found' });
+        const updated = await prisma.user.update({
+            where: { id },
+            data: { plan },
+            select: { id: true, email: true, name: true, role: true, plan: true, googleId: true, createdAt: true },
+        });
+        res.json(updated);
+    } catch (error: any) {
+        if (error instanceof z.ZodError) return res.status(400).json({ error: 'Invalid plan value' });
+        next(error);
+    }
+});
 
-// GET /api/admin/platform-ai - Read the platform AI config (key masked)
+// ---- Platform AI config (host-provided key that users rely on by default) ----
+// Mirrors the per-user AiSettings shape so the admin UI can reuse the same
+// multi-provider component. Keys are stored encrypted; the superadmin (who set
+// them) may read them back, exactly as a user reads back their own keys.
+
 router.get('/platform-ai', requireSuperAdmin, async (_req, res, next) => {
     try {
         const p = await prisma.platformSettings.findUnique({ where: { id: 'platform' } });
+        if (!p) {
+            return res.json({ aiEnabled: false, provider: 'deepseek', model: '', baseUrl: {}, keys: {}, customModels: {} });
+        }
+        const keys: Record<string, string[]> = {};
+        try {
+            if (p.aiKeys) {
+                for (const [prov, arr] of Object.entries(JSON.parse(p.aiKeys))) {
+                    if (Array.isArray(arr)) keys[prov] = arr.map((k: any) => decrypt(k));
+                }
+            }
+        } catch (e) { /* ignore parse/decrypt errors -> empty */ }
         res.json({
-            aiEnabled: p?.aiEnabled ?? false,
-            aiProvider: p?.aiProvider ?? 'deepseek',
-            aiModel: p?.aiModel ?? '',
-            aiBaseUrl: p?.aiBaseUrl ?? '',
-            hasKey: !!p?.aiKey,
+            aiEnabled: p.aiEnabled,
+            provider: p.aiProvider,
+            model: p.aiModel,
+            baseUrl: p.aiBaseUrl ? safeJson(p.aiBaseUrl, {}) : {},
+            keys,
+            customModels: p.aiCustomModels ? safeJson(p.aiCustomModels, {}) : {},
         });
-    } catch (error) {
+    } catch (error: any) {
+        if (error.message?.includes('AI_SETTINGS_SECRET')) return res.status(503).json({ error: 'AI settings encryption is not configured' });
         next(error);
     }
 });
 
 const platformAiSchema = z.object({
     aiEnabled: z.boolean(),
-    aiProvider: z.string().min(1),
-    aiModel: z.string(),
-    aiBaseUrl: z.string().nullish(),
-    // Non-empty -> set/replace the stored key. Omitted or empty -> keep existing.
-    aiKey: z.string().optional(),
-    clearKey: z.boolean().optional(),
+    provider: z.string().min(1),
+    model: z.string(),
+    baseUrl: z.record(z.string()).nullish(),
+    keys: z.record(z.array(z.string())).nullish(),
+    customModels: z.record(z.array(z.string())).nullish(),
 });
 
-// PUT /api/admin/platform-ai - Configure the platform AI key
 router.put('/platform-ai', requireSuperAdmin, async (req, res, next) => {
     try {
         const data = platformAiSchema.parse(req.body);
 
-        // Only touch the encrypted key when the admin actually supplies one (or
-        // explicitly clears it) — an empty field means "leave the key as-is".
-        let keyUpdate: { aiKey?: string | null } = {};
-        if (data.clearKey) {
-            keyUpdate = { aiKey: null };
-        } else if (data.aiKey && data.aiKey.trim()) {
-            keyUpdate = { aiKey: encrypt(data.aiKey.trim()) };
+        const encryptedKeys: Record<string, string[]> = {};
+        if (data.keys) {
+            for (const [prov, arr] of Object.entries(data.keys)) {
+                if (Array.isArray(arr) && arr.length > 0) encryptedKeys[prov] = arr.map(k => encrypt(k.trim()));
+            }
         }
-
-        const base = {
-            aiEnabled: data.aiEnabled,
-            aiProvider: data.aiProvider,
-            aiModel: data.aiModel,
-            aiBaseUrl: data.aiBaseUrl || null,
-        };
 
         const saved = await prisma.platformSettings.upsert({
             where: { id: 'platform' },
-            create: { id: 'platform', ...base, ...keyUpdate },
-            update: { ...base, ...keyUpdate },
+            create: {
+                id: 'platform',
+                aiEnabled: data.aiEnabled,
+                aiProvider: data.provider,
+                aiModel: data.model,
+                aiBaseUrl: data.baseUrl && Object.keys(data.baseUrl).length ? JSON.stringify(data.baseUrl) : null,
+                aiKeys: Object.keys(encryptedKeys).length ? JSON.stringify(encryptedKeys) : null,
+                aiCustomModels: data.customModels && Object.keys(data.customModels).length ? JSON.stringify(data.customModels) : null,
+            },
+            update: {
+                aiEnabled: data.aiEnabled,
+                aiProvider: data.provider,
+                aiModel: data.model,
+                aiBaseUrl: data.baseUrl && Object.keys(data.baseUrl).length ? JSON.stringify(data.baseUrl) : null,
+                aiKeys: Object.keys(encryptedKeys).length ? JSON.stringify(encryptedKeys) : null,
+                aiCustomModels: data.customModels && Object.keys(data.customModels).length ? JSON.stringify(data.customModels) : null,
+            },
         });
 
         res.json({
             aiEnabled: saved.aiEnabled,
-            aiProvider: saved.aiProvider,
-            aiModel: saved.aiModel,
-            aiBaseUrl: saved.aiBaseUrl ?? '',
-            hasKey: !!saved.aiKey,
+            provider: saved.aiProvider,
+            model: saved.aiModel,
+            baseUrl: data.baseUrl || {},
+            keys: data.keys || {},
+            customModels: data.customModels || {},
         });
     } catch (error: any) {
         if (error instanceof z.ZodError) return res.status(400).json({ error: 'Validation error', details: error.errors });
-        if (error.message?.includes('AI_SETTINGS_SECRET')) {
-            return res.status(503).json({ error: 'AI settings encryption is not configured' });
-        }
+        if (error.message?.includes('AI_SETTINGS_SECRET')) return res.status(503).json({ error: 'AI settings encryption is not configured' });
         next(error);
     }
 });
+
+const safeJson = (val: string, fallback: any) => {
+    try { const p = JSON.parse(val); return (p && typeof p === 'object') ? p : fallback; } catch { return fallback; }
+};
 
 export default router;
