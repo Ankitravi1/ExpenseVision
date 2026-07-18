@@ -29,6 +29,7 @@ import { Icon } from './components/Icon';
 import { useToast } from './context/ToastContext';
 import { AppContext } from './context/AppContext';
 import { TourProvider } from './context/TourContext';
+import { ToolsLauncher } from './components/tools/ToolsLauncher';
 import { transactionDateToIso } from './utils/date';
 
 // Re-export so existing `import { AppContext } from '../App'` keeps working
@@ -674,6 +675,7 @@ const App: React.FC = () => {
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
         />
+        <ToolsLauncher />
       </div>
      </TourProvider>
     </AppContext.Provider>

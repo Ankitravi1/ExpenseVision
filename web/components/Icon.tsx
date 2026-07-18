@@ -92,7 +92,10 @@ import {
   Lock,
   Menu,
   Snowflake,
-  FileText
+  FileText,
+  Calculator,
+  Wrench,
+  Delete
 } from 'lucide-react';
 
 export type IconName = string;
@@ -195,7 +198,10 @@ const iconComponents: { [key: string]: React.ComponentType<any> } = {
   Lock,
   Menu,
   Snowflake,
-  FileText
+  FileText,
+  Calculator,
+  Wrench,
+  Delete
 };
 
 export const iconList = Object.keys(iconComponents);
