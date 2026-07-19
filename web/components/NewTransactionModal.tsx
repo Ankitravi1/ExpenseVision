@@ -383,7 +383,7 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
                         {selectableAccounts.length === 0 && (
                             <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 text-amber-700 dark:text-amber-300 text-xs font-medium">
                                 <Icon name="AlertCircle" size={16} className="flex-shrink-0 mt-0.5" />
-                                <span>All your accounts are frozen — unfreeze one in Accounts to add a transaction.</span>
+                                <span>All your accounts are paused — resume one in Accounts to add a transaction.</span>
                             </div>
                         )}
 

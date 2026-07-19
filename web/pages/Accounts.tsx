@@ -253,7 +253,7 @@ const AccountCard: React.FC<{
                 {isFrozen && (
                     <span className="absolute top-3 right-3 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 border border-blue-200 dark:border-blue-900/60">
                         <Icon name="Snowflake" size={11} />
-                        Frozen
+                        Paused
                     </span>
                 )}
                 <div className="flex items-start justify-between mb-6">
@@ -280,7 +280,7 @@ const AccountCard: React.FC<{
                                     onUnfreeze();
                                 }}
                                 className={`p-2 transition-colors rounded-full hover:bg-white/10 ${isPredefined ? 'text-white/80 hover:text-white' : 'text-gray-400 hover:text-success'}`}
-                                title="Unfreeze account"
+                                title="Resume account"
                             >
                                 <Icon name="Snowflake" size={18} />
                             </button>
@@ -291,7 +291,7 @@ const AccountCard: React.FC<{
                                     onFreeze();
                                 }}
                                 className={`p-2 transition-colors rounded-full hover:bg-white/10 ${isPredefined ? 'text-white/80 hover:text-white' : 'text-gray-400 hover:text-primary'}`}
-                                title="Freeze account"
+                                title="Pause account"
                             >
                                 <Icon name="Lock" size={18} />
                             </button>
@@ -525,9 +525,9 @@ export const Accounts: React.FC = () => {
                             <div className="w-16 h-16 rounded-2xl bg-primary-light dark:bg-primary/20 flex items-center justify-center mb-4">
                                 <Icon name="Snowflake" className="text-primary dark:text-emerald-400" size={32} />
                             </div>
-                            <h4 className="text-lg font-bold text-gray-darkest dark:text-gray-100">All accounts are frozen</h4>
+                            <h4 className="text-lg font-bold text-gray-darkest dark:text-gray-100">All accounts are paused</h4>
                             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 max-w-xs">
-                                Use "Show frozen accounts" below to unfreeze one.
+                                Use "Show paused accounts" below to resume one.
                             </p>
                         </Card>
                     ) : (
@@ -570,7 +570,7 @@ export const Accounts: React.FC = () => {
                                 className="flex items-center gap-1.5 text-sm font-semibold text-primary hover:text-primary-600 hover:underline transition-colors"
                             >
                                 <Icon name={showFrozen ? 'ChevronUp' : 'ChevronDown'} size={16} />
-                                <span>{showFrozen ? 'Hide' : 'Show'} frozen accounts ({frozenAccounts.length})</span>
+                                <span>{showFrozen ? 'Hide' : 'Show'} paused accounts ({frozenAccounts.length})</span>
                             </button>
 
                             {showFrozen && (
@@ -605,9 +605,9 @@ export const Accounts: React.FC = () => {
                 onConfirm={() => {
                     if (freezeTarget) updateAccount(freezeTarget.id, { frozen: true });
                 }}
-                title="Freeze Account"
-                message={`Freeze "${freezeTarget?.name || 'this account'}"? While frozen, it won't accept new transactions or recurring rules, and it will be excluded from balance totals until you unfreeze it.`}
-                confirmText="Freeze"
+                title="Pause Account"
+                message={`Pause "${freezeTarget?.name || 'this account'}"? While paused, it won't accept new transactions or recurring rules, and it will be excluded from balance totals until you resume it.`}
+                confirmText="Pause"
                 cancelText="Cancel"
                 variant="warning"
             />

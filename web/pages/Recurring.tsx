@@ -394,7 +394,7 @@ export const Recurring: React.FC = () => {
                 {/* Keep the currently-selected account visible even if it has since been
                     frozen, so editing an existing rule doesn't silently blank the field. */}
                 {form.accountId && !selectableAccounts.some(a => a.id === form.accountId) && (
-                  <option value={form.accountId}>{accountName(form.accountId)} (frozen)</option>
+                  <option value={form.accountId}>{accountName(form.accountId)} (paused)</option>
                 )}
               </select>
             </label>
@@ -412,7 +412,7 @@ export const Recurring: React.FC = () => {
                     <option key={account.id} value={account.id}>{account.name}</option>
                   ))}
                   {form.transferToAccountId && !selectableAccounts.some(a => a.id === form.transferToAccountId) && (
-                    <option value={form.transferToAccountId}>{accountName(form.transferToAccountId)} (frozen)</option>
+                    <option value={form.transferToAccountId}>{accountName(form.transferToAccountId)} (paused)</option>
                   )}
                 </select>
               </label>

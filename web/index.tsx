@@ -7,16 +7,19 @@ import './index.css';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 
 import { ToastProvider } from './context/ToastContext';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 // Optional: Google sign-in is enabled only when a client ID is configured
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 const app = (
-  <BrowserRouter>
-    <ToastProvider>
-      <App />
-    </ToastProvider>
-  </BrowserRouter>
+  <ErrorBoundary>
+    <BrowserRouter>
+      <ToastProvider>
+        <App />
+      </ToastProvider>
+    </BrowserRouter>
+  </ErrorBoundary>
 );
 
 const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);

@@ -122,7 +122,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ isOpen, onClos
                         {account?.frozen && (
                             <div className="flex items-center gap-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-medium">
                                 <Icon name="Snowflake" size={16} className="flex-shrink-0" />
-                                <span>This account is frozen. Use the Unfreeze action on the Accounts page to reactivate it.</span>
+                                <span>This account is paused. Use the Resume action on the Accounts page to reactivate it.</span>
                             </div>
                         )}
                         <div>
