@@ -346,7 +346,7 @@ export const Recurring: React.FC = () => {
                   className={`px-3 py-2 rounded-md capitalize text-sm font-semibold transition-all ${form.type === type
                     ? form.id 
                       ? 'bg-amber-500 text-white shadow-sm'
-                      : 'bg-white text-primary shadow-sm dark:bg-gray-700 dark:text-indigo-300'
+                      : 'bg-white text-primary shadow-sm dark:bg-gray-700 dark:text-emerald-300'
                     : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100'
                     }`}
                 >

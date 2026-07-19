@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
+﻿import React, { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Page } from '../types';
 import { Icon } from '../components/Icon';
 
@@ -267,7 +267,7 @@ const TourOverlay: React.FC<{
             >
                 <div className="flex items-start justify-between gap-3 mb-2">
                     <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary dark:text-indigo-400 flex items-center justify-center flex-shrink-0">
+                        <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary dark:text-emerald-400 flex items-center justify-center flex-shrink-0">
                             <Icon name="GraduationCap" size={18} />
                         </div>
                         <h4 className="font-bold text-gray-900 dark:text-white text-base leading-tight">{step.title}</h4>

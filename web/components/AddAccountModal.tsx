@@ -1,4 +1,4 @@
-
+﻿
 import React, { useState, useContext, useEffect } from 'react';
 import { AppContext } from '../App';
 import { Icon, iconList } from './Icon';
@@ -132,7 +132,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ isOpen, onClos
                                     <div
                                         key={t.type}
                                         onClick={() => setSelectedType(t.type)}
-                                        className={`cursor-pointer border rounded-lg p-2 flex flex-col items-center justify-center space-y-1 transition-colors ${selectedType === t.type ? 'border-primary bg-primary-light/20 dark:bg-primary/20 text-primary dark:text-indigo-300' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                                        className={`cursor-pointer border rounded-lg p-2 flex flex-col items-center justify-center space-y-1 transition-colors ${selectedType === t.type ? 'border-primary bg-primary-light/20 dark:bg-primary/20 text-primary dark:text-emerald-300' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
                                     >
                                         <Icon name={t.icon} size={20} />
                                         <span className="text-[10px] font-medium text-center">{t.label}</span>
@@ -140,7 +140,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ isOpen, onClos
                                 ))}
                                 <div
                                     onClick={() => setSelectedType('Custom')}
-                                    className={`cursor-pointer border rounded-lg p-2 flex flex-col items-center justify-center space-y-1 transition-colors ${selectedType === 'Custom' ? 'border-primary bg-primary-light/20 dark:bg-primary/20 text-primary dark:text-indigo-300' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                                    className={`cursor-pointer border rounded-lg p-2 flex flex-col items-center justify-center space-y-1 transition-colors ${selectedType === 'Custom' ? 'border-primary bg-primary-light/20 dark:bg-primary/20 text-primary dark:text-emerald-300' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
                                 >
                                     <Icon name="Settings" size={20} />
                                     <span className="text-[10px] font-medium text-center">Custom</span>
@@ -182,7 +182,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ isOpen, onClos
                                                     key={iconName}
                                                     type="button"
                                                     onClick={() => { setSelectedIcon(iconName); setShowIconPicker(false); }}
-                                                    className={`p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 flex justify-center ${selectedIcon === iconName ? 'bg-primary-light dark:bg-primary/20 text-primary dark:text-indigo-300' : ''}`}
+                                                    className={`p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 flex justify-center ${selectedIcon === iconName ? 'bg-primary-light dark:bg-primary/20 text-primary dark:text-emerald-300' : ''}`}
                                                 >
                                                     <Icon name={iconName} size={18} />
                                                 </button>

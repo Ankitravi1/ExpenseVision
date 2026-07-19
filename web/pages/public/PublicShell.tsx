@@ -21,7 +21,7 @@ export const PublicShell: React.FC<{ children: React.ReactNode }> = ({ children 
             <header className="sticky top-0 z-40 backdrop-blur bg-white/80 dark:bg-gray-950/80 border-b border-gray-100 dark:border-gray-800">
                 <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
                     <Link to="/" className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-indigo-600 flex items-center justify-center">
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary-hover flex items-center justify-center">
                             <Icon name="Wallet" size={18} className="text-white" />
                         </div>
                         <span className="text-lg font-bold tracking-tight">ExpenseVision</span>
@@ -62,7 +62,7 @@ export const PublicShell: React.FC<{ children: React.ReactNode }> = ({ children 
                 <div className="max-w-6xl mx-auto px-6 py-12 grid grid-cols-2 md:grid-cols-4 gap-8 text-sm">
                     <div className="col-span-2 md:col-span-1">
                         <div className="flex items-center gap-2 mb-3">
-                            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-indigo-600 flex items-center justify-center">
+                            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-primary-hover flex items-center justify-center">
                                 <Icon name="Wallet" size={16} className="text-white" />
                             </div>
                             <span className="font-bold">ExpenseVision</span>

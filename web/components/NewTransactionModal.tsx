@@ -1,4 +1,4 @@
-
+﻿
 import React, { useState, useContext, useEffect, useRef } from 'react';
 import { AppContext } from '../App';
 import { useToast } from '../context/ToastContext';
@@ -243,7 +243,7 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen
                 <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gradient-to-r from-primary-light/40 to-transparent dark:from-primary/10 dark:to-transparent">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl bg-primary/10 dark:bg-primary/20 flex items-center justify-center flex-shrink-0">
-                            <Icon name={transaction ? 'Pencil' : 'Plus'} size={20} className="text-primary dark:text-indigo-300" />
+                            <Icon name={transaction ? 'Pencil' : 'Plus'} size={20} className="text-primary dark:text-emerald-300" />
                         </div>
                         <h3 className="text-xl font-bold dark:text-gray-50">{transaction ? 'Edit Transaction' : 'New Transaction'}</h3>
                     </div>

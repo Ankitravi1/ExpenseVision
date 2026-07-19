@@ -1,4 +1,4 @@
-
+﻿
 import React, { useState, useContext, useEffect } from 'react';
 import { AppContext } from '../App';
 import { Icon, iconList } from './Icon';
@@ -91,14 +91,14 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({ isOpen, onCl
                             <button
                                 type="button"
                                 onClick={() => setType('expense')}
-                                className={`flex-1 py-2 text-sm font-semibold rounded-md transition-all ${type === 'expense' ? 'bg-white dark:bg-gray-600 shadow text-primary dark:text-indigo-300' : 'text-gray-500 dark:text-gray-400'}`}
+                                className={`flex-1 py-2 text-sm font-semibold rounded-md transition-all ${type === 'expense' ? 'bg-white dark:bg-gray-600 shadow text-primary dark:text-emerald-300' : 'text-gray-500 dark:text-gray-400'}`}
                             >
                                 Expense
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setType('income')}
-                                className={`flex-1 py-2 text-sm font-semibold rounded-md transition-all ${type === 'income' ? 'bg-white dark:bg-gray-600 shadow text-primary dark:text-indigo-300' : 'text-gray-500 dark:text-gray-400'}`}
+                                className={`flex-1 py-2 text-sm font-semibold rounded-md transition-all ${type === 'income' ? 'bg-white dark:bg-gray-600 shadow text-primary dark:text-emerald-300' : 'text-gray-500 dark:text-gray-400'}`}
                             >
                                 Income
                             </button>
@@ -138,7 +138,7 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({ isOpen, onCl
                                             key={iconName}
                                             type="button"
                                             onClick={() => { setSelectedIcon(iconName); setShowIconPicker(false); }}
-                                            className={`p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 flex justify-center ${selectedIcon === iconName ? 'bg-primary-light dark:bg-primary/20 text-primary dark:text-indigo-300' : ''}`}
+                                            className={`p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 flex justify-center ${selectedIcon === iconName ? 'bg-primary-light dark:bg-primary/20 text-primary dark:text-emerald-300' : ''}`}
                                         >
                                             <Icon name={iconName} size={18} />
                                         </button>

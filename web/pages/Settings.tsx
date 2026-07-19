@@ -719,7 +719,7 @@ export const Settings: React.FC = () => {
                                         className={`group flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-all cursor-pointer select-none ${
                                             aiSettings.model === m
                                                 ? 'bg-primary text-white border-primary shadow'
-                                                : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-600 hover:border-primary hover:text-primary dark:hover:text-indigo-300'
+                                                : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-600 hover:border-primary hover:text-primary dark:hover:text-emerald-300'
                                         }`}
                                         onClick={() => { setAiSaved(false); setAiSettings(prev => ({ ...prev, model: m })); }}
                                     >

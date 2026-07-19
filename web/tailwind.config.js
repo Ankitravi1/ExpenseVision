@@ -14,18 +14,22 @@ export default {
   theme: {
     extend: {
       colors: {
-        primary: '#4f46e5',
-        'primary-hover': '#4338ca',
-        'primary-light': '#e0e7ff',
-        // Map gray to zinc for pure neutral grays without blue tint
-        gray: colors.zinc,
-        'gray-light': colors.zinc[100],
-        'gray-medium': colors.zinc[400],
-        'gray-dark': colors.zinc[600],
-        'gray-darkest': colors.zinc[800],
+        // Emerald & Sand — deep, editorial money-green (not cartoon green)
+        primary: '#0E7C66',
+        'primary-hover': '#0B5D4E',
+        'primary-light': '#d1faec',
+        // Warm gold micro-accent, used sparingly
+        accent: '#E0A82E',
+        'accent-hover': '#c8942a',
+        // Map gray to stone for a warm neutral canvas (cream whites, warm inks)
+        gray: colors.stone,
+        'gray-light': colors.stone[100],
+        'gray-medium': colors.stone[400],
+        'gray-dark': colors.stone[600],
+        'gray-darkest': colors.stone[800],
         success: '#10b981',
         warning: '#f59e0b',
-        danger: '#ef4444',
+        danger: '#e11d48',
       },
       fontFamily: {
         sans: ['Inter', 'sans-serif'],

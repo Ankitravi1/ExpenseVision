@@ -73,7 +73,7 @@ export const Header: React.FC<HeaderProps> = ({ pageTitle, onNewTransaction, onM
       <div className="flex items-center gap-3 sm:gap-4">
         <div className="flex flex-col items-end border-r border-gray-200 dark:border-gray-700 pr-3 sm:pr-4">
           <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Net Worth</span>
-          <span className="text-base sm:text-lg font-black text-primary dark:text-indigo-400">{formatCurrency(netWorth, currency)}</span>
+          <span className="text-base sm:text-lg font-black text-primary dark:text-emerald-400">{formatCurrency(netWorth, currency)}</span>
         </div>
         
         <NotificationCenter />

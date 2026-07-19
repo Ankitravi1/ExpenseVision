@@ -7,7 +7,7 @@ import { Icon } from '../../components/Icon';
 export const AuthShell: React.FC<{ onBack: () => void; children: React.ReactNode }> = ({ onBack, children }) => (
     <div className="min-h-screen grid lg:grid-cols-2">
         {/* Brand panel */}
-        <div className="hidden lg:flex flex-col justify-between p-12 bg-gradient-to-br from-primary to-indigo-700 text-white relative overflow-hidden">
+        <div className="hidden lg:flex flex-col justify-between p-12 bg-gradient-to-br from-primary to-primary-hover text-white relative overflow-hidden">
             <div className="absolute -top-24 -right-24 w-96 h-96 bg-white/10 rounded-full blur-3xl" />
             <div className="absolute -bottom-32 -left-16 w-96 h-96 bg-black/10 rounded-full blur-3xl" />
             <div className="relative flex items-center gap-2">
@@ -32,7 +32,7 @@ export const AuthShell: React.FC<{ onBack: () => void; children: React.ReactNode
         </div>
 
         {/* Form side */}
-        <div className="flex items-center justify-center p-6 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+        <div className="flex items-center justify-center p-6 bg-[#faf9f6] dark:bg-gray-950">
             <div className="w-full max-w-md">
                 <button onClick={onBack} className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white mb-8 transition-colors">
                     <Icon name="ChevronLeft" size={20} />

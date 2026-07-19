@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { Icon } from '../Icon';
 
 // A small, self-contained calculator. Standard four-function + %, sign flip,
@@ -77,7 +77,7 @@ export const Calculator: React.FC = () => {
     const Btn: React.FC<{ label: React.ReactNode; onClick: () => void; variant?: 'num' | 'op' | 'fn' | 'eq'; className?: string }> = ({ label, onClick, variant = 'num', className = '' }) => {
         const styles = {
             num: 'bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white',
-            op: 'bg-primary/10 hover:bg-primary/20 text-primary dark:text-indigo-300 font-bold',
+            op: 'bg-primary/10 hover:bg-primary/20 text-primary dark:text-emerald-300 font-bold',
             fn: 'bg-gray-200/60 hover:bg-gray-300/60 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300',
             eq: 'bg-primary hover:bg-primary-hover text-white font-bold',
         }[variant];

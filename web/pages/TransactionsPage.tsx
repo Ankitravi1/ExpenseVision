@@ -1,4 +1,4 @@
-import React, { useContext, useMemo, useState, useRef, useEffect } from 'react';
+﻿import React, { useContext, useMemo, useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppContext } from '../App';
 import { Card } from '../components/Card';
@@ -55,7 +55,7 @@ const TransactionRow: React.FC<{
             <td className="px-6 py-4 whitespace-nowrap">
                 <div className="flex items-center">
                     <div className="w-8 h-8 rounded-full bg-primary-light/50 dark:bg-primary/20 flex items-center justify-center mr-3 flex-shrink-0">
-                        <Icon name={icon} className="text-primary dark:text-indigo-300" size={16} />
+                        <Icon name={icon} className="text-primary dark:text-emerald-300" size={16} />
                     </div>
                     <span className="text-sm font-medium text-gray-950 dark:text-gray-100 truncate max-w-xs" title={note}>
                         {note}
@@ -89,7 +89,7 @@ const TransactionRow: React.FC<{
             {/* Transfer To */}
             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 font-bold">
                 {isTransfer && destAccount ? (
-                    <span className="inline-flex items-center gap-1 text-primary dark:text-indigo-400">
+                    <span className="inline-flex items-center gap-1 text-primary dark:text-emerald-400">
                         <Icon name="ArrowRight" size={12} />
                         {destAccount.name}
                     </span>
@@ -553,7 +553,7 @@ export const TransactionsPage: React.FC = () => {
                                 Carry Over
                             </label>
                             <div className="relative group/tooltip">
-                                <Icon name="Info" size={12} className="text-gray-400 dark:text-gray-500 hover:text-primary dark:hover:text-indigo-400 cursor-pointer" />
+                                <Icon name="Info" size={12} className="text-gray-400 dark:text-gray-500 hover:text-primary dark:hover:text-emerald-400 cursor-pointer" />
                                 <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-[10px] rounded-lg shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-200 z-50 leading-normal">
                                     Includes your savings/expenses from previous months in the starting balance.
                                 </div>
@@ -601,15 +601,15 @@ export const TransactionsPage: React.FC = () => {
                     </Card>
 
                     {/* Balance Card - Blue/Indigo Gradient matching dashboard */}
-                    <Card className="flex items-center p-6 bg-gradient-to-br from-blue-50 to-indigo-50/50 dark:from-indigo-950/20 dark:to-gray-800/40 border border-blue-200 dark:border-indigo-900/30 shadow-sm rounded-xl">
-                        <div className="w-12 h-12 rounded-xl bg-primary-light dark:bg-primary/20 text-primary dark:text-indigo-300 flex items-center justify-center mr-4">
+                    <Card className="flex items-center p-6 bg-gradient-to-br from-blue-50 to-emerald-50/50 dark:from-emerald-950/20 dark:to-gray-800/40 border border-blue-200 dark:border-emerald-900/30 shadow-sm rounded-xl">
+                        <div className="w-12 h-12 rounded-xl bg-primary-light dark:bg-primary/20 text-primary dark:text-emerald-300 flex items-center justify-center mr-4">
                             <Icon name="CircleDollarSign" size={24} />
                         </div>
                         <div>
                             <p className="text-xs font-medium text-blue-700 dark:text-gray-300">
                                 {carryOver ? 'Balance (with Carry Over)' : 'Net Balance'}
                             </p>
-                            <p className="text-2xl font-bold mt-1 text-primary dark:text-indigo-400">
+                            <p className="text-2xl font-bold mt-1 text-primary dark:text-emerald-400">
                                 {formatCurrency(displayBalance, currency)}
                             </p>
                         </div>
@@ -669,7 +669,7 @@ export const TransactionsPage: React.FC = () => {
                         )}
 
                         {/* Showing transactions badge moved to right side */}
-                        <span className="text-xs font-bold text-primary bg-primary-light/60 dark:bg-primary/20 dark:text-indigo-300 border border-primary-light px-3 py-1.5 rounded-lg inline-block shadow-sm">
+                        <span className="text-xs font-bold text-primary bg-primary-light/60 dark:bg-primary/20 dark:text-emerald-300 border border-primary-light px-3 py-1.5 rounded-lg inline-block shadow-sm">
                             Showing transactions from <span className="font-extrabold">{formatDisplayDate(startDate)}</span> to <span className="font-extrabold">{formatDisplayDate(endDate)}</span>
                         </span>
                     </div>
@@ -721,7 +721,7 @@ export const TransactionsPage: React.FC = () => {
                                              onClick={() => setShowAmountFilterPopup(!showAmountFilterPopup)}
                                              className={`flex items-center justify-between text-xs py-1 px-2 w-full bg-white dark:bg-gray-700 border rounded-md outline-none text-left font-medium transition-all ${
                                                  colFilters.amountLimit
-                                                     ? 'text-primary dark:text-indigo-400 border-primary dark:border-indigo-500 bg-primary-light/30 dark:bg-primary/10'
+                                                     ? 'text-primary dark:text-emerald-400 border-primary dark:border-emerald-500 bg-primary-light/30 dark:bg-primary/10'
                                                      : 'text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-600'
                                              }`}
                                          >

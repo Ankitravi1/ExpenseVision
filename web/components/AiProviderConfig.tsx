@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { Icon } from './Icon';
 
 // Reusable multi-provider AI config UI (provider select, models, API keys).
@@ -144,7 +144,7 @@ export const AiProviderConfig: React.FC<{
                             <div
                                 key={m}
                                 onClick={() => onChange({ ...value, model: m })}
-                                className={`group flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-all cursor-pointer select-none ${value.model === m ? 'bg-primary text-white border-primary shadow' : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-600 hover:border-primary hover:text-primary dark:hover:text-indigo-300'}`}
+                                className={`group flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-all cursor-pointer select-none ${value.model === m ? 'bg-primary text-white border-primary shadow' : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-600 hover:border-primary hover:text-primary dark:hover:text-emerald-300'}`}
                             >
                                 <span>{m}</span>
                                 <button

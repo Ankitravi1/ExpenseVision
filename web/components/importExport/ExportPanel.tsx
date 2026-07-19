@@ -1,4 +1,4 @@
-import React, { useContext, useMemo, useRef, useState } from 'react';
+﻿import React, { useContext, useMemo, useRef, useState } from 'react';
 import { AppContext } from '../../App';
 import { useToast } from '../../context/ToastContext';
 import { Icon } from '../Icon';
@@ -359,13 +359,13 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({ initialStartDate, init
                         <p className="text-2xl font-bold mt-1 text-success dark:text-emerald-400">+{formatCurrency(rangeIncome, currency)}</p>
                     </div>
                 </div>
-                <div className="flex items-center p-6 bg-gradient-to-br from-blue-50 to-indigo-50/50 dark:from-indigo-950/20 dark:to-gray-800/40 border border-blue-200 dark:border-indigo-900/30 shadow-sm rounded-xl">
-                    <div className="w-12 h-12 rounded-xl bg-primary-light dark:bg-primary/20 text-primary dark:text-indigo-300 flex items-center justify-center mr-4">
+                <div className="flex items-center p-6 bg-gradient-to-br from-blue-50 to-emerald-50/50 dark:from-emerald-950/20 dark:to-gray-800/40 border border-blue-200 dark:border-emerald-900/30 shadow-sm rounded-xl">
+                    <div className="w-12 h-12 rounded-xl bg-primary-light dark:bg-primary/20 text-primary dark:text-emerald-300 flex items-center justify-center mr-4">
                         <Icon name="CircleDollarSign" size={24} />
                     </div>
                     <div>
                         <p className="text-xs font-medium text-blue-700 dark:text-gray-300">{carryOver ? 'Balance (with Carry Over)' : 'Net Balance'}</p>
-                        <p className="text-2xl font-bold mt-1 text-primary dark:text-indigo-400">{formatCurrency(displayBalance, currency)}</p>
+                        <p className="text-2xl font-bold mt-1 text-primary dark:text-emerald-400">{formatCurrency(displayBalance, currency)}</p>
                     </div>
                 </div>
             </div>
@@ -381,7 +381,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({ initialStartDate, init
                     <Icon name="SlidersHorizontal" size={14} />
                     <span>Filter</span>
                 </button>
-                <span className="text-xs font-bold text-primary bg-primary-light/60 dark:bg-primary/20 dark:text-indigo-300 border border-primary-light px-3 py-1.5 rounded-lg inline-block shadow-sm">
+                <span className="text-xs font-bold text-primary bg-primary-light/60 dark:bg-primary/20 dark:text-emerald-300 border border-primary-light px-3 py-1.5 rounded-lg inline-block shadow-sm">
                     Showing <span className="font-extrabold">{filteredTransactions.length}</span> transactions from{' '}
                     <span className="font-extrabold">{formatDisplayDate(startDate)}</span> to <span className="font-extrabold">{formatDisplayDate(endDate)}</span>
                 </span>
@@ -496,7 +496,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({ initialStartDate, init
                                     </td>
                                     <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 font-bold">
                                         {isTransfer && destAccount ? (
-                                            <span className="inline-flex items-center gap-1 text-primary dark:text-indigo-400">
+                                            <span className="inline-flex items-center gap-1 text-primary dark:text-emerald-400">
                                                 <Icon name="ArrowRight" size={12} />
                                                 {destAccount.name}
                                             </span>

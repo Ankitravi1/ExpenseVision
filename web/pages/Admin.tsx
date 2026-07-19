@@ -482,7 +482,7 @@ export const Admin: React.FC = () => {
                                                     {/* Reset Password */}
                                                     <button
                                                         onClick={() => setResetUser(user)}
-                                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/20 dark:hover:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-xs font-semibold border border-indigo-200 dark:border-indigo-900/30 transition"
+                                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/20 dark:hover:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-xs font-semibold border border-emerald-200 dark:border-emerald-900/30 transition"
                                                         title="Reset Password"
                                                     >
                                                         <Icon name="KeyRound" size={13} />

@@ -46,7 +46,7 @@ const BudgetCard: React.FC<{ budget: Budget; onEdit: () => void }> = ({ budget, 
             <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center">
                     <div className="w-10 h-10 rounded-full bg-primary-light dark:bg-primary/20 flex items-center justify-center mr-3">
-                        <Icon name={category.icon} className="text-primary dark:text-indigo-300" />
+                        <Icon name={category.icon} className="text-primary dark:text-emerald-300" />
                     </div>
                     <div>
                         <h4 className="font-bold text-sm text-gray-900 dark:text-gray-100">{category.name}</h4>
@@ -313,16 +313,16 @@ export const Budgets: React.FC = () => {
                                     key={category.id}
                                     type="button"
                                     onClick={() => openSetBudget(category.id)}
-                                    className="flex items-center justify-between p-3 bg-white dark:bg-gray-800/40 rounded-xl border border-gray-200 dark:border-gray-700/80 hover:border-primary dark:hover:border-indigo-500 hover:bg-gray-50 dark:hover:bg-gray-800 hover:shadow-sm transition-all text-left group"
+                                    className="flex items-center justify-between p-3 bg-white dark:bg-gray-800/40 rounded-xl border border-gray-200 dark:border-gray-700/80 hover:border-primary dark:hover:border-emerald-500 hover:bg-gray-50 dark:hover:bg-gray-800 hover:shadow-sm transition-all text-left group"
                                 >
                                     <div className="flex items-center min-w-0 mr-2">
                                         <div className="w-8 h-8 rounded-lg bg-gray-50 dark:bg-gray-800 flex items-center justify-center mr-3 flex-shrink-0 group-hover:bg-primary-light dark:group-hover:bg-primary/20 transition-colors">
-                                            <Icon name={category.icon} className="text-gray-400 dark:text-gray-500 group-hover:text-primary dark:group-hover:text-indigo-300 transition-colors" size={14} />
+                                            <Icon name={category.icon} className="text-gray-400 dark:text-gray-500 group-hover:text-primary dark:group-hover:text-emerald-300 transition-colors" size={14} />
                                         </div>
-                                        <span className="font-semibold text-xs text-gray-700 dark:text-gray-300 truncate group-hover:text-primary dark:group-hover:text-indigo-300 transition-colors">{category.name}</span>
+                                        <span className="font-semibold text-xs text-gray-700 dark:text-gray-300 truncate group-hover:text-primary dark:group-hover:text-emerald-300 transition-colors">{category.name}</span>
                                     </div>
-                                    <div className="w-6 h-6 rounded-md border border-gray-200 dark:border-gray-700 flex items-center justify-center group-hover:border-primary dark:group-hover:border-indigo-500 transition-all">
-                                        <Icon name="Plus" size={12} className="text-gray-400 dark:text-gray-500 group-hover:text-primary dark:group-hover:text-indigo-300 group-hover:scale-110 transition-all flex-shrink-0" />
+                                    <div className="w-6 h-6 rounded-md border border-gray-200 dark:border-gray-700 flex items-center justify-center group-hover:border-primary dark:group-hover:border-emerald-500 transition-all">
+                                        <Icon name="Plus" size={12} className="text-gray-400 dark:text-gray-500 group-hover:text-primary dark:group-hover:text-emerald-300 group-hover:scale-110 transition-all flex-shrink-0" />
                                     </div>
                                 </button>
                             ))}

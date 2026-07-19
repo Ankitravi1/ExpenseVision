@@ -46,7 +46,7 @@ const StatCard: React.FC<{ title: string; subtitle?: string; amount: number; cha
         titleColorClass = 'text-rose-700';
         iconName = 'AlertTriangle';
       } else {
-        gradientClass = 'from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-800/20';
+        gradientClass = 'from-blue-50 to-emerald-50 dark:from-blue-900/20 dark:to-emerald-800/20';
         borderClass = 'border-blue-200 dark:border-blue-800/30';
         textClass = 'text-blue-900 dark:text-blue-100';
         titleColorClass = 'text-blue-700';
@@ -150,7 +150,7 @@ const TransactionRow: React.FC<{ transaction: Transaction }> = ({ transaction })
           </span>
         )}
         {account && (
-          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-primary-light/50 text-primary dark:bg-primary/20 dark:text-indigo-300">
+          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-primary-light/50 text-primary dark:bg-primary/20 dark:text-emerald-300">
             {account.name}
           </span>
         )}
@@ -320,7 +320,7 @@ export const Dashboard: React.FC = () => {
         </div>
 
         {/* Date range label on the right */}
-        <span className="text-xs font-bold text-primary bg-primary-light/60 dark:bg-primary/20 dark:text-indigo-300 border border-primary-light px-3 py-1.5 rounded-lg inline-block shadow-sm">
+        <span className="text-xs font-bold text-primary bg-primary-light/60 dark:bg-primary/20 dark:text-emerald-300 border border-primary-light px-3 py-1.5 rounded-lg inline-block shadow-sm">
           {dateRangeLabel}
         </span>
       </div>
@@ -485,7 +485,7 @@ export const Dashboard: React.FC = () => {
                 return (
                   <div key={acc.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50/50 dark:bg-gray-800/20 border border-gray-100 dark:border-gray-700/40">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-primary-light dark:bg-primary/10 flex items-center justify-center text-primary dark:text-indigo-300">
+                      <div className="w-8 h-8 rounded-lg bg-primary-light dark:bg-primary/10 flex items-center justify-center text-primary dark:text-emerald-300">
                         <Icon name={acc.icon || accIcon} size={16} />
                       </div>
                       <div>

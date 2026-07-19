@@ -1,4 +1,4 @@
-
+﻿
 import React, { useState, useContext } from 'react';
 import { Card } from '../components/Card';
 import { Icon } from '../components/Icon';
@@ -18,7 +18,7 @@ const CategoryChip: React.FC<{ category: Category; onEdit: () => void }> = ({ ca
         <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-60 transition-opacity">
             <button
                 onClick={onEdit}
-                className="p-1.5 text-gray-400 hover:text-primary dark:hover:text-indigo-400 transition-colors"
+                className="p-1.5 text-gray-400 hover:text-primary dark:hover:text-emerald-400 transition-colors"
                 title="Category settings"
             >
                 <Icon name="Settings" size={16} />

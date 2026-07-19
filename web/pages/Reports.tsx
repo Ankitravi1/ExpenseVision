@@ -1,4 +1,4 @@
-import React, { useState, useContext, useMemo, useRef, useEffect } from 'react';
+﻿import React, { useState, useContext, useMemo, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
@@ -411,7 +411,7 @@ const AccountOverviewModal: React.FC<{
             >
                 <div className="flex items-center justify-between p-5 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40">
                     <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-11 h-11 rounded-xl bg-primary/10 dark:bg-primary/20 flex items-center justify-center text-primary dark:text-indigo-300 flex-shrink-0">
+                        <div className="w-11 h-11 rounded-xl bg-primary/10 dark:bg-primary/20 flex items-center justify-center text-primary dark:text-emerald-300 flex-shrink-0">
                             <Icon name={account.icon || 'Wallet'} size={22} />
                         </div>
                         <div className="min-w-0">
@@ -453,8 +453,8 @@ const AccountOverviewModal: React.FC<{
                             <p className="text-base font-bold text-orange-500 mt-1 tabular-nums">−{formatCurrency(transferOut, currency)}</p>
                         </div>
                         <div className="p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent">
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-primary dark:text-indigo-400">Current balance</p>
-                            <p className="text-base font-bold text-primary dark:text-indigo-400 mt-1 tabular-nums">{formatCurrency(account.balance, currency)}</p>
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-primary dark:text-emerald-400">Current balance</p>
+                            <p className="text-base font-bold text-primary dark:text-emerald-400 mt-1 tabular-nums">{formatCurrency(account.balance, currency)}</p>
                             <p className="text-[10px] text-gray-400 mt-0.5">Period net {periodNet >= 0 ? '+' : '−'}{formatCurrency(Math.abs(periodNet), currency)}</p>
                         </div>
                     </div>
@@ -1042,7 +1042,7 @@ export const Reports: React.FC = () => {
                             Carry Over
                         </label>
                         <div className="relative group/tooltip">
-                            <Icon name="Info" size={12} className="text-gray-400 dark:text-gray-500 hover:text-primary dark:hover:text-indigo-400 cursor-pointer" />
+                            <Icon name="Info" size={12} className="text-gray-400 dark:text-gray-500 hover:text-primary dark:hover:text-emerald-400 cursor-pointer" />
                             <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-[10px] rounded-lg shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-200 z-50 leading-normal">
                                 Includes your savings/expenses from previous months in the starting balance.
                             </div>
@@ -1086,14 +1086,14 @@ export const Reports: React.FC = () => {
                 </Card>
 
                 <Card className="flex items-center p-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700/60 shadow-sm rounded-xl">
-                    <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-indigo-900/30 text-primary dark:text-indigo-300 flex items-center justify-center mr-4">
+                    <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-emerald-900/30 text-primary dark:text-emerald-300 flex items-center justify-center mr-4">
                         <Icon name="CircleDollarSign" size={24} />
                     </div>
                     <div>
                         <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
                             {carryOver ? 'Balance (with Carry Over)' : 'Net Balance'}
                         </h4>
-                        <p className="text-2xl font-bold mt-1 text-primary dark:text-indigo-400 tabular-nums">
+                        <p className="text-2xl font-bold mt-1 text-primary dark:text-emerald-400 tabular-nums">
                             {formatCurrency(displayBalance, currency)}
                         </p>
                     </div>
@@ -1328,7 +1328,7 @@ export const Reports: React.FC = () => {
                                                     <th className="py-2.5 px-2 text-right text-rose-600 dark:text-rose-400">Expense</th>
                                                     <th className="py-2.5 px-2 text-right text-blue-500">Transfer In</th>
                                                     <th className="py-2.5 px-2 text-right text-orange-500">Transfer Out</th>
-                                                    <th className="py-2.5 px-2 text-right text-primary dark:text-indigo-400 font-extrabold">Current Balance</th>
+                                                    <th className="py-2.5 px-2 text-right text-primary dark:text-emerald-400 font-extrabold">Current Balance</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -1359,7 +1359,7 @@ export const Reports: React.FC = () => {
                                                             <td className="py-3 px-2 text-right tabular-nums text-orange-500 font-medium bg-orange-500/5">
                                                                 −{formatCurrency(transferOut, currency)}
                                                             </td>
-                                                            <td className="py-3 px-2 text-right tabular-nums text-primary dark:text-indigo-400 font-extrabold bg-primary/5">
+                                                            <td className="py-3 px-2 text-right tabular-nums text-primary dark:text-emerald-400 font-extrabold bg-primary/5">
                                                                 {formatCurrency(account.balance, currency)}
                                                             </td>
                                                         </tr>

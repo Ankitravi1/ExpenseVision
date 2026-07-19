@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useRef, useState } from 'react';
+﻿import React, { useContext, useEffect, useRef, useState } from 'react';
 import { AppContext } from '../../App';
 import { useToast } from '../../context/ToastContext';
 import { Icon } from '../Icon';
@@ -402,9 +402,9 @@ export const ImportWizard: React.FC = () => {
     const stepIndex = { input: 1, bank: 2, parsing: 3, preview: 4, success: 5 }[step];
 
     const StepBadge: React.FC<{ n: number; label: string }> = ({ n, label }) => (
-        <div className={`flex items-center gap-2 ${stepIndex === n ? 'text-primary dark:text-indigo-400' : stepIndex > n ? 'text-emerald-500' : 'text-gray-300 dark:text-gray-600'}`}>
+        <div className={`flex items-center gap-2 ${stepIndex === n ? 'text-primary dark:text-emerald-400' : stepIndex > n ? 'text-emerald-500' : 'text-gray-300 dark:text-gray-600'}`}>
             <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold border-2 ${
-                stepIndex === n ? 'border-primary dark:border-indigo-400' : stepIndex > n ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-gray-300 dark:border-gray-600'
+                stepIndex === n ? 'border-primary dark:border-emerald-400' : stepIndex > n ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-gray-300 dark:border-gray-600'
             }`}>
                 {stepIndex > n ? <Icon name="Check" size={12} /> : n}
             </div>
@@ -450,13 +450,13 @@ export const ImportWizard: React.FC = () => {
                     <div className="flex gap-2 bg-gray-100 dark:bg-gray-800 p-1 rounded-xl border border-gray-200 dark:border-gray-700 w-fit">
                         <button
                             onClick={() => setInputMode('file')}
-                            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${inputMode === 'file' ? 'bg-white dark:bg-gray-700 text-primary dark:text-indigo-400 shadow-sm' : 'text-gray-500 dark:text-gray-400'}`}
+                            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${inputMode === 'file' ? 'bg-white dark:bg-gray-700 text-primary dark:text-emerald-400 shadow-sm' : 'text-gray-500 dark:text-gray-400'}`}
                         >
                             Upload File
                         </button>
                         <button
                             onClick={() => setInputMode('paste')}
-                            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${inputMode === 'paste' ? 'bg-white dark:bg-gray-700 text-primary dark:text-indigo-400 shadow-sm' : 'text-gray-500 dark:text-gray-400'}`}
+                            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${inputMode === 'paste' ? 'bg-white dark:bg-gray-700 text-primary dark:text-emerald-400 shadow-sm' : 'text-gray-500 dark:text-gray-400'}`}
                         >
                             Paste Text
                         </button>
@@ -464,7 +464,7 @@ export const ImportWizard: React.FC = () => {
 
                     {isProcessing && !pdfPasswordPrompt && (
                         <div className="py-16 flex flex-col items-center justify-center gap-4 text-center">
-                            <div className="w-10 h-10 border-4 border-primary/20 border-t-primary dark:border-indigo-400/20 dark:border-t-indigo-400 rounded-full animate-spin" />
+                            <div className="w-10 h-10 border-4 border-primary/20 border-t-primary dark:border-emerald-400/20 dark:border-t-emerald-400 rounded-full animate-spin" />
                             <p className="text-sm font-bold text-gray-700 dark:text-gray-300">{processStatus}</p>
                         </div>
                     )}
@@ -504,7 +504,7 @@ export const ImportWizard: React.FC = () => {
 
                     {!isProcessing && !pdfPasswordPrompt && inputMode === 'file' && (
                         <div
-                            className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-8 text-center hover:border-primary dark:hover:border-indigo-400 transition-all cursor-pointer bg-gray-50/20 dark:bg-gray-800/10 flex flex-col items-center justify-center min-h-[160px]"
+                            className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-8 text-center hover:border-primary dark:hover:border-emerald-400 transition-all cursor-pointer bg-gray-50/20 dark:bg-gray-800/10 flex flex-col items-center justify-center min-h-[160px]"
                             onClick={() => fileInputRef.current?.click()}
                         >
                             <input
@@ -514,7 +514,7 @@ export const ImportWizard: React.FC = () => {
                                 accept=".csv,.xlsx,.xls,.pdf,.png,.jpg,.jpeg,.webp,.txt"
                                 className="hidden"
                             />
-                            <div className="w-12 h-12 bg-primary/10 text-primary dark:text-indigo-400 rounded-full flex items-center justify-center mx-auto mb-3">
+                            <div className="w-12 h-12 bg-primary/10 text-primary dark:text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-3">
                                 <Icon name="FileSpreadsheet" size={24} />
                             </div>
                             <p className="text-gray-900 dark:text-white font-bold mb-1 text-sm">
@@ -529,7 +529,7 @@ export const ImportWizard: React.FC = () => {
                     {!isProcessing && !pdfPasswordPrompt && inputMode === 'file' && (
                         <div className="bg-gray-50 dark:bg-gray-800/40 border border-gray-200 dark:border-gray-700 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
                             <div className="flex items-start gap-2.5 min-w-0">
-                                <Icon name="FileSpreadsheet" size={18} className="text-primary dark:text-indigo-400 mt-0.5 flex-shrink-0" />
+                                <Icon name="FileSpreadsheet" size={18} className="text-primary dark:text-emerald-400 mt-0.5 flex-shrink-0" />
                                 <div className="min-w-0">
                                     <p className="text-sm font-bold text-gray-800 dark:text-gray-200">Prefer to start from a template?</p>
                                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
@@ -541,7 +541,7 @@ export const ImportWizard: React.FC = () => {
                                 <button
                                     type="button"
                                     onClick={downloadCsvTemplate}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-gray-800 text-primary dark:text-indigo-400 rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-all text-xs font-bold border border-gray-200 dark:border-gray-700"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-gray-800 text-primary dark:text-emerald-400 rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-all text-xs font-bold border border-gray-200 dark:border-gray-700"
                                 >
                                     <Icon name="Download" size={14} />
                                     CSV
@@ -549,7 +549,7 @@ export const ImportWizard: React.FC = () => {
                                 <button
                                     type="button"
                                     onClick={downloadExcelTemplate}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-gray-800 text-primary dark:text-indigo-400 rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-all text-xs font-bold border border-gray-200 dark:border-gray-700"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-gray-800 text-primary dark:text-emerald-400 rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-all text-xs font-bold border border-gray-200 dark:border-gray-700"
                                 >
                                     <Icon name="Download" size={14} />
                                     Excel
@@ -596,7 +596,7 @@ export const ImportWizard: React.FC = () => {
                 <div className="space-y-4">
                     <div className="flex items-center justify-between">
                         <h4 className="font-bold text-sm dark:text-white flex items-center gap-1.5">
-                            <Icon name="FileText" size={16} className="text-primary dark:text-indigo-400" />
+                            <Icon name="FileText" size={16} className="text-primary dark:text-emerald-400" />
                             Text extracted from {file ? file.name : 'pasted text'}
                         </h4>
                         <button onClick={() => setStep('input')} className="text-xs text-rose-500 hover:text-rose-700 font-bold hover:underline flex items-center gap-1">

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+﻿import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { flushSync } from 'react-dom';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { Sidebar } from './components/Sidebar';
@@ -564,7 +564,7 @@ const App: React.FC = () => {
   // If authenticated but user data not loaded yet, show loading
   if (!user) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-[#faf9f6] dark:bg-gray-950 flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
@@ -573,7 +573,7 @@ const App: React.FC = () => {
   // If authenticated but needs profile completion, show profile completion screen
   if (needsProfileCompletion) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center p-6">
+      <div className="min-h-screen bg-[#faf9f6] dark:bg-gray-950 flex items-center justify-center p-6">
         <div className="w-full max-w-md">
           {/* Back to Home Button */}
           <button

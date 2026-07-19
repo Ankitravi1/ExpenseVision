@@ -73,7 +73,7 @@ const AccountDetailsModal: React.FC<AccountDetailsModalProps> = ({
                         <div>
                             <h3 className="text-xl font-bold text-gray-darkest dark:text-gray-100 flex items-center gap-2">
                                 <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                                    <Icon name={account.icon || 'Wallet'} className="text-primary dark:text-indigo-400" size={18} />
+                                    <Icon name={account.icon || 'Wallet'} className="text-primary dark:text-emerald-400" size={18} />
                                 </div>
                                 {account.name}
                             </h3>
@@ -83,7 +83,7 @@ const AccountDetailsModal: React.FC<AccountDetailsModalProps> = ({
                                 </span>
                                 <div className="flex items-baseline gap-2">
                                     <span className="text-xs text-gray-400 dark:text-gray-500">Current:</span>
-                                    <span className="text-xl font-black text-primary dark:text-indigo-400">{formatCurrency(account.balance, currency)}</span>
+                                    <span className="text-xl font-black text-primary dark:text-emerald-400">{formatCurrency(account.balance, currency)}</span>
                                 </div>
                                 <div className="flex items-baseline gap-2 border-l border-gray-200 dark:border-gray-700 pl-3">
                                     <span className="text-xs text-gray-400 dark:text-gray-500">Initial:</span>
@@ -151,10 +151,10 @@ const AccountDetailsModal: React.FC<AccountDetailsModalProps> = ({
                                                     >
                                                         <div className="flex items-center min-w-0 mr-4">
                                                             <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center mr-3 flex-shrink-0 group-hover:bg-primary-light dark:group-hover:bg-primary/20 transition-colors">
-                                                                <Icon name={iconName} size={15} className="text-gray-600 dark:text-gray-300 group-hover:text-primary dark:group-hover:text-indigo-300 transition-colors" />
+                                                                <Icon name={iconName} size={15} className="text-gray-600 dark:text-gray-300 group-hover:text-primary dark:group-hover:text-emerald-300 transition-colors" />
                                                             </div>
                                                             <div className="min-w-0">
-                                                                <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate group-hover:text-primary dark:group-hover:text-indigo-300 transition-colors">
+                                                                <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate group-hover:text-primary dark:group-hover:text-emerald-300 transition-colors">
                                                                     {t.note || (t.type === 'transfer' ? 'Transfer' : category?.name || 'Uncategorized')}
                                                                 </p>
                                                                 <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">
@@ -166,7 +166,7 @@ const AccountDetailsModal: React.FC<AccountDetailsModalProps> = ({
                                                             <span className={`text-sm font-bold ${isIncoming ? 'text-success' : 'text-danger'}`}>
                                                                 {displayAmount}
                                                             </span>
-                                                            <Icon name="Pencil" size={12} className="text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity ml-1.5 flex-shrink-0 text-primary dark:text-indigo-400" />
+                                                            <Icon name="Pencil" size={12} className="text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity ml-1.5 flex-shrink-0 text-primary dark:text-emerald-400" />
                                                         </div>
                                                     </div>
                                                 );
@@ -225,7 +225,7 @@ const AccountCard: React.FC<{
         
         switch (account.type) {
             case 'Savings':
-                cardClass = "bg-gradient-to-br from-indigo-600 to-blue-700 shadow-md text-white hover:brightness-105";
+                cardClass = "bg-gradient-to-br from-emerald-600 to-blue-700 shadow-md text-white hover:brightness-105";
                 break;
             case 'Credit Card':
                 cardClass = "bg-gradient-to-br from-gray-800 via-gray-900 to-slate-950 shadow-md text-white hover:brightness-105";
@@ -234,7 +234,7 @@ const AccountCard: React.FC<{
                 cardClass = "bg-gradient-to-br from-teal-600 to-emerald-700 shadow-md text-white hover:brightness-105";
                 break;
             case 'Investment':
-                cardClass = "bg-gradient-to-br from-purple-600 to-indigo-700 shadow-md text-white hover:brightness-105";
+                cardClass = "bg-gradient-to-br from-purple-600 to-emerald-700 shadow-md text-white hover:brightness-105";
                 break;
             case 'Loan':
                 cardClass = "bg-gradient-to-br from-rose-800 to-red-950 shadow-md text-white hover:brightness-105";
@@ -485,13 +485,13 @@ export const Accounts: React.FC = () => {
                         </div>
                     </Card>
 
-                    <Card className="flex items-center p-6 bg-gradient-to-br from-primary-light/30 to-indigo-50/10 dark:from-indigo-950/20 dark:to-gray-800/40">
+                    <Card className="flex items-center p-6 bg-gradient-to-br from-primary-light/30 to-emerald-50/10 dark:from-emerald-950/20 dark:to-gray-800/40">
                         <div className="w-12 h-12 rounded-xl bg-primary-light dark:bg-primary/20 flex items-center justify-center mr-4">
-                            <Icon name="Landmark" className="text-primary dark:text-indigo-300" size={24} />
+                            <Icon name="Landmark" className="text-primary dark:text-emerald-300" size={24} />
                         </div>
                         <div>
                             <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Current Balance</h4>
-                            <p className="text-2xl font-bold mt-1 text-primary dark:text-indigo-400">
+                            <p className="text-2xl font-bold mt-1 text-primary dark:text-emerald-400">
                                 {formatCurrency(totalBalance, currency)}
                             </p>
                         </div>
@@ -513,7 +513,7 @@ export const Accounts: React.FC = () => {
                     {accounts.length === 0 ? (
                         <Card className="flex flex-col items-center justify-center text-center py-16">
                             <div className="w-16 h-16 rounded-2xl bg-primary-light dark:bg-primary/20 flex items-center justify-center mb-4">
-                                <Icon name="Landmark" className="text-primary dark:text-indigo-400" size={32} />
+                                <Icon name="Landmark" className="text-primary dark:text-emerald-400" size={32} />
                             </div>
                             <h4 className="text-lg font-bold text-gray-darkest dark:text-gray-100">No accounts yet</h4>
                             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 max-w-xs">
@@ -523,7 +523,7 @@ export const Accounts: React.FC = () => {
                     ) : activeAccounts.length === 0 ? (
                         <Card className="flex flex-col items-center justify-center text-center py-16">
                             <div className="w-16 h-16 rounded-2xl bg-primary-light dark:bg-primary/20 flex items-center justify-center mb-4">
-                                <Icon name="Snowflake" className="text-primary dark:text-indigo-400" size={32} />
+                                <Icon name="Snowflake" className="text-primary dark:text-emerald-400" size={32} />
                             </div>
                             <h4 className="text-lg font-bold text-gray-darkest dark:text-gray-100">All accounts are frozen</h4>
                             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 max-w-xs">
