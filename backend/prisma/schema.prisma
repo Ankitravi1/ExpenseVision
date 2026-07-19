@@ -23,6 +23,8 @@ model User {
   // Billing tier. Controls how much host-funded (platform-key) AI a user gets
   // per day. Users on their own key are unlimited and don't touch this.
   plan            String   @default("free") // free | pro
+  // When set, Pro access ends at this time (payment webhook sets it). Null = no expiry.
+  planExpiresAt   DateTime?
 
   // Auth fields
   emailVerified       Boolean   @default(false)

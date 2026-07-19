@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { resolveAiForUser, GENERIC_AI_UNAVAILABLE, checkAndCountPlatformUsage } from './aiSettings.js';
+import { isPro, UPGRADE_REQUIRED_AI_IMPORT } from '../lib/entitlements.js';
 import { syncAccountBalances } from './accounts.js';
 
 const router = Router();
@@ -399,6 +400,10 @@ router.post('/parse-statement', async (req, res, next) => {
         if (!text || text.trim().length < 10) {
             return res.status(400).json({ error: 'Please enter statement text to parse' });
         }
+        // Bound the input server-side (not just in the client) to cap AI cost/abuse.
+        if (typeof text !== 'string' || text.length > 100000) {
+            return res.status(413).json({ error: 'Statement is too large. Please split it into smaller parts and import again.' });
+        }
 
         // Resolve which AI key to use (the user's own, or the host/platform key
         // they rely on by default) — see resolveAiForUser in aiSettings.
@@ -407,6 +412,19 @@ router.post('/parse-statement', async (req, res, next) => {
             return res.status(resolution.status).json({ error: resolution.error });
         }
         const ai = resolution.config;
+
+        // AI statement import on the host/platform key is a Pro feature. Own-key
+        // users (self-host / BYO) always have it. Free platform users get a
+        // legitimate upgrade prompt (not the generic "unavailable" mask).
+        if (ai.source === 'platform') {
+            const user = await prisma.user.findUnique({ where: { id: userId }, select: { plan: true } });
+            if (!isPro(user)) {
+                return res.status(403).json({ error: UPGRADE_REQUIRED_AI_IMPORT });
+            }
+            // Host-funded usage is still capped per day to protect the AI bill.
+            const usage = await checkAndCountPlatformUsage(prisma, userId, 'import');
+            if (!usage.ok) return res.status(usage.status).json({ error: usage.error });
+        }
 
         const [accounts, categories] = await Promise.all([
             prisma.account.findMany({ where: { userId }, select: { id: true, name: true, type: true } }),

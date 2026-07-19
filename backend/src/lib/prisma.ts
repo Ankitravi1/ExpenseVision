@@ -54,3 +54,8 @@ export const prisma = prismaClient.$extends({
     },
   },
 });
+
+// The `$extends` above changes the client's type (computed Decimal→number fields,
+// and it drops `$on`/`$use`). Helpers that receive the shared client should be
+// typed against THIS type, not the base `PrismaClient`, or TS will reject the call.
+export type ExtendedPrismaClient = typeof prisma;

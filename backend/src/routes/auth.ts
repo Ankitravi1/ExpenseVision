@@ -1,6 +1,5 @@
 import express from 'express';
 import { z } from 'zod';
-import { PrismaClient } from '@prisma/client';
 import { hashPassword, comparePassword, generateToken, generateRefreshToken } from '../utils/auth';
 import { OAuth2Client } from 'google-auth-library';
 import crypto from 'crypto';
@@ -8,13 +7,13 @@ import { sendVerificationEmail, sendPasswordResetEmail, isEmailEnabled } from '.
 import speakeasy from 'speakeasy';
 import qrcode from 'qrcode';
 import { authLimiter } from '../middleware/rateLimit';
-import { prisma } from '../lib/prisma';
+import { prisma, type ExtendedPrismaClient } from '../lib/prisma';
 
 const router = express.Router();
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // Helper to seed default data for new users
-const seedUserData = async (userId: string, prismaClient: PrismaClient) => {
+const seedUserData = async (userId: string, prismaClient: ExtendedPrismaClient) => {
     const defaultCategories = [
         { name: 'Salary', type: 'income', icon: 'Wallet' },
         { name: 'Freelance', type: 'income', icon: 'Briefcase' },

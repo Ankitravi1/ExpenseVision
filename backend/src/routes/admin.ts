@@ -6,8 +6,10 @@ import { encrypt, decrypt } from './aiSettings.js';
 
 const router = Router();
 
-// The one designated superadmin email — cannot be deleted or demoted
-const SUPERADMIN_EMAIL = 'ankitravione@gmail.com';
+// The one designated superadmin email — cannot be deleted or demoted.
+// Overridable via env so it can change without a code edit; the current value
+// remains the default.
+const SUPERADMIN_EMAIL = process.env.SUPERADMIN_EMAIL || 'ankitravione@gmail.com';
 
 // Middleware to verify the user is THE superadmin
 const requireSuperAdmin = async (req: any, res: any, next: any) => {

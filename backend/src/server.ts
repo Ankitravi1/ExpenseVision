@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import { prisma } from './lib/prisma.js';
 import transactionsRouter from './routes/transactions.js';
 import accountsRouter from './routes/accounts.js';
@@ -21,12 +22,33 @@ import { openApiSpec } from './docs/openapi.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const isProd = process.env.NODE_ENV === 'production';
+
+// Fail fast on missing critical secrets so we never boot an insecure server in
+// production (in dev we only warn, to keep the first-run experience friction-free).
+const requiredSecrets = ['JWT_SECRET', 'AI_SETTINGS_SECRET'];
+const missingSecrets = requiredSecrets.filter(k => !process.env[k]);
+if (missingSecrets.length) {
+    const msg = `Missing required env var(s): ${missingSecrets.join(', ')}`;
+    if (isProd) {
+        console.error(`❌ ${msg}. Refusing to start.`);
+        process.exit(1);
+    } else {
+        console.warn(`⚠️  ${msg}. Some features will be disabled until set.`);
+    }
+}
 
 // Trust the proxy to ensure rate limiting uses the real client IP (X-Forwarded-For)
 // rather than instantly blocking the Vite dev server proxy (127.0.0.1).
 app.set('trust proxy', 1);
 
-// CORS: allow local dev origins + any extras from env (e.g. LAN IP for mobile dev)
+// Security headers. CSP is disabled because this process only serves a JSON API
+// (+ Swagger UI, which its own inline assets would otherwise violate); the web
+// app is served separately and gets its own CSP from the reverse proxy.
+app.use(helmet({ contentSecurityPolicy: false }));
+
+// CORS: in production, ONLY the explicitly configured origins are allowed. In
+// dev we additionally allow localhost + private LAN ranges (for mobile testing).
 const extraOrigins = (process.env.CORS_ORIGINS || '')
     .split(',')
     .map(o => o.trim())
@@ -35,6 +57,7 @@ const extraOrigins = (process.env.CORS_ORIGINS || '')
 const allowedOrigin = (origin: string | undefined): boolean => {
     if (!origin) return true; // same-origin, curl, native mobile apps
     if (extraOrigins.includes(origin)) return true;
+    if (isProd) return false; // prod: nothing beyond the configured allow-list
     try {
         const { hostname } = new URL(origin);
         return (
@@ -54,7 +77,8 @@ app.use(cors({
         callback(null, allowedOrigin(origin));
     }
 }));
-app.use(express.json());
+// Body-size limit bounds abuse/DoS on JSON endpoints (statements are text).
+app.use(express.json({ limit: '5mb' }));
 
 // Make prisma available to routes
 app.use((req, res, next) => {
