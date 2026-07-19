@@ -1,0 +1,6 @@
+# Files that run on Linux (containers / the VM) must keep LF endings even when
+# checked out on Windows — CRLF breaks bash shebangs and Docker RUN steps.
+*.sh            text eol=lf
+Dockerfile      text eol=lf
+Caddyfile       text eol=lf
+*.dockerignore  text eol=lf
