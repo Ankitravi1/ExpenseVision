@@ -1,0 +1,57 @@
+# Production stack for a single VM (e.g. Oracle Ampere A1 Ubuntu).
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Required env (put in a root `.env` next to this file — git-ignored):
+#   POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB
+#   SITE_ADDRESS         e.g. expensevision.net
+#   VITE_GOOGLE_CLIENT_ID (optional, build-time)
+# The backend reads its own secrets from ./backend/.env.prod (see .env.example).
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    restart: always
+    env_file:
+      - ./backend/.env.prod
+    depends_on:
+      postgres:
+        condition: service_healthy
+    expose:
+      - '5000'
+
+  web:
+    build:
+      context: ./web
+      args:
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
+    restart: always
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS}
+    depends_on:
+      - backend
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
