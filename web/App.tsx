@@ -16,6 +16,7 @@ import { Profile } from './pages/Profile';
 import { Settings } from './pages/Settings';
 import { Admin } from './pages/Admin';
 import { LandingPage } from './pages/LandingPage';
+import { AboutPage, DocsPage, PrivacyPage, TermsPage } from './pages/public/InfoPages';
 import { Login } from './pages/Login';
 import { Signup } from './pages/Signup';
 import { VerifyEmail } from './pages/VerifyEmail';
@@ -551,6 +552,10 @@ const App: React.FC = () => {
             onSignupClick={() => navigate('/signup')}
           />
         } />
+        <Route path="/about" element={<AboutPage />} />
+        <Route path="/docs" element={<DocsPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="/terms" element={<TermsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     );
